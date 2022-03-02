@@ -1,50 +1,44 @@
 /**
-* This file is part of DSO.
-* 
-* Copyright 2016 Technical University of Munich and Intel.
-* Developed by Jakob Engel <engelj at in dot tum dot de>,
-* for more information see <http://vision.in.tum.de/dso>.
-* If you use this code, please cite the respective publications as
-* listed on the above website.
-*
-* DSO is free software: you can redistribute it and/or modify
-* it under the terms of the GNU General Public License as published by
-* the Free Software Foundation, either version 3 of the License, or
-* (at your option) any later version.
-*
-* DSO is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-* GNU General Public License for more details.
-*
-* You should have received a copy of the GNU General Public License
-* along with DSO. If not, see <http://www.gnu.org/licenses/>.
-*/
-
+ * This file is part of DSO.
+ * 
+ * Copyright 2016 Technical University of Munich and Intel.
+ * Developed by Jakob Engel <engelj at in dot tum dot de>,
+ * for more information see <http://vision.in.tum.de/dso>.
+ * If you use this code, please cite the respective publications as
+ * listed on the above website.
+ *
+ * DSO is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * DSO is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with DSO. If not, see <http://www.gnu.org/licenses/>.
+ */
 
 #pragma once
 #define MAX_ACTIVE_FRAMES 100
 
- 
 #include "util/globalCalib.h"
 #include "vector"
- 
+
 #include <iostream>
 #include <fstream>
 #include "util/NumType.h"
 #include "FullSystem/Residuals.h"
 #include "util/ImageAndExposure.h"
 
-
-namespace dso
-{
-
+namespace dso {
 
 inline Vec2 affFromTo(const Vec2 &from, const Vec2 &to)	// contains affine parameters as XtoWorld.
-{
+		{
 	return Vec2(from[0] / to[0], (from[1] - to[1]) / to[0]);
 }
-
 
 struct FrameHessian;
 struct PointHessian;
@@ -73,14 +67,13 @@ class EFPoint;
 #define SCALE_A_INVERSE (1.0f / SCALE_A)
 #define SCALE_B_INVERSE (1.0f / SCALE_B)
 
-
-struct FrameFramePrecalc
-{
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+struct FrameFramePrecalc {
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	;
 	// static values
 	static int instanceCounter;
-	FrameHessian* host;	// defines row
-	FrameHessian* target;	// defines column
+	FrameHessian *host;	// defines row
+	FrameHessian *target;	// defines column
 
 	// precalc values
 	Mat33f PRE_RTll;
@@ -97,33 +90,26 @@ struct FrameFramePrecalc
 
 	float distanceLL;
 
-
-    inline ~FrameFramePrecalc() {}
-    inline FrameFramePrecalc() {host=target=0;}
-	void set(FrameHessian* host, FrameHessian* target, CalibHessian* HCalib);
+	inline ~FrameFramePrecalc() {
+	}
+	inline FrameFramePrecalc() {
+		host = target = 0;
+	}
+	void set(FrameHessian *host, FrameHessian *target, CalibHessian *HCalib);
 };
 
-
-
-
-
-struct FrameHessian
-{
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-	EFFrame* efFrame;
+struct FrameHessian {
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	;
+	EFFrame *efFrame;
 
 	// constant info & pre-calculated values
 	//DepthImageWrap* frame;
-	FrameShell* shell;
+	FrameShell *shell;
 
-	Eigen::Vector3f* dI;				 // trace, fine tracking. Used for direction select (not for gradient histograms etc.)
-	Eigen::Vector3f* dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.
-	float* absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
-
-
-
-
-
+	Eigen::Vector3f *dI;				 // trace, fine tracking. Used for direction select (not for gradient histograms etc.)
+	Eigen::Vector3f *dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.
+	float *absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
 
 	int frameID;						// incremental ID for keyframes only!
 	static int instanceCounter;
@@ -136,10 +122,9 @@ struct FrameHessian
 	bool flaggedForMarginalization;
 
 	std::vector<PointHessian*> pointHessians;				// contains all ACTIVE points.
-	std::vector<PointHessian*> pointHessiansMarginalized;	// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
+	std::vector<PointHessian*> pointHessiansMarginalized;// contains all MARGINALIZED points (= fully marginalized, usually because point went OOB.)
 	std::vector<PointHessian*> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
 	std::vector<ImmaturePoint*> immaturePoints;		// contains all OUTLIER points (= discarded.).
-
 
 	Mat66 nullspaces_pose;
 	Mat42 nullspaces_affine;
@@ -154,30 +139,40 @@ struct FrameHessian
 	Vec10 step_backup;
 	Vec10 state_backup;
 
-
-    EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return worldToCam_evalPT;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state_zero() const {return state_zero;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state() const {return state;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state_scaled() const {return state_scaled;}
-    EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const {return get_state() - get_state_zero();}
-
+	EIGEN_STRONG_INLINE const SE3& get_worldToCam_evalPT() const {
+		return worldToCam_evalPT;
+	}
+	EIGEN_STRONG_INLINE const Vec10& get_state_zero() const {
+		return state_zero;
+	}
+	EIGEN_STRONG_INLINE const Vec10& get_state() const {
+		return state;
+	}
+	EIGEN_STRONG_INLINE const Vec10& get_state_scaled() const {
+		return state_scaled;
+	}
+	EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const {
+		return get_state() - get_state_zero();
+	}
 
 	// precalc values
 	SE3 PRE_worldToCam;
 	SE3 PRE_camToWorld;
-	std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
-	MinimalImageB3* debugImage;
+	std::vector<FrameFramePrecalc, Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
+	MinimalImageB3 *debugImage;
 
-
-    inline Vec6 w2c_leftEps() const {return get_state_scaled().head<6>();}
-    inline AffLight aff_g2l() const {return AffLight(get_state_scaled()[6], get_state_scaled()[7]);}
-    inline AffLight aff_g2l_0() const {return AffLight(get_state_zero()[6]*SCALE_A, get_state_zero()[7]*SCALE_B);}
-
-
+	inline Vec6 w2c_leftEps() const {
+		return get_state_scaled().head<6>();
+	}
+	inline AffLight aff_g2l() const {
+		return AffLight(get_state_scaled()[6], get_state_scaled()[7]);
+	}
+	inline AffLight aff_g2l_0() const {
+		return AffLight(get_state_zero()[6] * SCALE_A, get_state_zero()[7] * SCALE_B);
+	}
 
 	void setStateZero(const Vec10 &state_zero);
-	inline void setState(const Vec10 &state)
-	{
+	inline void setState(const Vec10 &state) {
 
 		this->state = state;
 		state_scaled.segment<3>(0) = SCALE_XI_TRANS * state.segment<3>(0);
@@ -190,9 +185,9 @@ struct FrameHessian
 		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
 		PRE_camToWorld = PRE_worldToCam.inverse();
 		//setCurrentNullspace();
-	};
-	inline void setStateScaled(const Vec10 &state_scaled)
-	{
+	}
+	;
+	inline void setStateScaled(const Vec10 &state_scaled) {
 
 		this->state_scaled = state_scaled;
 		state.segment<3>(0) = SCALE_XI_TRANS_INVERSE * state_scaled.segment<3>(0);
@@ -205,80 +200,72 @@ struct FrameHessian
 		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
 		PRE_camToWorld = PRE_worldToCam.inverse();
 		//setCurrentNullspace();
-	};
-	inline void setEvalPT(const SE3 &worldToCam_evalPT, const Vec10 &state)
-	{
+	}
+	;
+	inline void setEvalPT(const SE3 &worldToCam_evalPT, const Vec10 &state) {
 
 		this->worldToCam_evalPT = worldToCam_evalPT;
 		setState(state);
 		setStateZero(state);
-	};
+	}
+	;
 
-
-
-	inline void setEvalPT_scaled(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l)
-	{
+	inline void setEvalPT_scaled(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l) {
 		Vec10 initial_state = Vec10::Zero();
 		initial_state[6] = aff_g2l.a;
 		initial_state[7] = aff_g2l.b;
 		this->worldToCam_evalPT = worldToCam_evalPT;
 		setStateScaled(initial_state);
 		setStateZero(this->get_state());
-	};
+	}
+	;
 
 	void release();
 
-	inline ~FrameHessian()
-	{
+	inline ~FrameHessian() {
 		assert(efFrame==0);
-		release(); instanceCounter--;
-		for(int i=0;i<pyrLevelsUsed;i++)
-		{
+		release();
+		instanceCounter--;
+		for (int i = 0; i < pyrLevelsUsed; i++) {
 			delete[] dIp[i];
-			delete[]  absSquaredGrad[i];
+			delete[] absSquaredGrad[i];
 
 		}
 
-
-
-		if(debugImage != 0) delete debugImage;
-	};
-	inline FrameHessian()
-	{
+		if (debugImage != 0)
+			delete debugImage;
+	}
+	;
+	inline FrameHessian() {
 		instanceCounter++;
-		flaggedForMarginalization=false;
+		flaggedForMarginalization = false;
 		frameID = -1;
 		efFrame = 0;
-		frameEnergyTH = 8*8*patternNum;
+		frameEnergyTH = 8 * 8 * patternNum;
 
+		debugImage = 0;
+	}
+	;
 
+	void makeImages(float *color, CalibHessian *HCalib);
 
-		debugImage=0;
-	};
-
-
-    void makeImages(float* color, CalibHessian* HCalib);
-
-	inline Vec10 getPrior()
-	{
-		Vec10 p =  Vec10::Zero();
-		if(frameID==0)
-		{
+	inline Vec10 getPrior() {
+		Vec10 p = Vec10::Zero();
+		if (frameID == 0) {
 			p.head<3>() = Vec3::Constant(setting_initialTransPrior);
 			p.segment<3>(3) = Vec3::Constant(setting_initialRotPrior);
-			if(setting_solverMode & SOLVER_REMOVE_POSEPRIOR) p.head<6>().setZero();
+			if (setting_solverMode & SOLVER_REMOVE_POSEPRIOR)
+				p.head<6>().setZero();
 
 			p[6] = setting_initialAffAPrior;
 			p[7] = setting_initialAffBPrior;
-		}
-		else
-		{
-			if(setting_affineOptModeA < 0)
+		} else {
+			if (setting_affineOptModeA < 0)
 				p[6] = setting_initialAffAPrior;
 			else
 				p[6] = setting_affineOptModeA;
 
-			if(setting_affineOptModeB < 0)
+			if (setting_affineOptModeB < 0)
 				p[7] = setting_initialAffBPrior;
 			else
 				p[7] = setting_affineOptModeB;
@@ -288,17 +275,15 @@ struct FrameHessian
 		return p;
 	}
 
-
-	inline Vec10 getPriorZero()
-	{
+	inline Vec10 getPriorZero() {
 		return Vec10::Zero();
 	}
 
 };
 
-struct CalibHessian
-{
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+struct CalibHessian {
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	;
 	static int instanceCounter;
 
 	VecC value_zero;
@@ -311,9 +296,10 @@ struct CalibHessian
 	VecC value_backup;
 	VecC value_minus_value_zero;
 
-    inline ~CalibHessian() {instanceCounter--;}
-	inline CalibHessian()
-	{
+	inline ~CalibHessian() {
+		instanceCounter--;
+	}
+	inline CalibHessian() {
 
 		VecC initial_value = VecC::Zero();
 		initial_value[0] = fxG[0];
@@ -326,25 +312,38 @@ struct CalibHessian
 		value_minus_value_zero.setZero();
 
 		instanceCounter++;
-		for(int i=0;i<256;i++)
+		for (int i = 0; i < 256; i++)
 			Binv[i] = B[i] = i;		// set gamma function to identity
-	};
-
+	}
+	;
 
 	// normal mode: use the optimized parameters everywhere!
-    inline float& fxl() {return value_scaledf[0];}
-    inline float& fyl() {return value_scaledf[1];}
-    inline float& cxl() {return value_scaledf[2];}
-    inline float& cyl() {return value_scaledf[3];}
-    inline float& fxli() {return value_scaledi[0];}
-    inline float& fyli() {return value_scaledi[1];}
-    inline float& cxli() {return value_scaledi[2];}
-    inline float& cyli() {return value_scaledi[3];}
+	inline float& fxl() {
+		return value_scaledf[0];
+	}
+	inline float& fyl() {
+		return value_scaledf[1];
+	}
+	inline float& cxl() {
+		return value_scaledf[2];
+	}
+	inline float& cyl() {
+		return value_scaledf[3];
+	}
+	inline float& fxli() {
+		return value_scaledi[0];
+	}
+	inline float& fyli() {
+		return value_scaledi[1];
+	}
+	inline float& cxli() {
+		return value_scaledi[2];
+	}
+	inline float& cyli() {
+		return value_scaledi[3];
+	}
 
-
-
-	inline void setValue(const VecC &value)
-	{
+	inline void setValue(const VecC &value) {
 		// [0-3: Kl, 4-7: Kr, 8-12: l2r]
 		this->value = value;
 		value_scaled[0] = SCALE_F * value[0];
@@ -355,13 +354,13 @@ struct CalibHessian
 		this->value_scaledf = this->value_scaled.cast<float>();
 		this->value_scaledi[0] = 1.0f / this->value_scaledf[0];
 		this->value_scaledi[1] = 1.0f / this->value_scaledf[1];
-		this->value_scaledi[2] = - this->value_scaledf[2] / this->value_scaledf[0];
-		this->value_scaledi[3] = - this->value_scaledf[3] / this->value_scaledf[1];
+		this->value_scaledi[2] = -this->value_scaledf[2] / this->value_scaledf[0];
+		this->value_scaledi[3] = -this->value_scaledf[3] / this->value_scaledf[1];
 		this->value_minus_value_zero = this->value - this->value_zero;
-	};
+	}
+	;
 
-	inline void setValueScaled(const VecC &value_scaled)
-	{
+	inline void setValueScaled(const VecC &value_scaled) {
 		this->value_scaled = value_scaled;
 		this->value_scaledf = this->value_scaled.cast<float>();
 		value[0] = SCALE_F_INVERSE * value_scaled[0];
@@ -372,50 +371,48 @@ struct CalibHessian
 		this->value_minus_value_zero = this->value - this->value_zero;
 		this->value_scaledi[0] = 1.0f / this->value_scaledf[0];
 		this->value_scaledi[1] = 1.0f / this->value_scaledf[1];
-		this->value_scaledi[2] = - this->value_scaledf[2] / this->value_scaledf[0];
-		this->value_scaledi[3] = - this->value_scaledf[3] / this->value_scaledf[1];
-	};
-
+		this->value_scaledi[2] = -this->value_scaledf[2] / this->value_scaledf[0];
+		this->value_scaledi[3] = -this->value_scaledf[3] / this->value_scaledf[1];
+	}
+	;
 
 	float Binv[256];
 	float B[256];
 
-
-	EIGEN_STRONG_INLINE float getBGradOnly(float color)
-	{
-		int c = color+0.5f;
-		if(c<5) c=5;
-		if(c>250) c=250;
-		return B[c+1]-B[c];
+	EIGEN_STRONG_INLINE float getBGradOnly(float color) {
+		int c = color + 0.5f;
+		if (c < 5)
+			c = 5;
+		if (c > 250)
+			c = 250;
+		return B[c + 1] - B[c];
 	}
 
-	EIGEN_STRONG_INLINE float getBInvGradOnly(float color)
-	{
-		int c = color+0.5f;
-		if(c<5) c=5;
-		if(c>250) c=250;
-		return Binv[c+1]-Binv[c];
+	EIGEN_STRONG_INLINE float getBInvGradOnly(float color) {
+		int c = color + 0.5f;
+		if (c < 5)
+			c = 5;
+		if (c > 250)
+			c = 250;
+		return Binv[c + 1] - Binv[c];
 	}
 };
 
-
 // hessian component associated with one point.
-struct PointHessian
-{
-	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+struct PointHessian {
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	;
 	static int instanceCounter;
-	EFPoint* efPoint;
+	EFPoint *efPoint;
 
 	// static values
 	float color[MAX_RES_PER_POINT];			// colors in host frame
 	float weights[MAX_RES_PER_POINT];		// host-weights for respective residuals.
 
-
-
-	float u,v;
+	float u, v;
 	int idx;
 	float energyTH;
-	FrameHessian* host;
+	FrameHessian *host;
 	bool hasDepthPrior;
 
 	float my_type;
@@ -433,73 +430,68 @@ struct PointHessian
 	float maxRelBaseline;
 	int numGoodResiduals;
 
-	enum PtStatus {ACTIVE=0, INACTIVE, OUTLIER, OOB, MARGINALIZED};
+	enum PtStatus {
+		ACTIVE = 0, INACTIVE, OUTLIER, OOB, MARGINALIZED
+	};
 	PtStatus status;
 
-    inline void setPointStatus(PtStatus s) {status=s;}
-
+	inline void setPointStatus(PtStatus s) {
+		status = s;
+	}
 
 	inline void setIdepth(float idepth) {
 		this->idepth = idepth;
 		this->idepth_scaled = SCALE_IDEPTH * idepth;
-    }
+	}
 	inline void setIdepthScaled(float idepth_scaled) {
 		this->idepth = SCALE_IDEPTH_INVERSE * idepth_scaled;
 		this->idepth_scaled = idepth_scaled;
-    }
+	}
 	inline void setIdepthZero(float idepth) {
 		idepth_zero = idepth;
 		idepth_zero_scaled = SCALE_IDEPTH * idepth;
-		nullspaces_scale = -(idepth*1.001 - idepth/1.001)*500;
-    }
+		nullspaces_scale = -(idepth * 1.001 - idepth / 1.001) * 500;
+	}
 
-
-	std::vector<PointFrameResidual*> residuals;					// only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
-	std::pair<PointFrameResidual*, ResState> lastResiduals[2]; 	// contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
-
+	std::vector<PointFrameResidual*> residuals;			// only contains good residuals (not OOB and not OUTLIER). Arbitrary order.
+	std::pair<PointFrameResidual*, ResState> lastResiduals[2]; // contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
 
 	void release();
-	PointHessian(const ImmaturePoint* const rawPoint, CalibHessian* Hcalib);
-    inline ~PointHessian() {assert(efPoint==0); release(); instanceCounter--;}
+	PointHessian(const ImmaturePoint *const rawPoint, CalibHessian *Hcalib);
+	inline ~PointHessian() {
+		assert(efPoint==0);
+		release();
+		instanceCounter--;
+	}
 
-
-	inline bool isOOB(const std::vector<FrameHessian*>& toKeep, const std::vector<FrameHessian*>& toMarg) const
-	{
+	inline bool isOOB(const std::vector<FrameHessian*> &toKeep, const std::vector<FrameHessian*> &toMarg) const {
 
 		int visInToMarg = 0;
-		for(PointFrameResidual* r : residuals)
-		{
-			if(r->state_state != ResState::IN) continue;
-			for(FrameHessian* k : toMarg)
-				if(r->target == k) visInToMarg++;
+		for (PointFrameResidual *r : residuals) {
+			if (r->state_state != ResState::IN)
+				continue;
+			for (FrameHessian *k : toMarg)
+				if (r->target == k)
+					visInToMarg++;
 		}
-		if((int)residuals.size() >= setting_minGoodActiveResForMarg &&
-				numGoodResiduals > setting_minGoodResForMarg+10 &&
-				(int)residuals.size()-visInToMarg < setting_minGoodActiveResForMarg)
+		if ((int) residuals.size() >= setting_minGoodActiveResForMarg && numGoodResiduals > setting_minGoodResForMarg + 10
+				&& (int) residuals.size() - visInToMarg < setting_minGoodActiveResForMarg)
 			return true;
 
-
-
-
-
-		if(lastResiduals[0].second == ResState::OOB) return true;
-		if(residuals.size() < 2) return false;
-		if(lastResiduals[0].second == ResState::OUTLIER && lastResiduals[1].second == ResState::OUTLIER) return true;
+		if (lastResiduals[0].second == ResState::OOB)
+			return true;
+		if (residuals.size() < 2)
+			return false;
+		if (lastResiduals[0].second == ResState::OUTLIER && lastResiduals[1].second == ResState::OUTLIER)
+			return true;
 		return false;
 	}
 
-
-	inline bool isInlierNew()
-	{
-		return (int)residuals.size() >= setting_minGoodActiveResForMarg
-                    && numGoodResiduals >= setting_minGoodResForMarg;
+	inline bool isInlierNew() {
+		return (int) residuals.size() >= setting_minGoodActiveResForMarg && numGoodResiduals >= setting_minGoodResForMarg;
 	}
 
 };
-
-
-
-
 
 }
 
