@@ -66,7 +66,7 @@ void EnergyFunctional::setAdjointsF(CalibHessian *Hcalib) {
 			AT(6, 6) = -affLL[0];
 			AH(6, 6) = affLL[0];
 			AT(7, 7) = -1;
-			AH(7, 7) = affLL[0];
+			AH(7, 7) = affLL[0];  // surely should be B?
 
 			AH.block<3, 8>(0, 0) *= SCALE_XI_TRANS;
 			AH.block<3, 8>(3, 0) *= SCALE_XI_ROT;
@@ -252,7 +252,7 @@ void EnergyFunctional::resubstituteF_MT(VecX x, CalibHessian *HCalib, bool MT) {
 	delete[] xAd;
 }
 
-void EnergyFunctional::resubstituteFPt(const VecCf &xc, Mat18f *xAd, int min, int max, Vec10 *stats, int tid) {
+void EnergyFunctional::resubstituteFPt(const VecCf &cstep, Mat18f *xAd, int min, int max, Vec10 *stats, int tid) {
 	for (int k = min; k < max; k++) {
 		EFPoint *p = allPoints[k];
 
@@ -265,7 +265,7 @@ void EnergyFunctional::resubstituteFPt(const VecCf &xc, Mat18f *xAd, int min, in
 			continue;
 		}
 		float b = p->bdSumF;
-		b -= xc.dot(p->Hcd_accAF + p->Hcd_accLF);
+		b -= cstep.dot(p->Hcd_accAF + p->Hcd_accLF);
 
 		for (EFResidual *r : p->residualsAll) {
 			if (!r->isActive())
@@ -326,12 +326,12 @@ void EnergyFunctional::calcLEnergyPt(int min, int max, Vec10 *stats, int tid) {
 				r0 = _mm_add_ps(r0, r0);
 				r0 = _mm_add_ps(r0, Jdelta);
 				Jdelta = _mm_mul_ps(Jdelta, r0);
-				E.updateSSENoShift(Jdelta);
+				E.updateSSE(Jdelta);
 			}
 			for (int i = ((patternNum >> 2) << 2); i < patternNum; i++) {
 				float Jdelta = rJ->JIdx[0][i] * Jp_delta_x_1 + rJ->JIdx[1][i] * Jp_delta_y_1 + rJ->JabF[0][i] * dp[6]
 						+ rJ->JabF[1][i] * dp[7];
-				E.updateSingleNoShift((float) (Jdelta * (Jdelta + 2 * r->res_toZeroF[i])));
+				E.updateSingle((float) (Jdelta * (Jdelta + 2 * r->res_toZeroF[i])));
 			}
 		}
 		E.updateSingle(p->deltaF * p->deltaF * p->priorF);
@@ -435,8 +435,8 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 	assert(EFIndicesValid);
 
 	assert((int)fh->points.size()==0);
-	int ndim = nFrames * 8 + CPARS - 8; // new dimension
-	int odim = nFrames * 8 + CPARS; // old dimension
+	int ndim = nFrames * 8 + CPARS - 8;  // new dimension
+	int odim = nFrames * 8 + CPARS;  // old dimension
 
 //	VecX eigenvaluesPre = HM.eigenvalues().real();
 //	std::sort(eigenvaluesPre.data(), eigenvaluesPre.data()+eigenvaluesPre.size());
@@ -658,8 +658,10 @@ void EnergyFunctional::orthogonalize(VecX *b, MatXX *H) {
 
 	MatXX Npi = svdNN.matrixU() * SNN.asDiagonal() * svdNN.matrixV().transpose(); 	// [dim] x 9.
 	MatXX NNpiT = N * Npi.transpose(); 	// [dim] x [dim].
+			// N * N Pseudo Inverse Transposed. Made Symetric!?
 	MatXX NNpiTS = 0.5 * (NNpiT + NNpiT.transpose());	// = N * (N' * N)^-1 * N'.
 
+	// remove the influence of null space
 	if (b != 0)
 		*b -= NNpiTS * *b;
 	if (H != 0)

@@ -33,7 +33,7 @@
 namespace dso {
 
 template<int mode>
-void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *const ef, int tid)// 0 = active, 1 = linearized, 2=marginalize
+void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *const ef, int tid) // 0 = active, 1 = linearized, 2=marginalize
 		{
 
 	assert(mode==0 || mode==1 || mode==2);

@@ -74,7 +74,9 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	bool isNew;
 
+	// All pattern pixel coords from projection into target frame using PRE_ pose estimate. Assigned in PointFrameResidual::linearize())
 	Eigen::Vector2f projectedTo[MAX_RES_PER_POINT];
+	// Center pixel coords from projection into target frame using PRE_ pose estimate. Assigned in PointFrameResidual::linearize())
 	Vec3f centerProjectedTo;
 
 	~PointFrameResidual();

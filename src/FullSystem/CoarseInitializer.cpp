@@ -103,7 +103,6 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, std::vector<IO
 	if (firstFrame->ab_exposure > 0 && newFrame->ab_exposure > 0)
 		refToNew_aff_current = AffLight(logf(newFrame->ab_exposure / firstFrame->ab_exposure), 0); // coarse approximation.
 
-	Vec3f latestRes = Vec3f::Zero();
 	for (int lvl = pyrLevelsUsed - 1; lvl >= 0; lvl--) {
 
 		if (lvl < pyrLevelsUsed - 1)
@@ -112,7 +111,7 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, std::vector<IO
 		Mat88f H, Hsc;
 		Vec8f b, bsc;
 		resetPoints(lvl);
-		Vec3f resOld = calcResAndGS(lvl, H, b, Hsc, bsc, refToNew_current, refToNew_aff_current, false);
+		Vec3f resOld = calcResidualAndGS(lvl, H, b, Hsc, bsc, refToNew_current, refToNew_aff_current);
 		applyStep(lvl);
 
 		float lambda = 0.1;
@@ -149,12 +148,12 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, std::vector<IO
 			AffLight refToNew_aff_new = refToNew_aff_current;
 			refToNew_aff_new.a += inc[6];
 			refToNew_aff_new.b += inc[7];
-			doStep(lvl, lambda, inc);
+			doIdepthStepUpdate(lvl, lambda, inc);
 
 			Mat88f H_new, Hsc_new;
 			Vec8f b_new, bsc_new;
-			Vec3f resNew = calcResAndGS(lvl, H_new, b_new, Hsc_new, bsc_new, refToNew_new, refToNew_aff_new, false);
-			Vec3f regEnergy = calcEC(lvl);
+			Vec3f resNew = calcResidualAndGS(lvl, H_new, b_new, Hsc_new, bsc_new, refToNew_new, refToNew_aff_new);
+			Vec3f regEnergy = calcDepthRegularisationCouplingEnergy(lvl);
 
 			float eTotalNew = (resNew[0] + resNew[1] + regEnergy[1]);
 			float eTotalOld = (resOld[0] + resOld[1] + regEnergy[0]);
@@ -182,7 +181,7 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, std::vector<IO
 				refToNew_aff_current = refToNew_aff_new;
 				refToNew_current = refToNew_new;
 				applyStep(lvl);
-				optReg(lvl);
+				updateIdepthRegularisation(lvl);
 				lambda *= 0.5;
 				fails = 0;
 				if (lambda < 0.0001)
@@ -194,21 +193,12 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, std::vector<IO
 					lambda = 10000;
 			}
 
-			bool quitOpt = false;
-
 			if (!(inc.norm() > eps) || iteration >= maxIterations[lvl] || fails >= 2) {
-				Mat88f H, Hsc;
-				Vec8f b, bsc;
-
-				quitOpt = true;
+				break;
 			}
 
-			if (quitOpt)
-				break;
 			iteration++;
 		}
-		latestRes = resOld;
-
 	}
 
 	thisToNext = refToNew_current;
@@ -272,8 +262,8 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 }
 
 // calculates residual, Hessian and Hessian-block neede for re-substituting depth.
-Vec3f CoarseInitializer::calcResAndGS(int lvl, Mat88f &H_out, Vec8f &b_out, Mat88f &H_out_sc, Vec8f &b_out_sc, const SE3 &refToNew,
-		AffLight refToNew_aff, bool plot) {
+Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out, Mat88f &H_out_sc, Vec8f &b_out_sc,
+		const SE3 &refToNew, AffLight refToNew_aff) {
 	int wl = w[lvl], hl = h[lvl];
 	Eigen::Vector3f *colorRef = firstFrame->dIp[lvl];
 	Eigen::Vector3f *colorNew = newFrame->dIp[lvl];
@@ -359,16 +349,16 @@ Vec3f CoarseInitializer::calcResAndGS(int lvl, Mat88f &H_out, Vec8f &b_out, Mat8
 			if(hw < 1) hw = sqrtf(hw);
 			float dxInterp = hw*hitColor[1]*fxl;
 			float dyInterp = hw*hitColor[2]*fyl;
-			dp0[idx] = new_idepth*dxInterp;
-			dp1[idx] = new_idepth*dyInterp;
-			dp2[idx] = -new_idepth*(u*dxInterp + v*dyInterp);
-			dp3[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;
-			dp4[idx] = (1+u*u)*dxInterp + u*v*dyInterp;
-			dp5[idx] = -v*dxInterp + u*dyInterp;
-			dp6[idx] = - hw*r2new_aff[0] * rlR;
-			dp7[idx] = - hw*1;
-			dd[idx] = dxInterp * dxdd + dyInterp * dydd;
-			r[idx] = hw*residual;
+			dp0[idx] = new_idepth*dxInterp;						// dRes/dTransX - image gradient in x / depth
+			dp1[idx] = new_idepth*dyInterp;// dRes/dTransY - image gradient in y / depth
+			dp2[idx] = -new_idepth*(u*dxInterp + v*dyInterp);// dRes/dTransZ - ( x offset from image center / -depth) * image gradient in x .. + same for y
+			dp3[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;// dRes/dRotX -
+			dp4[idx] = (1+u*u)*dxInterp + u*v*dyInterp;// dRes/dRotY -
+			dp5[idx] = -v*dxInterp + u*dyInterp;// dRes/dRotZ -
+			dp6[idx] = - hw*r2new_aff[0] * rlR;// dPhotoAffineSomething...
+			dp7[idx] = - hw*1;// dPhotoAffineSomething...
+			dd[idx] = dxInterp * dxdd + dyInterp * dydd;// dRes/dInverseDepth
+			r[idx] = hw*residual;// Huber weighted residual.
 
 			float maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
 			if(maxstep < point->maxstep) point->maxstep = maxstep;
@@ -415,6 +405,7 @@ Vec3f CoarseInitializer::calcResAndGS(int lvl, Mat88f &H_out, Vec8f &b_out, Mat8
 	acc9.finish();
 
 	// calculate alpha energy, and decide if we cap it.
+	// SURELY IT SHOULD UPDATE EAlpha AND NOT E
 	Accumulator11 EAlpha;
 	EAlpha.initialize();
 	for (int i = 0; i < npts; i++) {
@@ -502,7 +493,7 @@ float CoarseInitializer::rescale() {
 	return factor;
 }
 
-Vec3f CoarseInitializer::calcEC(int lvl) {
+Vec3f CoarseInitializer::calcDepthRegularisationCouplingEnergy(int lvl) {
 	if (!snapped)
 		return Vec3f(0, 0, numPoints[lvl]);
 	AccumulatorX<2> E;
@@ -518,12 +509,11 @@ Vec3f CoarseInitializer::calcEC(int lvl) {
 
 		//printf("%f %f %f!\n", point->idepth, point->idepth_new, point->iR);
 	}
-	E.finish();
 
 	//printf("ER: %f %f %f!\n", couplingWeight*E.A1m[0], couplingWeight*E.A1m[1], (float)E.num.numIn1m);
-	return Vec3f(couplingWeight * E.A1m[0], couplingWeight * E.A1m[1], E.num);
+	return Vec3f(couplingWeight * E.A[0], couplingWeight * E.A[1], E.num);
 }
-void CoarseInitializer::optReg(int lvl) {
+void CoarseInitializer::updateIdepthRegularisation(int lvl) {
 	int npts = numPoints[lvl];
 	Pnt *ptsl = points[lvl];
 	if (!snapped) {
@@ -591,7 +581,7 @@ void CoarseInitializer::propagateUp(int srcLvl) {
 		}
 	}
 
-	optReg(srcLvl + 1);
+	updateIdepthRegularisation(srcLvl + 1);
 }
 
 void CoarseInitializer::propagateDown(int srcLvl) {
@@ -618,7 +608,7 @@ void CoarseInitializer::propagateDown(int srcLvl) {
 			point->iR = point->idepth = point->idepth_new = newiR;
 		}
 	}
-	optReg(srcLvl - 1);
+	updateIdepthRegularisation(srcLvl - 1);
 }
 
 void CoarseInitializer::makeGradients(Eigen::Vector3f **data) {
@@ -683,14 +673,15 @@ void CoarseInitializer::setFirst(CalibHessian *HCalib, FrameHessian *newFrameHes
 					pl[nl].lastHessian_new = 0;
 					pl[nl].my_type = (lvl != 0) ? 1 : statusMap[x + y * wl];
 
-					Eigen::Vector3f *cpt = firstFrame->dIp[lvl] + x + y * w[lvl];
-					float sumGrad2 = 0;
-					for (int idx = 0; idx < patternNum; idx++) {
-						int dx = patternP[idx][0];
-						int dy = patternP[idx][1];
-						float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm();
-						sumGrad2 += absgrad;
-					}
+//				Eigen::Vector3f* cpt = firstFrame->dIp[lvl] + x + y*w[lvl];
+//				float sumGrad2=0;
+//				for(int idx=0;idx<patternNum;idx++)
+//				{
+//					int dx = patternP[idx][0];
+//					int dy = patternP[idx][1];
+//					float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm();
+//					sumGrad2 += absgrad;
+//				}
 
 //				float gth = setting_outlierTH * (sqrtf(sumGrad2)+setting_outlierTHSumComponent);
 //				pl[nl].outlierTH = patternNum*gth*gth;
@@ -742,7 +733,7 @@ void CoarseInitializer::resetPoints(int lvl) {
 		}
 	}
 }
-void CoarseInitializer::doStep(int lvl, float lambda, Vec8f inc) {
+void CoarseInitializer::doIdepthStepUpdate(int lvl, float lambda, Vec8f inc) {
 
 	const float maxPixelStep = 0.25;
 	const float idMaxStep = 1e10;

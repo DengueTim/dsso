@@ -107,8 +107,8 @@ struct FrameHessian {
 	//DepthImageWrap* frame;
 	FrameShell *shell;
 
-	Eigen::Vector3f *dI;				 // trace, fine tracking. Used for direction select (not for gradient histograms etc.)
-	Eigen::Vector3f *dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.
+	Eigen::Vector3f *dI;			// trace, fine tracking. Used for direction select (not for gradient histograms etc.)   dIp[0]
+	Eigen::Vector3f *dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.  Elements: Pixel value, dx, dy
 	float *absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
 
 	int frameID;						// incremental ID for keyframes only!
@@ -457,14 +457,14 @@ struct PointHessian {
 	std::pair<PointFrameResidual*, ResState> lastResiduals[2]; // contains information about residuals to the last two (!) frames. ([0] = latest, [1] = the one before).
 
 	void release();
-	PointHessian(const ImmaturePoint *const rawPoint, CalibHessian *Hcalib);
+	PointHessian(const ImmaturePoint *const rawPoint);
 	inline ~PointHessian() {
 		assert(efPoint==0);
 		release();
 		instanceCounter--;
 	}
 
-	inline bool isOOB(const std::vector<FrameHessian*> &toKeep, const std::vector<FrameHessian*> &toMarg) const {
+	inline bool isOOB(const std::vector<FrameHessian*> &toMarg) const {
 
 		int visInToMarg = 0;
 		for (PointFrameResidual *r : residuals) {

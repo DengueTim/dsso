@@ -42,6 +42,7 @@ typedef Sophus::SE3d SE3;
 typedef Sophus::Sim3d Sim3;
 typedef Sophus::SO3d SO3;
 
+// Number of Camera intrisic params fx,fy,cx,cx.
 #define CPARS 4
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatXX;
@@ -154,6 +155,8 @@ struct AffLight {
 	// Affine Parameters:
 	double a, b;	// I_frame = exp(a)*I_global + b. // I_global = exp(-a)*(I_frame - b).
 
+	// Photometric error...
+	// Takes the exposure and AB affine light params for 2 images and returns an AB vec for the Affine light transform between the two images.
 	static Vec2 fromToVecExposure(float exposureF, float exposureT, AffLight g2F, AffLight g2T) {
 		if (exposureF == 0 || exposureT == 0) {
 			exposureT = exposureF = 1;
@@ -161,9 +164,9 @@ struct AffLight {
 			//assert(setting_brightnessTransferFunc < 2);
 		}
 
-		double a = exp(g2T.a - g2F.a) * exposureT / exposureF;
-		double b = g2T.b - a * g2F.b;
-		return Vec2(a, b);
+		double a_tf = exp(g2T.a - g2F.a) * exposureT / exposureF;
+		double b_tf = g2T.b - a_tf * g2F.b;
+		return Vec2(a_tf, b_tf);
 	}
 
 	Vec2 vec() {

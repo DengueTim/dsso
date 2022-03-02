@@ -617,8 +617,8 @@ void FullSystem::activatePointsMT() {
 			assert(newpoint->efPoint != 0);
 			delete ph;
 		} else if (newpoint == (PointHessian*) ((long) (-1)) || ph->lastTraceStatus == IPS_OOB) {
-			delete ph;
 			ph->host->immaturePoints[ph->idxInImmaturePoints] = 0;
+			delete ph;
 		} else {
 			assert(newpoint == 0 || newpoint == (PointHessian*)((long)(-1)));
 		}
@@ -643,19 +643,13 @@ void FullSystem::activatePointsOldFirst() {
 void FullSystem::flagPointsForRemoval() {
 	assert(EFIndicesValid);
 
-	std::vector<FrameHessian*> fhsToKeepPoints;
 	std::vector<FrameHessian*> fhsToMargPoints;
 
 	//if(setting_margPointVisWindow>0)
-	{
-		for (int i = ((int) frameHessians.size()) - 1; i >= 0 && i >= ((int) frameHessians.size()); i--)
-			if (!frameHessians[i]->flaggedForMarginalization)
-				fhsToKeepPoints.push_back(frameHessians[i]);
 
-		for (int i = 0; i < (int) frameHessians.size(); i++)
-			if (frameHessians[i]->flaggedForMarginalization)
-				fhsToMargPoints.push_back(frameHessians[i]);
-	}
+	for (int i = 0; i < (int) frameHessians.size(); i++)
+		if (frameHessians[i]->flaggedForMarginalization)
+			fhsToMargPoints.push_back(frameHessians[i]);
 
 	//ef->setAdjointsF();
 	//ef->setDeltaF(&Hcalib);
@@ -673,7 +667,7 @@ void FullSystem::flagPointsForRemoval() {
 				ph->efPoint->stateFlag = EFPointStatus::PS_DROP;
 				host->pointHessians[i] = 0;
 				flag_nores++;
-			} else if (ph->isOOB(fhsToKeepPoints, fhsToMargPoints) || host->flaggedForMarginalization) {
+			} else if (ph->isOOB(fhsToMargPoints) || host->flaggedForMarginalization) {
 				flag_oob++;
 				if (ph->isInlierNew()) {
 					flag_in++;
@@ -862,7 +856,7 @@ void FullSystem::mappingLoop() {
 		if (unmappedTrackedFrames.size() > 3)
 			needToKetchupMapping = true;
 
-		if (unmappedTrackedFrames.size() > 0) // if there are other frames to tracke, do that first.
+		if (unmappedTrackedFrames.size() > 0) // if there are other frames to track, do that first.
 				{
 			lock.unlock();
 			makeNonKeyFrame(fh);
@@ -1036,10 +1030,13 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame) {
 
 	// add firstframe.
 	FrameHessian *firstFrame = coarseInitializer->firstFrame;
+
 	firstFrame->idx = frameHessians.size();
 	frameHessians.push_back(firstFrame);
+
 	firstFrame->frameID = allKeyFramesHistory.size();
 	allKeyFramesHistory.push_back(firstFrame->shell);
+
 	ef->insertFrame(firstFrame, &Hcalib);
 	setPrecalcValues();
 
@@ -1077,7 +1074,7 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame) {
 		}
 
 		pt->idepth_max = pt->idepth_min = 1;
-		PointHessian *ph = new PointHessian(pt, &Hcalib);
+		PointHessian *ph = new PointHessian(pt);
 		delete pt;
 		if (!std::isfinite(ph->energyTH)) {
 			delete ph;

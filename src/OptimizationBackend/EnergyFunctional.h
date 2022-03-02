@@ -40,9 +40,7 @@ class EFResidual;
 class EFPoint;
 class EFFrame;
 class EnergyFunctional;
-class AccumulatedTopHessian;
 class AccumulatedTopHessianSSE;
-class AccumulatedSCHessian;
 class AccumulatedSCHessianSSE;
 
 extern bool EFAdjointsValid;
@@ -55,9 +53,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	friend class EFFrame;
 	friend class EFPoint;
 	friend class EFResidual;
-	friend class AccumulatedTopHessian;
 	friend class AccumulatedTopHessianSSE;
-	friend class AccumulatedSCHessian;
 	friend class AccumulatedSCHessianSSE;
 
 	EnergyFunctional();

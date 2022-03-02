@@ -128,17 +128,17 @@ private:
 	float regWeight;
 	float couplingWeight;
 
-	Vec3f calcResAndGS(int lvl, Mat88f &H_out, Vec8f &b_out, Mat88f &H_out_sc, Vec8f &b_out_sc, const SE3 &refToNew,
-			AffLight refToNew_aff, bool plot);
-	Vec3f calcEC(int lvl); // returns OLD NERGY, NEW ENERGY, NUM TERMS.
-	void optReg(int lvl);
+	Vec3f calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out, Mat88f &H_out_sc, Vec8f &b_out_sc, const SE3 &refToNew,
+			AffLight refToNew_aff);
+	Vec3f calcDepthRegularisationCouplingEnergy(int lvl); // returns OLD NERGY, NEW ENERGY, NUM TERMS.
+	void updateIdepthRegularisation(int lvl);
 
 	void propagateUp(int srcLvl);
 	void propagateDown(int srcLvl);
 	float rescale();
 
 	void resetPoints(int lvl);
-	void doStep(int lvl, float lambda, Vec8f inc);
+	void doIdepthStepUpdate(int lvl, float lambda, Vec8f inc);
 	void applyStep(int lvl);
 
 	void makeGradients(Eigen::Vector3f **data);

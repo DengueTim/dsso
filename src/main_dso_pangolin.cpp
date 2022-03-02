@@ -55,7 +55,7 @@ bool disableROS = false;
 int start = 0;
 int end = 100000;
 bool prefetch = false;
-float playbackSpeed = 0;// 0 for linearize (play as fast as possible, while sequentializing tracking & mapping). otherwise, factor on timestamps.
+float playbackSpeed = 0; // 0 for linearize (play as fast as possible, while sequentializing tracking & mapping). otherwise, factor on timestamps.
 bool preload = false;
 bool useSampleOutput = false;
 

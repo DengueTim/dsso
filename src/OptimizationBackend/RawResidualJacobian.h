@@ -30,22 +30,30 @@ struct RawResidualJacobian {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
 	// ================== new structure: save independently =============.
+
+	// resF, Jpdxi, Jpdc & Jpdd are linearised at the first estimate.  First Estimate Jacobian FEJ
+
+	// Per pixel(N per point) Huber weighted residual (ab adjusted already). Assigned in PointFrameResidual::linearize()
 	VecNRf resF;
 
-	// the two rows of d[x,y]/d[xi].
+	// the two rows of d[x,y]/d[xi].  How image point x & y change with pose estimate.
 	Vec6f Jpdxi[2];			// 2x6
 
-	// the two rows of d[x,y]/d[C].
+	// the two rows of d[x,y]/d[C].  How image point x & y change with Camera intrinsics estimate.
 	VecCf Jpdc[2];			// 2x4
 
-	// the two rows of d[x,y]/d[idepth].
+	// the two rows of d[x,y]/d[idepth].  How image point x & y change with inverse depth estimate.
 	Vec2f Jpdd;				// 2x1
 
-	// the two columns of d[r]/d[x,y].
-	VecNRf JIdx[2];			// 9x2
+	// JIdx and JabF are linearised at the current estimate. (GN step?)
 
-	// = the two columns of d[r] / d[ab]
-	VecNRf JabF[2];			// 9x2
+	// The two columns of d[r]/d[x,y]. How point pixel residuals change with (point/pixel?) x,y position. Basically the weighted image gradient around pixel.
+	VecNRf JIdx[2];			// MAX_RES_PER_POINT(8)x2
+
+	// = the two columns of d[r] / d[ab]. How point pixel residuals change with estimated frame a and b values.
+	VecNRf JabF[2];			// MAX_RES_PER_POINT(8)x2
+
+	// JIdx, JabJIdx & Jab2 are derived from Jidx & JabF and are just stored for efficiency.
 
 	// = JIdx^T * JIdx (inner product). Only as a shorthand.
 	Mat22f JIdx2;				// 2x2

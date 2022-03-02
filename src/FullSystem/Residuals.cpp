@@ -94,6 +94,7 @@ double PointFrameResidual::linearize(CalibHessian *HCalib) {
 	Vec2f affLL = precalc->PRE_aff_mode;
 	float b0 = precalc->PRE_b0_mode;
 
+	// How the target image X and Y pixel position change WRT camera pose, camera intrinsics and point depth
 	Vec6f d_xi_x, d_xi_y;
 	Vec4f d_C_x, d_C_y;
 	float d_d_x, d_d_y;
@@ -102,8 +103,8 @@ double PointFrameResidual::linearize(CalibHessian *HCalib) {
 		float Ku, Kv;
 		Vec3f KliP;
 
-		if (!projectPoint(point->u, point->v, point->idepth_zero_scaled, 0, 0, HCalib, PRE_RTll_0, PRE_tTll_0, drescale, u, v, Ku,
-				Kv, KliP, new_idepth)) {
+		if (!projectPoint(point->u, point->v, point->idepth_zero_scaled, HCalib, PRE_RTll_0, PRE_tTll_0, drescale, u, v, Ku, Kv,
+				KliP, new_idepth)) {
 			state_NewState = ResState::OOB;
 			return state_energy;
 		}
@@ -201,8 +202,8 @@ double PointFrameResidual::linearize(CalibHessian *HCalib) {
 
 			J->resF[idx] = residual * hw;
 
-			J->JIdx[0][idx] = hitColor[1];
-			J->JIdx[1][idx] = hitColor[2];
+			J->JIdx[0][idx] = hitColor[1]; // image gradient in x * hw
+			J->JIdx[1][idx] = hitColor[2]; // image gradient in y * hw
 			J->JabF[0][idx] = drdA * hw;
 			J->JabF[1][idx] = hw;
 

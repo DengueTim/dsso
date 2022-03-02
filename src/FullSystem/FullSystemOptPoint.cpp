@@ -137,7 +137,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(ImmaturePoint *point, int minObs
 		return (PointHessian*) ((long) (-1));		// yeah I'm like 99% sure this is OK on 32bit systems.
 	}
 
-	PointHessian *p = new PointHessian(point, &Hcalib);
+	PointHessian *p = new PointHessian(point);
 	if (!std::isfinite(p->energyTH)) {
 		delete p;
 		return (PointHessian*) ((long) (-1));

@@ -54,8 +54,8 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 			if (r->efResidual->isActive()) {
 				if (r->isNew) {
 					PointHessian *p = r->point;
-					Vec3f ptp_inf = r->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u, p->v, 1);// projected point assuming infinite depth.
-					Vec3f ptp = ptp_inf + r->host->targetPrecalc[r->target->idx].PRE_KtTll * p->idepth_scaled;// projected point with real depth.
+					Vec3f ptp_inf = r->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u, p->v, 1); // projected point assuming infinite depth.
+					Vec3f ptp = ptp_inf + r->host->targetPrecalc[r->target->idx].PRE_KtTll * p->idepth_scaled; // projected point with real depth.
 					float relBS = 0.01 * ((ptp_inf.head<2>() / ptp_inf[2]) - (ptp.head<2>() / ptp[2])).norm();	// 0.01 = one pixel.
 
 					if (relBS > p->maxRelBaseline)
@@ -177,9 +177,9 @@ bool FullSystem::doStepFromBackup(float stepfacC, float stepfacT, float stepfacR
 //	meanStepC += Hcalib.step.norm();
 
 	Vec10 pstepfac;
-	pstepfac.segment<3>(0).setConstant(stepfacT);
-	pstepfac.segment<3>(3).setConstant(stepfacR);
-	pstepfac.segment<4>(6).setConstant(stepfacA);
+	pstepfac.segment<3>(0).setConstant(stepfacT); // Frame Translation
+	pstepfac.segment<3>(3).setConstant(stepfacR); // Frame Rotation
+	pstepfac.segment<4>(6).setConstant(stepfacA); // Frame AB exposure
 
 	float sumA = 0, sumB = 0, sumT = 0, sumR = 0, sumID = 0, numID = 0;
 
@@ -331,7 +331,7 @@ float FullSystem::optimize(int mnumOptIts) {
 
 	activeResiduals.clear();
 	int numPoints = 0;
-	int numLRes = 0;
+	int numLinearisedPointResiduals = 0;
 	for (FrameHessian *fh : frameHessians)
 		for (PointHessian *ph : fh->pointHessians) {
 			for (PointFrameResidual *r : ph->residuals) {
@@ -339,13 +339,14 @@ float FullSystem::optimize(int mnumOptIts) {
 					activeResiduals.push_back(r);
 					r->resetOOB();
 				} else
-					numLRes++;
+					numLinearisedPointResiduals++;
 			}
 			numPoints++;
 		}
 
 	if (!setting_debugout_runquiet)
-		printf("OPTIMIZE %d pts, %d active res, %d lin res!\n", ef->nPoints, (int) activeResiduals.size(), numLRes);
+		printf("OPTIMIZE %d pts, %d active res, %d lin res!\n", ef->nPoints, (int) activeResiduals.size(),
+				numLinearisedPointResiduals);
 
 	Vec3 lastEnergy = linearizeAll(false);
 	double lastEnergyL = calcLEnergy();
