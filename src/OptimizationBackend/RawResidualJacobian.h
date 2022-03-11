@@ -26,6 +26,7 @@
 #include "util/NumType.h"
 
 namespace dso {
+// Residual for a point. Although parts are the residuals on the pixels that belong to the point.
 struct RawResidualJacobian {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
@@ -50,16 +51,32 @@ struct RawResidualJacobian {
 	// The two columns of d[r]/d[x,y]. How point pixel residuals change with (point/pixel?) x,y position. Basically the weighted image gradient around pixel.
 	VecNRf JIdx[2];			// MAX_RES_PER_POINT(8)x2
 
-	// = the two columns of d[r] / d[ab]. How point pixel residuals change with estimated frame a and b values.
+	// = the two columns of d[r] / d[ab]. How point pixel residuals change with estimated frame a and b values(affine brightness).
 	VecNRf JabF[2];			// MAX_RES_PER_POINT(8)x2
 
 	// JIdx, JabJIdx & Jab2 are derived from Jidx & JabF and are just stored for efficiency.
 
-	// = JIdx^T * JIdx (inner product). Only as a shorthand.
-	Mat22f JIdx2;				// 2x2
-	// = Jab^T * JIdx (inner product). Only as a shorthand.
+	/* = JIdx^T * JIdx (inner product). Only as a shorthand.
+	 * How sum of squared residuals changes with
+	 * [ xx, xy ]
+	 * [ yx, yy ]
+	 * x & y being the point position in the image.
+	 */
+	Mat22f JIdx2;			// 2x2
+	/* = Jab^T * JIdx (inner product). Only as a shorthand.
+	 * How sum of squared residuals changes with
+	 * [ xa, xb ]
+	 * [ ya, yb ]
+	 * x & y being the point position in the image.
+	 * a & b being the affine brightness factors
+	 */
 	Mat22f JabJIdx;			// 2x2
-	// = Jab^T * Jab (inner product). Only as a shorthand.
+	/* = Jab^T * Jab (inner product). Only as a shorthand.
+	 * How sum of squared residuals changes with
+	 * [ aa, ab ]
+	 * [ ba, bb ]
+	 *  * a & b being the affine brightness factors
+	 */
 	Mat22f Jab2;			// 2x2
 
 };

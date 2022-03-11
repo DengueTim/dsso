@@ -82,6 +82,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	std::vector<EFFrame*> frames;
 	int nPoints, nFrames, nResiduals;
 
+	// Contribution from marginalied frames/points..
 	MatXX HM;
 	VecX bM;
 
@@ -125,10 +126,11 @@ private:
 	VecCf cDeltaF;
 	VecCf cPriorF;
 
-	AccumulatedTopHessianSSE *accSSE_top_L;
-	AccumulatedTopHessianSSE *accSSE_top_A;
+	AccumulatedTopHessianSSE *accTop_L;  // Contribution from Linearized points.
+	AccumulatedTopHessianSSE *accTop_A;  // Contribution from Active points. Used for marginalization and GN step
 
-	AccumulatedSCHessianSSE *accSSE_bot;
+	// Used for marginalization and GN step
+	AccumulatedSCHessianSSE *accSC_bot;
 
 	std::vector<EFPoint*> allPoints;
 	std::vector<EFPoint*> allPointsToMarg;

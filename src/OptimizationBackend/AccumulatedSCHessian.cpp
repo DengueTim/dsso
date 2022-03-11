@@ -58,17 +58,20 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 
 	assert(std::isfinite((float)(p->HdiF)));
 
-	int nFrames2 = nframes[tid] * nframes[tid];
+	int nf = nframes[tid];
 	for (EFResidual *r1 : p->residualsAll) {
 		if (!r1->isActive())
 			continue;
-		int r1ht = r1->hostIDX + r1->targetIDX * nframes[tid];
+		int r1ht = r1->hostIDX + r1->targetIDX * nf;
 
 		for (EFResidual *r2 : p->residualsAll) {
 			if (!r2->isActive())
 				continue;
 
-			accD[tid][r1ht + r2->targetIDX * nFrames2].update(r1->JpJdF, r2->JpJdF, p->HdiF);
+			/* Contribution factor of pair of depth residuals on pose-pose block Haa...
+			 * Accumulation over pairs of residuals that have a common host targets
+			 */
+			accD[tid][r1ht + r2->targetIDX * nf * nf].update(r1->JpJdF, r2->JpJdF, p->HdiF);
 		}
 
 		accE[tid][r1ht].update(r1->JpJdF, Hcd, p->HdiF);
@@ -109,10 +112,10 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 		b[tid].segment<8>(iIdx) += EF->adHost[ijIdx] * bp;
 		b[tid].segment<8>(jIdx) += EF->adTarget[ijIdx] * bp;
 
-		for (int k = 0; k < nf; k++) {
-			int kIdx = CPARS + k * 8;
-			int ijkIdx = ijIdx + k * nframes2;
-			int ikIdx = i + nf * k;
+		for (int fi = 0; fi < nf; fi++) {
+			int kIdx = CPARS + fi * 8;
+			int ijkIdx = ijIdx + fi * nframes2;
+			int ikIdx = i + nf * fi;
 
 			Mat88 accDM = Mat88::Zero();
 

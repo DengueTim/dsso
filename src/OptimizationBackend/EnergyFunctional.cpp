@@ -115,9 +115,9 @@ EnergyFunctional::EnergyFunctional() {
 	HM = MatXX::Zero(CPARS, CPARS);
 	bM = VecX::Zero(CPARS);
 
-	accSSE_top_L = new AccumulatedTopHessianSSE();
-	accSSE_top_A = new AccumulatedTopHessianSSE();
-	accSSE_bot = new AccumulatedSCHessianSSE();
+	accTop_L = new AccumulatedTopHessianSSE();
+	accTop_A = new AccumulatedTopHessianSSE();
+	accSC_bot = new AccumulatedSCHessianSSE();
 
 	resInA = resInL = resInM = 0;
 	currentLambda = 0;
@@ -148,9 +148,9 @@ EnergyFunctional::~EnergyFunctional() {
 	if (adHTdeltaF != 0)
 		delete[] adHTdeltaF;
 
-	delete accSSE_top_L;
-	delete accSSE_top_A;
-	delete accSSE_bot;
+	delete accTop_L;
+	delete accTop_A;
+	delete accSC_bot;
 }
 
 void EnergyFunctional::setDeltaF(CalibHessian *HCalib) {
@@ -179,51 +179,51 @@ void EnergyFunctional::setDeltaF(CalibHessian *HCalib) {
 // accumulates & shifts L.
 void EnergyFunctional::accumulateAF_MT(MatXX &H, VecX &b, bool MT) {
 	if (MT) {
-		red->reduce(boost::bind(&AccumulatedTopHessianSSE::setZero, accSSE_top_A, nFrames, _1, _2, _3, _4), 0, 0, 0);
-		red->reduce(boost::bind(&AccumulatedTopHessianSSE::addPointsInternal<0>, accSSE_top_A, &allPoints, this, _1, _2, _3, _4), 0,
+		red->reduce(boost::bind(&AccumulatedTopHessianSSE::setZero, accTop_A, nFrames, _1, _2, _3, _4), 0, 0, 0);
+		red->reduce(boost::bind(&AccumulatedTopHessianSSE::addPointsInternal<0>, accTop_A, &allPoints, this, _1, _2, _3, _4), 0,
 				allPoints.size(), 50);
-		accSSE_top_A->stitchDoubleMT(red, H, b, this, false, true);
-		resInA = accSSE_top_A->nres[0];
+		accTop_A->stitchDoubleMT(red, H, b, this, false, true);
+		resInA = accTop_A->nres[0];
 	} else {
-		accSSE_top_A->setZero(nFrames);
+		accTop_A->setZero(nFrames);
 		for (EFFrame *f : frames)
 			for (EFPoint *p : f->points)
-				accSSE_top_A->addPoint<0>(p, this);
-		accSSE_top_A->stitchDoubleMT(red, H, b, this, false, false);
-		resInA = accSSE_top_A->nres[0];
+				accTop_A->addPoint<0>(p, this);  // <0> - Active point.
+		accTop_A->stitchDoubleMT(red, H, b, this, false, false);
+		resInA = accTop_A->nres[0];
 	}
 }
 
 // accumulates & shifts L.
 void EnergyFunctional::accumulateLF_MT(MatXX &H, VecX &b, bool MT) {
 	if (MT) {
-		red->reduce(boost::bind(&AccumulatedTopHessianSSE::setZero, accSSE_top_L, nFrames, _1, _2, _3, _4), 0, 0, 0);
-		red->reduce(boost::bind(&AccumulatedTopHessianSSE::addPointsInternal<1>, accSSE_top_L, &allPoints, this, _1, _2, _3, _4), 0,
+		red->reduce(boost::bind(&AccumulatedTopHessianSSE::setZero, accTop_L, nFrames, _1, _2, _3, _4), 0, 0, 0);
+		red->reduce(boost::bind(&AccumulatedTopHessianSSE::addPointsInternal<1>, accTop_L, &allPoints, this, _1, _2, _3, _4), 0,
 				allPoints.size(), 50);
-		accSSE_top_L->stitchDoubleMT(red, H, b, this, true, true);
-		resInL = accSSE_top_L->nres[0];
+		accTop_L->stitchDoubleMT(red, H, b, this, true, true);
+		resInL = accTop_L->nres[0];
 	} else {
-		accSSE_top_L->setZero(nFrames);
+		accTop_L->setZero(nFrames);
 		for (EFFrame *f : frames)
 			for (EFPoint *p : f->points)
-				accSSE_top_L->addPoint<1>(p, this);
-		accSSE_top_L->stitchDoubleMT(red, H, b, this, true, false);
-		resInL = accSSE_top_L->nres[0];
+				accTop_L->addPoint<1>(p, this); // <1> - Linearised point.
+		accTop_L->stitchDoubleMT(red, H, b, this, true, false);
+		resInL = accTop_L->nres[0];
 	}
 }
 
 void EnergyFunctional::accumulateSCF_MT(MatXX &H, VecX &b, bool MT) {
 	if (MT) {
-		red->reduce(boost::bind(&AccumulatedSCHessianSSE::setZero, accSSE_bot, nFrames, _1, _2, _3, _4), 0, 0, 0);
-		red->reduce(boost::bind(&AccumulatedSCHessianSSE::addPointsInternal, accSSE_bot, &allPoints, true, _1, _2, _3, _4), 0,
+		red->reduce(boost::bind(&AccumulatedSCHessianSSE::setZero, accSC_bot, nFrames, _1, _2, _3, _4), 0, 0, 0);
+		red->reduce(boost::bind(&AccumulatedSCHessianSSE::addPointsInternal, accSC_bot, &allPoints, true, _1, _2, _3, _4), 0,
 				allPoints.size(), 50);
-		accSSE_bot->stitchDoubleMT(red, H, b, this, true);
+		accSC_bot->stitchDoubleMT(red, H, b, this, true);
 	} else {
-		accSSE_bot->setZero(nFrames);
+		accSC_bot->setZero(nFrames);
 		for (EFFrame *f : frames)
 			for (EFPoint *p : f->points)
-				accSSE_bot->addPoint(p, true);
-		accSSE_bot->stitchDoubleMT(red, H, b, this, false);
+				accSC_bot->addPoint(p, true);
+		accSC_bot->stitchDoubleMT(red, H, b, this, false);
 	}
 }
 
@@ -547,19 +547,19 @@ void EnergyFunctional::marginalizePointsF() {
 		}
 	}
 
-	accSSE_bot->setZero(nFrames);
-	accSSE_top_A->setZero(nFrames);
+	accSC_bot->setZero(nFrames);
+	accTop_A->setZero(nFrames);
 	for (EFPoint *p : allPointsToMarg) {
-		accSSE_top_A->addPoint<2>(p, this);
-		accSSE_bot->addPoint(p, false);
+		accTop_A->addPoint<2>(p, this); // <2> - Marginalised points.
+		accSC_bot->addPoint(p, false);
 		removePoint(p);
 	}
 	MatXX M, Msc;
 	VecX Mb, Mbsc;
-	accSSE_top_A->stitchDouble(M, Mb, this, false, false);
-	accSSE_bot->stitchDouble(Msc, Mbsc, this);
+	accTop_A->stitchDouble(M, Mb, this, false, false);
+	accSC_bot->stitchDouble(Msc, Mbsc, this);
 
-	resInM += accSSE_top_A->nres[0];
+	resInM += accTop_A->nres[0];
 
 	MatXX H = M - Msc;
 	VecX b = Mb - Mbsc;
@@ -619,6 +619,7 @@ void EnergyFunctional::removePoint(EFPoint *p) {
 	delete p;
 }
 
+// remove the influence of null space
 void EnergyFunctional::orthogonalize(VecX *b, MatXX *H) {
 //	VecX eigenvaluesPre = H.eigenvalues().real();
 //	std::sort(eigenvaluesPre.data(), eigenvaluesPre.data()+eigenvaluesPre.size());

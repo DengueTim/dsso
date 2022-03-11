@@ -70,8 +70,8 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	RawResidualJacobian *J;
 
-	VecNRf res_toZeroF;
-	Vec8f JpJdF;
+	VecNRf res_toZeroF; // Set when point is marginalized.
+	Vec8f JpJdF; // How pose changes with depth?
 
 	// status.
 	bool isLinearized;
@@ -106,17 +106,24 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	int idxInPoints;
 	EFFrame *host;
 
-	// contains all residuals.
+	/* contains all residuals.
+	 * Elements are the residual between the points host frame and the n>0 target frames the point appears in.
+	 */
 	std::vector<EFResidual*> residualsAll;
 
-	float bdSumF;
+	float bdSumF; // Sum of bd_accLF + bd_accAF (+ prior..)?
+	/* Computed/set in Acc.SCHessian.addPoint().
+	 * 1 / (Hdd_accAF + Hdd_accLF + priorF).  1 / "idepth_hessian"
+	 * Used for weighting depth step. HdiF -> Hessian Inverse Depth Float
+	 * Point diagonal element of Schur Comp. Hbb^-1 in the paper (eq.17)?
+	 */
 	float HdiF;
-	float Hdd_accLF;
-	VecCf Hcd_accLF;
-	float bd_accLF;
-	float Hdd_accAF;
-	VecCf Hcd_accAF;
-	float bd_accAF;
+	float Hdd_accLF; // Depth to Depth Hessian value Accumulator for Linearized point.
+	VecCf Hcd_accLF; // Depth to Camera params Hessian value Accumulator for Linearized point.
+	float bd_accLF;  // Depth B(residual) value Accumulator for Linearized point.
+	float Hdd_accAF; // Depth to Depth Hessian value Accumulator for Active point.
+	VecCf Hcd_accAF; // Depth to Camera params Hessian value Accumulator for Active point.
+	float bd_accAF;  // Depth B(residual) value Accumulator for Active point.
 
 	EFPointStatus stateFlag;
 };
