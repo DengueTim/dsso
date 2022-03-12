@@ -58,7 +58,6 @@
 namespace dso {
 int FrameHessian::instanceCounter = 0;
 int PointHessian::instanceCounter = 0;
-int CalibHessian::instanceCounter = 0;
 
 FullSystem::FullSystem() {
 
@@ -750,6 +749,7 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
 			// if still initializing
 			fh->shell->poseValid = false;
 			delete fh;
+			printf("Still initializing...\n");
 		}
 		return;
 	} else	// do front-end operation.

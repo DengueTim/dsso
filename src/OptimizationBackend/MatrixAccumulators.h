@@ -606,12 +606,12 @@ class AccumulatorApprox {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
 
-	Mat1313f H;
+	Mat2323f H;
 	size_t num;
 
 	inline void initialize() {
-		memset(Data, 0, sizeof(float) * 60);
-		memset(TopRight_Data, 0, sizeof(float) * 32);
+		memset(Data, 0, sizeof(float) * 212);
+		memset(TopRight_Data, 0, sizeof(float) * 60);
 		memset(BotRight_Data, 0, sizeof(float) * 8);
 		num = 0;
 	}
@@ -620,145 +620,354 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		H.setZero();
 
 		int idx = 0;
-		for (int r = 0; r < 10; r++)
-			for (int c = r; c < 10; c++) {
+		for (int r = 0; r < 20; r++)
+			for (int c = r; c < 20; c++) {
 				H(r, c) = H(c, r) = Data[idx];
 				idx++;
 			}
 
 		idx = 0;
-		for (int r = 0; r < 10; r++)
+		for (int r = 0; r < 20; r++)
 			for (int c = 0; c < 3; c++) {
-				H(r, c + 10) = H(c + 10, r) = TopRight_Data[idx];
+				H(r, c + 20) = H(c + 20, r) = TopRight_Data[idx];
 				idx++;
 			}
 
-		H(10, 10) = BotRight_Data[0];
-		H(10, 11) = H(11, 10) = BotRight_Data[1];
-		H(10, 12) = H(12, 10) = BotRight_Data[2];
-		H(11, 11) = BotRight_Data[3];
-		H(11, 12) = H(12, 11) = BotRight_Data[4];
-		H(12, 12) = BotRight_Data[5];
+		H(20, 20) = BotRight_Data[0];
+		H(20, 21) = H(21, 20) = BotRight_Data[1];
+		H(20, 22) = H(22, 20) = BotRight_Data[2];
+		H(21, 21) = BotRight_Data[3];
+		H(21, 22) = H(22, 21) = BotRight_Data[4];
+		H(22, 22) = BotRight_Data[5];
 	}
 
 	/*
-	 * same as other method, just that x/y are composed of two parts, the first 4 elements are in x4/y4, the last 6 in x6/y6.
+	 * Params are how image x & y change with Camera intrisics(xC,yC) and pose (xXm yX). And
+	 * How the point (sum of squared pixel)residual change with image x & y squared(a,b,c).
+	 *
+	 * Accumulates dRes/(dCameraP, dPose)?
 	 */
-	inline void update(const float *const x4, const float *const x6, const float *const y4, const float *const y6, const float a,
+	inline void update(const float *const xC, const float *const xX, const float *const yC, const float *const yX, const float a,
 			const float b, const float c) {
 
-		Data[0] += a * x4[0] * x4[0] + c * y4[0] * y4[0] + b * (x4[0] * y4[0] + y4[0] * x4[0]);
-		Data[1] += a * x4[1] * x4[0] + c * y4[1] * y4[0] + b * (x4[1] * y4[0] + y4[1] * x4[0]);
-		Data[2] += a * x4[2] * x4[0] + c * y4[2] * y4[0] + b * (x4[2] * y4[0] + y4[2] * x4[0]);
-		Data[3] += a * x4[3] * x4[0] + c * y4[3] * y4[0] + b * (x4[3] * y4[0] + y4[3] * x4[0]);
-		Data[4] += a * x6[0] * x4[0] + c * y6[0] * y4[0] + b * (x6[0] * y4[0] + y6[0] * x4[0]);
-		Data[5] += a * x6[1] * x4[0] + c * y6[1] * y4[0] + b * (x6[1] * y4[0] + y6[1] * x4[0]);
-		Data[6] += a * x6[2] * x4[0] + c * y6[2] * y4[0] + b * (x6[2] * y4[0] + y6[2] * x4[0]);
-		Data[7] += a * x6[3] * x4[0] + c * y6[3] * y4[0] + b * (x6[3] * y4[0] + y6[3] * x4[0]);
-		Data[8] += a * x6[4] * x4[0] + c * y6[4] * y4[0] + b * (x6[4] * y4[0] + y6[4] * x4[0]);
-		Data[9] += a * x6[5] * x4[0] + c * y6[5] * y4[0] + b * (x6[5] * y4[0] + y6[5] * x4[0]);
+		Data[0] += a * xC[0] * xC[0] + c * yC[0] * yC[0] + b * (xC[0] * yC[0] + yC[0] * xC[0]);
+		Data[1] += a * xC[1] * xC[0] + c * yC[1] * yC[0] + b * (xC[1] * yC[0] + yC[1] * xC[0]);
+		Data[2] += a * xC[2] * xC[0] + c * yC[2] * yC[0] + b * (xC[2] * yC[0] + yC[2] * xC[0]);
+		Data[3] += a * xC[3] * xC[0] + c * yC[3] * yC[0] + b * (xC[3] * yC[0] + yC[3] * xC[0]);
+		Data[4] += a * xC[4] * xC[0] + c * yC[4] * yC[0] + b * (xC[4] * yC[0] + yC[4] * xC[0]);
+		Data[5] += a * xC[5] * xC[0] + c * yC[5] * yC[0] + b * (xC[5] * yC[0] + yC[5] * xC[0]);
+		Data[6] += a * xC[6] * xC[0] + c * yC[6] * yC[0] + b * (xC[6] * yC[0] + yC[6] * xC[0]);
+		Data[7] += a * xC[7] * xC[0] + c * yC[7] * yC[0] + b * (xC[7] * yC[0] + yC[7] * xC[0]);
+		Data[8] += a * xC[8] * xC[0] + c * yC[8] * yC[0] + b * (xC[8] * yC[0] + yC[8] * xC[0]);
+		Data[9] += a * xC[9] * xC[0] + c * yC[9] * yC[0] + b * (xC[9] * yC[0] + yC[9] * xC[0]);
+		Data[10] += a * xC[10] * xC[0] + c * yC[10] * yC[0] + b * (xC[10] * yC[0] + yC[10] * xC[0]);
+		Data[11] += a * xC[11] * xC[0] + c * yC[11] * yC[0] + b * (xC[11] * yC[0] + yC[11] * xC[0]);
+		Data[12] += a * xC[12] * xC[0] + c * yC[12] * yC[0] + b * (xC[12] * yC[0] + yC[12] * xC[0]);
+		Data[13] += a * xC[13] * xC[0] + c * yC[13] * yC[0] + b * (xC[13] * yC[0] + yC[13] * xC[0]);
+		Data[14] += a * xX[0] * xC[0] + c * yX[0] * yC[0] + b * (xX[0] * yC[0] + yX[0] * xC[0]);
+		Data[15] += a * xX[1] * xC[0] + c * yX[1] * yC[0] + b * (xX[1] * yC[0] + yX[1] * xC[0]);
+		Data[16] += a * xX[2] * xC[0] + c * yX[2] * yC[0] + b * (xX[2] * yC[0] + yX[2] * xC[0]);
+		Data[17] += a * xX[3] * xC[0] + c * yX[3] * yC[0] + b * (xX[3] * yC[0] + yX[3] * xC[0]);
+		Data[18] += a * xX[4] * xC[0] + c * yX[4] * yC[0] + b * (xX[4] * yC[0] + yX[4] * xC[0]);
+		Data[19] += a * xX[5] * xC[0] + c * yX[5] * yC[0] + b * (xX[5] * yC[0] + yX[5] * xC[0]);
 
-		Data[10] += a * x4[1] * x4[1] + c * y4[1] * y4[1] + b * (x4[1] * y4[1] + y4[1] * x4[1]);
-		Data[11] += a * x4[2] * x4[1] + c * y4[2] * y4[1] + b * (x4[2] * y4[1] + y4[2] * x4[1]);
-		Data[12] += a * x4[3] * x4[1] + c * y4[3] * y4[1] + b * (x4[3] * y4[1] + y4[3] * x4[1]);
-		Data[13] += a * x6[0] * x4[1] + c * y6[0] * y4[1] + b * (x6[0] * y4[1] + y6[0] * x4[1]);
-		Data[14] += a * x6[1] * x4[1] + c * y6[1] * y4[1] + b * (x6[1] * y4[1] + y6[1] * x4[1]);
-		Data[15] += a * x6[2] * x4[1] + c * y6[2] * y4[1] + b * (x6[2] * y4[1] + y6[2] * x4[1]);
-		Data[16] += a * x6[3] * x4[1] + c * y6[3] * y4[1] + b * (x6[3] * y4[1] + y6[3] * x4[1]);
-		Data[17] += a * x6[4] * x4[1] + c * y6[4] * y4[1] + b * (x6[4] * y4[1] + y6[4] * x4[1]);
-		Data[18] += a * x6[5] * x4[1] + c * y6[5] * y4[1] + b * (x6[5] * y4[1] + y6[5] * x4[1]);
+		Data[20] += a * xC[1] * xC[1] + c * yC[1] * yC[1] + b * (xC[1] * yC[1] + yC[1] * xC[1]);
+		Data[21] += a * xC[2] * xC[1] + c * yC[2] * yC[1] + b * (xC[2] * yC[1] + yC[2] * xC[1]);
+		Data[22] += a * xC[3] * xC[1] + c * yC[3] * yC[1] + b * (xC[3] * yC[1] + yC[3] * xC[1]);
+		Data[23] += a * xC[4] * xC[1] + c * yC[4] * yC[1] + b * (xC[4] * yC[1] + yC[4] * xC[1]);
+		Data[24] += a * xC[5] * xC[1] + c * yC[5] * yC[1] + b * (xC[5] * yC[1] + yC[5] * xC[1]);
+		Data[25] += a * xC[6] * xC[1] + c * yC[6] * yC[1] + b * (xC[6] * yC[1] + yC[6] * xC[1]);
+		Data[26] += a * xC[7] * xC[1] + c * yC[7] * yC[1] + b * (xC[7] * yC[1] + yC[7] * xC[1]);
+		Data[27] += a * xC[8] * xC[1] + c * yC[8] * yC[1] + b * (xC[8] * yC[1] + yC[8] * xC[1]);
+		Data[28] += a * xC[9] * xC[1] + c * yC[9] * yC[1] + b * (xC[9] * yC[1] + yC[9] * xC[1]);
+		Data[29] += a * xC[10] * xC[1] + c * yC[10] * yC[1] + b * (xC[10] * yC[1] + yC[10] * xC[1]);
+		Data[30] += a * xC[11] * xC[1] + c * yC[11] * yC[1] + b * (xC[11] * yC[1] + yC[11] * xC[1]);
+		Data[31] += a * xC[12] * xC[1] + c * yC[12] * yC[1] + b * (xC[12] * yC[1] + yC[12] * xC[1]);
+		Data[32] += a * xC[13] * xC[1] + c * yC[13] * yC[1] + b * (xC[13] * yC[1] + yC[13] * xC[1]);
+		Data[33] += a * xX[0] * xC[1] + c * yX[0] * yC[1] + b * (xX[0] * yC[1] + yX[0] * xC[1]);
+		Data[34] += a * xX[1] * xC[1] + c * yX[1] * yC[1] + b * (xX[1] * yC[1] + yX[1] * xC[1]);
+		Data[35] += a * xX[2] * xC[1] + c * yX[2] * yC[1] + b * (xX[2] * yC[1] + yX[2] * xC[1]);
+		Data[36] += a * xX[3] * xC[1] + c * yX[3] * yC[1] + b * (xX[3] * yC[1] + yX[3] * xC[1]);
+		Data[37] += a * xX[4] * xC[1] + c * yX[4] * yC[1] + b * (xX[4] * yC[1] + yX[4] * xC[1]);
+		Data[38] += a * xX[5] * xC[1] + c * yX[5] * yC[1] + b * (xX[5] * yC[1] + yX[5] * xC[1]);
 
-		Data[19] += a * x4[2] * x4[2] + c * y4[2] * y4[2] + b * (x4[2] * y4[2] + y4[2] * x4[2]);
-		Data[20] += a * x4[3] * x4[2] + c * y4[3] * y4[2] + b * (x4[3] * y4[2] + y4[3] * x4[2]);
-		Data[21] += a * x6[0] * x4[2] + c * y6[0] * y4[2] + b * (x6[0] * y4[2] + y6[0] * x4[2]);
-		Data[22] += a * x6[1] * x4[2] + c * y6[1] * y4[2] + b * (x6[1] * y4[2] + y6[1] * x4[2]);
-		Data[23] += a * x6[2] * x4[2] + c * y6[2] * y4[2] + b * (x6[2] * y4[2] + y6[2] * x4[2]);
-		Data[24] += a * x6[3] * x4[2] + c * y6[3] * y4[2] + b * (x6[3] * y4[2] + y6[3] * x4[2]);
-		Data[25] += a * x6[4] * x4[2] + c * y6[4] * y4[2] + b * (x6[4] * y4[2] + y6[4] * x4[2]);
-		Data[26] += a * x6[5] * x4[2] + c * y6[5] * y4[2] + b * (x6[5] * y4[2] + y6[5] * x4[2]);
+		Data[39] += a * xC[2] * xC[2] + c * yC[2] * yC[2] + b * (xC[2] * yC[2] + yC[2] * xC[2]);
+		Data[40] += a * xC[3] * xC[2] + c * yC[3] * yC[2] + b * (xC[3] * yC[2] + yC[3] * xC[2]);
+		Data[41] += a * xC[4] * xC[2] + c * yC[4] * yC[2] + b * (xC[4] * yC[2] + yC[4] * xC[2]);
+		Data[42] += a * xC[5] * xC[2] + c * yC[5] * yC[2] + b * (xC[5] * yC[2] + yC[5] * xC[2]);
+		Data[43] += a * xC[6] * xC[2] + c * yC[6] * yC[2] + b * (xC[6] * yC[2] + yC[6] * xC[2]);
+		Data[44] += a * xC[7] * xC[2] + c * yC[7] * yC[2] + b * (xC[7] * yC[2] + yC[7] * xC[2]);
+		Data[45] += a * xC[8] * xC[2] + c * yC[8] * yC[2] + b * (xC[8] * yC[2] + yC[8] * xC[2]);
+		Data[46] += a * xC[9] * xC[2] + c * yC[9] * yC[2] + b * (xC[9] * yC[2] + yC[9] * xC[2]);
+		Data[47] += a * xC[10] * xC[2] + c * yC[10] * yC[2] + b * (xC[10] * yC[2] + yC[10] * xC[2]);
+		Data[48] += a * xC[11] * xC[2] + c * yC[11] * yC[2] + b * (xC[11] * yC[2] + yC[11] * xC[2]);
+		Data[49] += a * xC[12] * xC[2] + c * yC[12] * yC[2] + b * (xC[12] * yC[2] + yC[12] * xC[2]);
+		Data[50] += a * xC[13] * xC[2] + c * yC[13] * yC[2] + b * (xC[13] * yC[2] + yC[13] * xC[2]);
+		Data[51] += a * xX[0] * xC[2] + c * yX[0] * yC[2] + b * (xX[0] * yC[2] + yX[0] * xC[2]);
+		Data[52] += a * xX[1] * xC[2] + c * yX[1] * yC[2] + b * (xX[1] * yC[2] + yX[1] * xC[2]);
+		Data[53] += a * xX[2] * xC[2] + c * yX[2] * yC[2] + b * (xX[2] * yC[2] + yX[2] * xC[2]);
+		Data[54] += a * xX[3] * xC[2] + c * yX[3] * yC[2] + b * (xX[3] * yC[2] + yX[3] * xC[2]);
+		Data[55] += a * xX[4] * xC[2] + c * yX[4] * yC[2] + b * (xX[4] * yC[2] + yX[4] * xC[2]);
+		Data[56] += a * xX[5] * xC[2] + c * yX[5] * yC[2] + b * (xX[5] * yC[2] + yX[5] * xC[2]);
 
-		Data[27] += a * x4[3] * x4[3] + c * y4[3] * y4[3] + b * (x4[3] * y4[3] + y4[3] * x4[3]);
-		Data[28] += a * x6[0] * x4[3] + c * y6[0] * y4[3] + b * (x6[0] * y4[3] + y6[0] * x4[3]);
-		Data[29] += a * x6[1] * x4[3] + c * y6[1] * y4[3] + b * (x6[1] * y4[3] + y6[1] * x4[3]);
-		Data[30] += a * x6[2] * x4[3] + c * y6[2] * y4[3] + b * (x6[2] * y4[3] + y6[2] * x4[3]);
-		Data[31] += a * x6[3] * x4[3] + c * y6[3] * y4[3] + b * (x6[3] * y4[3] + y6[3] * x4[3]);
-		Data[32] += a * x6[4] * x4[3] + c * y6[4] * y4[3] + b * (x6[4] * y4[3] + y6[4] * x4[3]);
-		Data[33] += a * x6[5] * x4[3] + c * y6[5] * y4[3] + b * (x6[5] * y4[3] + y6[5] * x4[3]);
+		Data[57] += a * xC[3] * xC[3] + c * yC[3] * yC[3] + b * (xC[3] * yC[3] + yC[3] * xC[3]);
+		Data[58] += a * xC[4] * xC[3] + c * yC[4] * yC[3] + b * (xC[4] * yC[3] + yC[4] * xC[3]);
+		Data[59] += a * xC[5] * xC[3] + c * yC[5] * yC[3] + b * (xC[5] * yC[3] + yC[5] * xC[3]);
+		Data[60] += a * xC[6] * xC[3] + c * yC[6] * yC[3] + b * (xC[6] * yC[3] + yC[6] * xC[3]);
+		Data[61] += a * xC[7] * xC[3] + c * yC[7] * yC[3] + b * (xC[7] * yC[3] + yC[7] * xC[3]);
+		Data[62] += a * xC[8] * xC[3] + c * yC[8] * yC[3] + b * (xC[8] * yC[3] + yC[8] * xC[3]);
+		Data[63] += a * xC[9] * xC[3] + c * yC[9] * yC[3] + b * (xC[9] * yC[3] + yC[9] * xC[3]);
+		Data[64] += a * xC[10] * xC[3] + c * yC[10] * yC[3] + b * (xC[10] * yC[3] + yC[10] * xC[3]);
+		Data[65] += a * xC[11] * xC[3] + c * yC[11] * yC[3] + b * (xC[11] * yC[3] + yC[11] * xC[3]);
+		Data[66] += a * xC[12] * xC[3] + c * yC[12] * yC[3] + b * (xC[12] * yC[3] + yC[12] * xC[3]);
+		Data[67] += a * xC[13] * xC[3] + c * yC[13] * yC[3] + b * (xC[13] * yC[3] + yC[13] * xC[3]);
+		Data[68] += a * xX[0] * xC[3] + c * yX[0] * yC[3] + b * (xX[0] * yC[3] + yX[0] * xC[3]);
+		Data[69] += a * xX[1] * xC[3] + c * yX[1] * yC[3] + b * (xX[1] * yC[3] + yX[1] * xC[3]);
+		Data[70] += a * xX[2] * xC[3] + c * yX[2] * yC[3] + b * (xX[2] * yC[3] + yX[2] * xC[3]);
+		Data[71] += a * xX[3] * xC[3] + c * yX[3] * yC[3] + b * (xX[3] * yC[3] + yX[3] * xC[3]);
+		Data[72] += a * xX[4] * xC[3] + c * yX[4] * yC[3] + b * (xX[4] * yC[3] + yX[4] * xC[3]);
+		Data[73] += a * xX[5] * xC[3] + c * yX[5] * yC[3] + b * (xX[5] * yC[3] + yX[5] * xC[3]);
 
-		Data[34] += a * x6[0] * x6[0] + c * y6[0] * y6[0] + b * (x6[0] * y6[0] + y6[0] * x6[0]);
-		Data[35] += a * x6[1] * x6[0] + c * y6[1] * y6[0] + b * (x6[1] * y6[0] + y6[1] * x6[0]);
-		Data[36] += a * x6[2] * x6[0] + c * y6[2] * y6[0] + b * (x6[2] * y6[0] + y6[2] * x6[0]);
-		Data[37] += a * x6[3] * x6[0] + c * y6[3] * y6[0] + b * (x6[3] * y6[0] + y6[3] * x6[0]);
-		Data[38] += a * x6[4] * x6[0] + c * y6[4] * y6[0] + b * (x6[4] * y6[0] + y6[4] * x6[0]);
-		Data[39] += a * x6[5] * x6[0] + c * y6[5] * y6[0] + b * (x6[5] * y6[0] + y6[5] * x6[0]);
+		Data[74] += a * xC[4] * xC[4] + c * yC[4] * yC[4] + b * (xC[4] * yC[4] + yC[4] * xC[4]);
+		Data[75] += a * xC[5] * xC[4] + c * yC[5] * yC[4] + b * (xC[5] * yC[4] + yC[5] * xC[4]);
+		Data[76] += a * xC[6] * xC[4] + c * yC[6] * yC[4] + b * (xC[6] * yC[4] + yC[6] * xC[4]);
+		Data[77] += a * xC[7] * xC[4] + c * yC[7] * yC[4] + b * (xC[7] * yC[4] + yC[7] * xC[4]);
+		Data[78] += a * xC[8] * xC[4] + c * yC[8] * yC[4] + b * (xC[8] * yC[4] + yC[8] * xC[4]);
+		Data[79] += a * xC[9] * xC[4] + c * yC[9] * yC[4] + b * (xC[9] * yC[4] + yC[9] * xC[4]);
+		Data[80] += a * xC[10] * xC[4] + c * yC[10] * yC[4] + b * (xC[10] * yC[4] + yC[10] * xC[4]);
+		Data[81] += a * xC[11] * xC[4] + c * yC[11] * yC[4] + b * (xC[11] * yC[4] + yC[11] * xC[4]);
+		Data[82] += a * xC[12] * xC[4] + c * yC[12] * yC[4] + b * (xC[12] * yC[4] + yC[12] * xC[4]);
+		Data[83] += a * xC[13] * xC[4] + c * yC[13] * yC[4] + b * (xC[13] * yC[4] + yC[13] * xC[4]);
+		Data[84] += a * xX[0] * xC[4] + c * yX[0] * yC[4] + b * (xX[0] * yC[4] + yX[0] * xC[4]);
+		Data[85] += a * xX[1] * xC[4] + c * yX[1] * yC[4] + b * (xX[1] * yC[4] + yX[1] * xC[4]);
+		Data[86] += a * xX[2] * xC[4] + c * yX[2] * yC[4] + b * (xX[2] * yC[4] + yX[2] * xC[4]);
+		Data[87] += a * xX[3] * xC[4] + c * yX[3] * yC[4] + b * (xX[3] * yC[4] + yX[3] * xC[4]);
+		Data[88] += a * xX[4] * xC[4] + c * yX[4] * yC[4] + b * (xX[4] * yC[4] + yX[4] * xC[4]);
+		Data[89] += a * xX[5] * xC[4] + c * yX[5] * yC[4] + b * (xX[5] * yC[4] + yX[5] * xC[4]);
 
-		Data[40] += a * x6[1] * x6[1] + c * y6[1] * y6[1] + b * (x6[1] * y6[1] + y6[1] * x6[1]);
-		Data[41] += a * x6[2] * x6[1] + c * y6[2] * y6[1] + b * (x6[2] * y6[1] + y6[2] * x6[1]);
-		Data[42] += a * x6[3] * x6[1] + c * y6[3] * y6[1] + b * (x6[3] * y6[1] + y6[3] * x6[1]);
-		Data[43] += a * x6[4] * x6[1] + c * y6[4] * y6[1] + b * (x6[4] * y6[1] + y6[4] * x6[1]);
-		Data[44] += a * x6[5] * x6[1] + c * y6[5] * y6[1] + b * (x6[5] * y6[1] + y6[5] * x6[1]);
+		Data[90] += a * xC[5] * xC[5] + c * yC[5] * yC[5] + b * (xC[5] * yC[5] + yC[5] * xC[5]);
+		Data[91] += a * xC[6] * xC[5] + c * yC[6] * yC[5] + b * (xC[6] * yC[5] + yC[6] * xC[5]);
+		Data[92] += a * xC[7] * xC[5] + c * yC[7] * yC[5] + b * (xC[7] * yC[5] + yC[7] * xC[5]);
+		Data[93] += a * xC[8] * xC[5] + c * yC[8] * yC[5] + b * (xC[8] * yC[5] + yC[8] * xC[5]);
+		Data[94] += a * xC[9] * xC[5] + c * yC[9] * yC[5] + b * (xC[9] * yC[5] + yC[9] * xC[5]);
+		Data[95] += a * xC[10] * xC[5] + c * yC[10] * yC[5] + b * (xC[10] * yC[5] + yC[10] * xC[5]);
+		Data[96] += a * xC[11] * xC[5] + c * yC[11] * yC[5] + b * (xC[11] * yC[5] + yC[11] * xC[5]);
+		Data[97] += a * xC[12] * xC[5] + c * yC[12] * yC[5] + b * (xC[12] * yC[5] + yC[12] * xC[5]);
+		Data[98] += a * xC[13] * xC[5] + c * yC[13] * yC[5] + b * (xC[13] * yC[5] + yC[13] * xC[5]);
+		Data[99] += a * xX[0] * xC[5] + c * yX[0] * yC[5] + b * (xX[0] * yC[5] + yX[0] * xC[5]);
+		Data[100] += a * xX[1] * xC[5] + c * yX[1] * yC[5] + b * (xX[1] * yC[5] + yX[1] * xC[5]);
+		Data[101] += a * xX[2] * xC[5] + c * yX[2] * yC[5] + b * (xX[2] * yC[5] + yX[2] * xC[5]);
+		Data[102] += a * xX[3] * xC[5] + c * yX[3] * yC[5] + b * (xX[3] * yC[5] + yX[3] * xC[5]);
+		Data[103] += a * xX[4] * xC[5] + c * yX[4] * yC[5] + b * (xX[4] * yC[5] + yX[4] * xC[5]);
+		Data[104] += a * xX[5] * xC[5] + c * yX[5] * yC[5] + b * (xX[5] * yC[5] + yX[5] * xC[5]);
 
-		Data[45] += a * x6[2] * x6[2] + c * y6[2] * y6[2] + b * (x6[2] * y6[2] + y6[2] * x6[2]);
-		Data[46] += a * x6[3] * x6[2] + c * y6[3] * y6[2] + b * (x6[3] * y6[2] + y6[3] * x6[2]);
-		Data[47] += a * x6[4] * x6[2] + c * y6[4] * y6[2] + b * (x6[4] * y6[2] + y6[4] * x6[2]);
-		Data[48] += a * x6[5] * x6[2] + c * y6[5] * y6[2] + b * (x6[5] * y6[2] + y6[5] * x6[2]);
+		Data[105] += a * xC[6] * xC[6] + c * yC[6] * yC[6] + b * (xC[6] * yC[6] + yC[6] * xC[6]);
+		Data[106] += a * xC[7] * xC[6] + c * yC[7] * yC[6] + b * (xC[7] * yC[6] + yC[7] * xC[6]);
+		Data[107] += a * xC[8] * xC[6] + c * yC[8] * yC[6] + b * (xC[8] * yC[6] + yC[8] * xC[6]);
+		Data[108] += a * xC[9] * xC[6] + c * yC[9] * yC[6] + b * (xC[9] * yC[6] + yC[9] * xC[6]);
+		Data[109] += a * xC[10] * xC[6] + c * yC[10] * yC[6] + b * (xC[10] * yC[6] + yC[10] * xC[6]);
+		Data[110] += a * xC[11] * xC[6] + c * yC[11] * yC[6] + b * (xC[11] * yC[6] + yC[11] * xC[6]);
+		Data[111] += a * xC[12] * xC[6] + c * yC[12] * yC[6] + b * (xC[12] * yC[6] + yC[12] * xC[6]);
+		Data[112] += a * xC[13] * xC[6] + c * yC[13] * yC[6] + b * (xC[13] * yC[6] + yC[13] * xC[6]);
+		Data[113] += a * xX[0] * xC[6] + c * yX[0] * yC[6] + b * (xX[0] * yC[6] + yX[0] * xC[6]);
+		Data[114] += a * xX[1] * xC[6] + c * yX[1] * yC[6] + b * (xX[1] * yC[6] + yX[1] * xC[6]);
+		Data[115] += a * xX[2] * xC[6] + c * yX[2] * yC[6] + b * (xX[2] * yC[6] + yX[2] * xC[6]);
+		Data[116] += a * xX[3] * xC[6] + c * yX[3] * yC[6] + b * (xX[3] * yC[6] + yX[3] * xC[6]);
+		Data[117] += a * xX[4] * xC[6] + c * yX[4] * yC[6] + b * (xX[4] * yC[6] + yX[4] * xC[6]);
+		Data[118] += a * xX[5] * xC[6] + c * yX[5] * yC[6] + b * (xX[5] * yC[6] + yX[5] * xC[6]);
 
-		Data[49] += a * x6[3] * x6[3] + c * y6[3] * y6[3] + b * (x6[3] * y6[3] + y6[3] * x6[3]);
-		Data[50] += a * x6[4] * x6[3] + c * y6[4] * y6[3] + b * (x6[4] * y6[3] + y6[4] * x6[3]);
-		Data[51] += a * x6[5] * x6[3] + c * y6[5] * y6[3] + b * (x6[5] * y6[3] + y6[5] * x6[3]);
+		Data[119] += a * xC[7] * xC[7] + c * yC[7] * yC[7] + b * (xC[7] * yC[7] + yC[7] * xC[7]);
+		Data[120] += a * xC[8] * xC[7] + c * yC[8] * yC[7] + b * (xC[8] * yC[7] + yC[8] * xC[7]);
+		Data[121] += a * xC[9] * xC[7] + c * yC[9] * yC[7] + b * (xC[9] * yC[7] + yC[9] * xC[7]);
+		Data[122] += a * xC[10] * xC[7] + c * yC[10] * yC[7] + b * (xC[10] * yC[7] + yC[10] * xC[7]);
+		Data[123] += a * xC[11] * xC[7] + c * yC[11] * yC[7] + b * (xC[11] * yC[7] + yC[11] * xC[7]);
+		Data[124] += a * xC[12] * xC[7] + c * yC[12] * yC[7] + b * (xC[12] * yC[7] + yC[12] * xC[7]);
+		Data[125] += a * xC[13] * xC[7] + c * yC[13] * yC[7] + b * (xC[13] * yC[7] + yC[13] * xC[7]);
+		Data[126] += a * xX[0] * xC[7] + c * yX[0] * yC[7] + b * (xX[0] * yC[7] + yX[0] * xC[7]);
+		Data[127] += a * xX[1] * xC[7] + c * yX[1] * yC[7] + b * (xX[1] * yC[7] + yX[1] * xC[7]);
+		Data[128] += a * xX[2] * xC[7] + c * yX[2] * yC[7] + b * (xX[2] * yC[7] + yX[2] * xC[7]);
+		Data[129] += a * xX[3] * xC[7] + c * yX[3] * yC[7] + b * (xX[3] * yC[7] + yX[3] * xC[7]);
+		Data[130] += a * xX[4] * xC[7] + c * yX[4] * yC[7] + b * (xX[4] * yC[7] + yX[4] * xC[7]);
+		Data[131] += a * xX[5] * xC[7] + c * yX[5] * yC[7] + b * (xX[5] * yC[7] + yX[5] * xC[7]);
 
-		Data[52] += a * x6[4] * x6[4] + c * y6[4] * y6[4] + b * (x6[4] * y6[4] + y6[4] * x6[4]);
-		Data[53] += a * x6[5] * x6[4] + c * y6[5] * y6[4] + b * (x6[5] * y6[4] + y6[5] * x6[4]);
+		Data[132] += a * xC[8] * xC[8] + c * yC[8] * yC[8] + b * (xC[8] * yC[8] + yC[8] * xC[8]);
+		Data[133] += a * xC[9] * xC[8] + c * yC[9] * yC[8] + b * (xC[9] * yC[8] + yC[9] * xC[8]);
+		Data[134] += a * xC[10] * xC[8] + c * yC[10] * yC[8] + b * (xC[10] * yC[8] + yC[10] * xC[8]);
+		Data[135] += a * xC[11] * xC[8] + c * yC[11] * yC[8] + b * (xC[11] * yC[8] + yC[11] * xC[8]);
+		Data[136] += a * xC[12] * xC[8] + c * yC[12] * yC[8] + b * (xC[12] * yC[8] + yC[12] * xC[8]);
+		Data[137] += a * xC[13] * xC[8] + c * yC[13] * yC[8] + b * (xC[13] * yC[8] + yC[13] * xC[8]);
+		Data[138] += a * xX[0] * xC[8] + c * yX[0] * yC[8] + b * (xX[0] * yC[8] + yX[0] * xC[8]);
+		Data[139] += a * xX[1] * xC[8] + c * yX[1] * yC[8] + b * (xX[1] * yC[8] + yX[1] * xC[8]);
+		Data[140] += a * xX[2] * xC[8] + c * yX[2] * yC[8] + b * (xX[2] * yC[8] + yX[2] * xC[8]);
+		Data[141] += a * xX[3] * xC[8] + c * yX[3] * yC[8] + b * (xX[3] * yC[8] + yX[3] * xC[8]);
+		Data[142] += a * xX[4] * xC[8] + c * yX[4] * yC[8] + b * (xX[4] * yC[8] + yX[4] * xC[8]);
+		Data[143] += a * xX[5] * xC[8] + c * yX[5] * yC[8] + b * (xX[5] * yC[8] + yX[5] * xC[8]);
 
-		Data[54] += a * x6[5] * x6[5] + c * y6[5] * y6[5] + b * (x6[5] * y6[5] + y6[5] * x6[5]);
+		Data[144] += a * xC[9] * xC[9] + c * yC[9] * yC[9] + b * (xC[9] * yC[9] + yC[9] * xC[9]);
+		Data[145] += a * xC[10] * xC[9] + c * yC[10] * yC[9] + b * (xC[10] * yC[9] + yC[10] * xC[9]);
+		Data[146] += a * xC[11] * xC[9] + c * yC[11] * yC[9] + b * (xC[11] * yC[9] + yC[11] * xC[9]);
+		Data[147] += a * xC[12] * xC[9] + c * yC[12] * yC[9] + b * (xC[12] * yC[9] + yC[12] * xC[9]);
+		Data[148] += a * xC[13] * xC[9] + c * yC[13] * yC[9] + b * (xC[13] * yC[9] + yC[13] * xC[9]);
+		Data[149] += a * xX[0] * xC[9] + c * yX[0] * yC[9] + b * (xX[0] * yC[9] + yX[0] * xC[9]);
+		Data[150] += a * xX[1] * xC[9] + c * yX[1] * yC[9] + b * (xX[1] * yC[9] + yX[1] * xC[9]);
+		Data[151] += a * xX[2] * xC[9] + c * yX[2] * yC[9] + b * (xX[2] * yC[9] + yX[2] * xC[9]);
+		Data[152] += a * xX[3] * xC[9] + c * yX[3] * yC[9] + b * (xX[3] * yC[9] + yX[3] * xC[9]);
+		Data[153] += a * xX[4] * xC[9] + c * yX[4] * yC[9] + b * (xX[4] * yC[9] + yX[4] * xC[9]);
+		Data[154] += a * xX[5] * xC[9] + c * yX[5] * yC[9] + b * (xX[5] * yC[9] + yX[5] * xC[9]);
+
+		Data[155] += a * xC[10] * xC[10] + c * yC[10] * yC[10] + b * (xC[10] * yC[10] + yC[10] * xC[10]);
+		Data[156] += a * xC[11] * xC[10] + c * yC[11] * yC[10] + b * (xC[11] * yC[10] + yC[11] * xC[10]);
+		Data[157] += a * xC[12] * xC[10] + c * yC[12] * yC[10] + b * (xC[12] * yC[10] + yC[12] * xC[10]);
+		Data[158] += a * xC[13] * xC[10] + c * yC[13] * yC[10] + b * (xC[13] * yC[10] + yC[13] * xC[10]);
+		Data[159] += a * xX[0] * xC[10] + c * yX[0] * yC[10] + b * (xX[0] * yC[10] + yX[0] * xC[10]);
+		Data[160] += a * xX[1] * xC[10] + c * yX[1] * yC[10] + b * (xX[1] * yC[10] + yX[1] * xC[10]);
+		Data[161] += a * xX[2] * xC[10] + c * yX[2] * yC[10] + b * (xX[2] * yC[10] + yX[2] * xC[10]);
+		Data[162] += a * xX[3] * xC[10] + c * yX[3] * yC[10] + b * (xX[3] * yC[10] + yX[3] * xC[10]);
+		Data[163] += a * xX[4] * xC[10] + c * yX[4] * yC[10] + b * (xX[4] * yC[10] + yX[4] * xC[10]);
+		Data[164] += a * xX[5] * xC[10] + c * yX[5] * yC[10] + b * (xX[5] * yC[10] + yX[5] * xC[10]);
+
+		Data[165] += a * xC[11] * xC[11] + c * yC[11] * yC[11] + b * (xC[11] * yC[11] + yC[11] * xC[11]);
+		Data[166] += a * xC[12] * xC[11] + c * yC[12] * yC[11] + b * (xC[12] * yC[11] + yC[12] * xC[11]);
+		Data[167] += a * xC[13] * xC[11] + c * yC[13] * yC[11] + b * (xC[13] * yC[11] + yC[13] * xC[11]);
+		Data[168] += a * xX[0] * xC[11] + c * yX[0] * yC[11] + b * (xX[0] * yC[11] + yX[0] * xC[11]);
+		Data[169] += a * xX[1] * xC[11] + c * yX[1] * yC[11] + b * (xX[1] * yC[11] + yX[1] * xC[11]);
+		Data[170] += a * xX[2] * xC[11] + c * yX[2] * yC[11] + b * (xX[2] * yC[11] + yX[2] * xC[11]);
+		Data[171] += a * xX[3] * xC[11] + c * yX[3] * yC[11] + b * (xX[3] * yC[11] + yX[3] * xC[11]);
+		Data[172] += a * xX[4] * xC[11] + c * yX[4] * yC[11] + b * (xX[4] * yC[11] + yX[4] * xC[11]);
+		Data[173] += a * xX[5] * xC[11] + c * yX[5] * yC[11] + b * (xX[5] * yC[11] + yX[5] * xC[11]);
+
+		Data[174] += a * xC[12] * xC[12] + c * yC[12] * yC[12] + b * (xC[12] * yC[12] + yC[12] * xC[12]);
+		Data[175] += a * xC[13] * xC[12] + c * yC[13] * yC[12] + b * (xC[13] * yC[12] + yC[13] * xC[12]);
+		Data[176] += a * xX[0] * xC[12] + c * yX[0] * yC[12] + b * (xX[0] * yC[12] + yX[0] * xC[12]);
+		Data[177] += a * xX[1] * xC[12] + c * yX[1] * yC[12] + b * (xX[1] * yC[12] + yX[1] * xC[12]);
+		Data[178] += a * xX[2] * xC[12] + c * yX[2] * yC[12] + b * (xX[2] * yC[12] + yX[2] * xC[12]);
+		Data[179] += a * xX[3] * xC[12] + c * yX[3] * yC[12] + b * (xX[3] * yC[12] + yX[3] * xC[12]);
+		Data[180] += a * xX[4] * xC[12] + c * yX[4] * yC[12] + b * (xX[4] * yC[12] + yX[4] * xC[12]);
+		Data[181] += a * xX[5] * xC[12] + c * yX[5] * yC[12] + b * (xX[5] * yC[12] + yX[5] * xC[12]);
+
+		Data[182] += a * xC[13] * xC[13] + c * yC[13] * yC[13] + b * (xC[13] * yC[13] + yC[13] * xC[13]);
+		Data[183] += a * xX[0] * xC[13] + c * yX[0] * yC[13] + b * (xX[0] * yC[13] + yX[0] * xC[13]);
+		Data[184] += a * xX[1] * xC[13] + c * yX[1] * yC[13] + b * (xX[1] * yC[13] + yX[1] * xC[13]);
+		Data[185] += a * xX[2] * xC[13] + c * yX[2] * yC[13] + b * (xX[2] * yC[13] + yX[2] * xC[13]);
+		Data[186] += a * xX[3] * xC[13] + c * yX[3] * yC[13] + b * (xX[3] * yC[13] + yX[3] * xC[13]);
+		Data[187] += a * xX[4] * xC[13] + c * yX[4] * yC[13] + b * (xX[4] * yC[13] + yX[4] * xC[13]);
+		Data[188] += a * xX[5] * xC[13] + c * yX[5] * yC[13] + b * (xX[5] * yC[13] + yX[5] * xC[13]);
+
+		Data[189] += a * xX[0] * xX[0] + c * yX[0] * yX[0] + b * (xX[0] * yX[0] + yX[0] * xX[0]);
+		Data[190] += a * xX[1] * xX[0] + c * yX[1] * yX[0] + b * (xX[1] * yX[0] + yX[1] * xX[0]);
+		Data[191] += a * xX[2] * xX[0] + c * yX[2] * yX[0] + b * (xX[2] * yX[0] + yX[2] * xX[0]);
+		Data[192] += a * xX[3] * xX[0] + c * yX[3] * yX[0] + b * (xX[3] * yX[0] + yX[3] * xX[0]);
+		Data[193] += a * xX[4] * xX[0] + c * yX[4] * yX[0] + b * (xX[4] * yX[0] + yX[4] * xX[0]);
+		Data[194] += a * xX[5] * xX[0] + c * yX[5] * yX[0] + b * (xX[5] * yX[0] + yX[5] * xX[0]);
+
+		Data[195] += a * xX[1] * xX[1] + c * yX[1] * yX[1] + b * (xX[1] * yX[1] + yX[1] * xX[1]);
+		Data[196] += a * xX[2] * xX[1] + c * yX[2] * yX[1] + b * (xX[2] * yX[1] + yX[2] * xX[1]);
+		Data[197] += a * xX[3] * xX[1] + c * yX[3] * yX[1] + b * (xX[3] * yX[1] + yX[3] * xX[1]);
+		Data[198] += a * xX[4] * xX[1] + c * yX[4] * yX[1] + b * (xX[4] * yX[1] + yX[4] * xX[1]);
+		Data[199] += a * xX[5] * xX[1] + c * yX[5] * yX[1] + b * (xX[5] * yX[1] + yX[5] * xX[1]);
+
+		Data[200] += a * xX[2] * xX[2] + c * yX[2] * yX[2] + b * (xX[2] * yX[2] + yX[2] * xX[2]);
+		Data[201] += a * xX[3] * xX[2] + c * yX[3] * yX[2] + b * (xX[3] * yX[2] + yX[3] * xX[2]);
+		Data[202] += a * xX[4] * xX[2] + c * yX[4] * yX[2] + b * (xX[4] * yX[2] + yX[4] * xX[2]);
+		Data[203] += a * xX[5] * xX[2] + c * yX[5] * yX[2] + b * (xX[5] * yX[2] + yX[5] * xX[2]);
+
+		Data[204] += a * xX[3] * xX[3] + c * yX[3] * yX[3] + b * (xX[3] * yX[3] + yX[3] * xX[3]);
+		Data[205] += a * xX[4] * xX[3] + c * yX[4] * yX[3] + b * (xX[4] * yX[3] + yX[4] * xX[3]);
+		Data[206] += a * xX[5] * xX[3] + c * yX[5] * yX[3] + b * (xX[5] * yX[3] + yX[5] * xX[3]);
+
+		Data[207] += a * xX[4] * xX[4] + c * yX[4] * yX[4] + b * (xX[4] * yX[4] + yX[4] * xX[4]);
+		Data[208] += a * xX[5] * xX[4] + c * yX[5] * yX[4] + b * (xX[5] * yX[4] + yX[5] * xX[4]);
+
+		Data[209] += a * xX[5] * xX[5] + c * yX[5] * yX[5] + b * (xX[5] * yX[5] + yX[5] * xX[5]);
 
 		num++;
 	}
 
-	inline void updateTopRight(const float *const x4, const float *const x6, const float *const y4, const float *const y6,
+	inline void updateTopRight(const float *const xC, const float *const xX, const float *const yC, const float *const yX,
 			const float TR00, const float TR10, const float TR01, const float TR11, const float TR02, const float TR12) {
-		TopRight_Data[0] += x4[0] * TR00 + y4[0] * TR10;
-		TopRight_Data[1] += x4[0] * TR01 + y4[0] * TR11;
-		TopRight_Data[2] += x4[0] * TR02 + y4[0] * TR12;
+		TopRight_Data[0] += xC[0] * TR00 + yC[0] * TR10;
+		TopRight_Data[1] += xC[0] * TR01 + yC[0] * TR11;
+		TopRight_Data[2] += xC[0] * TR02 + yC[0] * TR12;
 
-		TopRight_Data[3] += x4[1] * TR00 + y4[1] * TR10;
-		TopRight_Data[4] += x4[1] * TR01 + y4[1] * TR11;
-		TopRight_Data[5] += x4[1] * TR02 + y4[1] * TR12;
+		TopRight_Data[3] += xC[1] * TR00 + yC[1] * TR10;
+		TopRight_Data[4] += xC[1] * TR01 + yC[1] * TR11;
+		TopRight_Data[5] += xC[1] * TR02 + yC[1] * TR12;
 
-		TopRight_Data[6] += x4[2] * TR00 + y4[2] * TR10;
-		TopRight_Data[7] += x4[2] * TR01 + y4[2] * TR11;
-		TopRight_Data[8] += x4[2] * TR02 + y4[2] * TR12;
+		TopRight_Data[6] += xC[2] * TR00 + yC[2] * TR10;
+		TopRight_Data[7] += xC[2] * TR01 + yC[2] * TR11;
+		TopRight_Data[8] += xC[2] * TR02 + yC[2] * TR12;
 
-		TopRight_Data[9] += x4[3] * TR00 + y4[3] * TR10;
-		TopRight_Data[10] += x4[3] * TR01 + y4[3] * TR11;
-		TopRight_Data[11] += x4[3] * TR02 + y4[3] * TR12;
+		TopRight_Data[9] += xC[4] * TR00 + yC[4] * TR10;
+		TopRight_Data[10] += xC[4] * TR01 + yC[4] * TR11;
+		TopRight_Data[11] += xC[4] * TR02 + yC[4] * TR12;
 
-		TopRight_Data[12] += x6[0] * TR00 + y6[0] * TR10;
-		TopRight_Data[13] += x6[0] * TR01 + y6[0] * TR11;
-		TopRight_Data[14] += x6[0] * TR02 + y6[0] * TR12;
+		TopRight_Data[12] += xC[5] * TR00 + yC[5] * TR10;
+		TopRight_Data[13] += xC[5] * TR01 + yC[5] * TR11;
+		TopRight_Data[14] += xC[5] * TR02 + yC[5] * TR12;
 
-		TopRight_Data[15] += x6[1] * TR00 + y6[1] * TR10;
-		TopRight_Data[16] += x6[1] * TR01 + y6[1] * TR11;
-		TopRight_Data[17] += x6[1] * TR02 + y6[1] * TR12;
+		TopRight_Data[15] += xC[6] * TR00 + yC[6] * TR10;
+		TopRight_Data[16] += xC[6] * TR01 + yC[6] * TR11;
+		TopRight_Data[17] += xC[6] * TR02 + yC[6] * TR12;
 
-		TopRight_Data[18] += x6[2] * TR00 + y6[2] * TR10;
-		TopRight_Data[19] += x6[2] * TR01 + y6[2] * TR11;
-		TopRight_Data[20] += x6[2] * TR02 + y6[2] * TR12;
+		TopRight_Data[18] += xC[7] * TR00 + yC[7] * TR10;
+		TopRight_Data[19] += xC[7] * TR01 + yC[7] * TR11;
+		TopRight_Data[20] += xC[7] * TR02 + yC[7] * TR12;
 
-		TopRight_Data[21] += x6[3] * TR00 + y6[3] * TR10;
-		TopRight_Data[22] += x6[3] * TR01 + y6[3] * TR11;
-		TopRight_Data[23] += x6[3] * TR02 + y6[3] * TR12;
+		TopRight_Data[21] += xC[8] * TR00 + yC[8] * TR10;
+		TopRight_Data[22] += xC[8] * TR01 + yC[8] * TR11;
+		TopRight_Data[23] += xC[8] * TR02 + yC[8] * TR12;
 
-		TopRight_Data[24] += x6[4] * TR00 + y6[4] * TR10;
-		TopRight_Data[25] += x6[4] * TR01 + y6[4] * TR11;
-		TopRight_Data[26] += x6[4] * TR02 + y6[4] * TR12;
+		TopRight_Data[24] += xC[9] * TR00 + yC[9] * TR10;
+		TopRight_Data[25] += xC[9] * TR01 + yC[9] * TR11;
+		TopRight_Data[26] += xC[9] * TR02 + yC[9] * TR12;
 
-		TopRight_Data[27] += x6[5] * TR00 + y6[5] * TR10;
-		TopRight_Data[28] += x6[5] * TR01 + y6[5] * TR11;
-		TopRight_Data[29] += x6[5] * TR02 + y6[5] * TR12;
+		TopRight_Data[27] += xC[10] * TR00 + yC[10] * TR10;
+		TopRight_Data[28] += xC[10] * TR01 + yC[10] * TR11;
+		TopRight_Data[29] += xC[10] * TR02 + yC[10] * TR12;
+
+		TopRight_Data[30] += xC[11] * TR00 + yC[11] * TR10;
+		TopRight_Data[31] += xC[11] * TR01 + yC[11] * TR11;
+		TopRight_Data[32] += xC[11] * TR02 + yC[11] * TR12;
+
+		TopRight_Data[33] += xC[12] * TR00 + yC[12] * TR10;
+		TopRight_Data[34] += xC[12] * TR01 + yC[12] * TR11;
+		TopRight_Data[35] += xC[12] * TR02 + yC[12] * TR12;
+
+		TopRight_Data[36] += xC[13] * TR00 + yC[13] * TR10;
+		TopRight_Data[37] += xC[13] * TR01 + yC[13] * TR11;
+		TopRight_Data[38] += xC[13] * TR02 + yC[13] * TR12;
+
+		TopRight_Data[39] += xC[14] * TR00 + yC[14] * TR10;
+		TopRight_Data[40] += xC[14] * TR01 + yC[14] * TR11;
+		TopRight_Data[41] += xC[14] * TR02 + yC[14] * TR12;
+
+		TopRight_Data[42] += xX[0] * TR00 + yX[0] * TR10;
+		TopRight_Data[43] += xX[0] * TR01 + yX[0] * TR11;
+		TopRight_Data[44] += xX[0] * TR02 + yX[0] * TR12;
+
+		TopRight_Data[45] += xX[1] * TR00 + yX[1] * TR10;
+		TopRight_Data[46] += xX[1] * TR01 + yX[1] * TR11;
+		TopRight_Data[47] += xX[1] * TR02 + yX[1] * TR12;
+
+		TopRight_Data[48] += xX[2] * TR00 + yX[2] * TR10;
+		TopRight_Data[49] += xX[2] * TR01 + yX[2] * TR11;
+		TopRight_Data[50] += xX[2] * TR02 + yX[2] * TR12;
+
+		TopRight_Data[51] += xX[3] * TR00 + yX[3] * TR10;
+		TopRight_Data[52] += xX[3] * TR01 + yX[3] * TR11;
+		TopRight_Data[53] += xX[3] * TR02 + yX[3] * TR12;
+
+		TopRight_Data[54] += xX[4] * TR00 + yX[4] * TR10;
+		TopRight_Data[55] += xX[4] * TR01 + yX[4] * TR11;
+		TopRight_Data[56] += xX[4] * TR02 + yX[4] * TR12;
+
+		TopRight_Data[57] += xX[5] * TR00 + yX[5] * TR10;
+		TopRight_Data[58] += xX[5] * TR01 + yX[5] * TR11;
+		TopRight_Data[59] += xX[5] * TR02 + yX[5] * TR12;
 
 	}
 
+	// ...why a 3x3 upper diagonal matrix of affine brightness AB?!
 	inline void updateBotRight(const float a00, const float a01, const float a02, const float a11, const float a12,
 			const float a22) {
 		BotRight_Data[0] += a00;
@@ -770,8 +979,8 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	}
 
 private:
-	EIGEN_ALIGN16 float Data[60];
-	EIGEN_ALIGN16 float TopRight_Data[32];
+	EIGEN_ALIGN16 float Data[212];  // 210 are used, but is divisible by 4 (4*4=16) for word alignment.
+	EIGEN_ALIGN16 float TopRight_Data[60];
 	EIGEN_ALIGN16 float BotRight_Data[8];
 };
 

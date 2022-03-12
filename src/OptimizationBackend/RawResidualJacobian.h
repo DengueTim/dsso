@@ -26,7 +26,7 @@
 #include "util/NumType.h"
 
 namespace dso {
-// Residual for a point. Although parts are the residuals on the pixels that belong to the point.
+// Residual for a point. Although parts are the residuals on the pixels that belong to that point.
 struct RawResidualJacobian {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
@@ -41,7 +41,7 @@ struct RawResidualJacobian {
 	Vec6f Jpdxi[2];			// 2x6
 
 	// the two rows of d[x,y]/d[C].  How image point x & y change with Camera intrinsics estimate.
-	VecCf Jpdc[2];			// 2x4
+	VecCf Jpdc[2];			// 2x14
 
 	// the two rows of d[x,y]/d[idepth].  How image point x & y change with inverse depth estimate.
 	Vec2f Jpdd;				// 2x1

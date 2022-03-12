@@ -284,7 +284,6 @@ struct FrameHessian {
 struct CalibHessian {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
-	static int instanceCounter;
 
 	VecC value_zero;
 	VecC value_scaled;
@@ -296,9 +295,6 @@ struct CalibHessian {
 	VecC value_backup;
 	VecC value_minus_value_zero;
 
-	inline ~CalibHessian() {
-		instanceCounter--;
-	}
 	inline CalibHessian() {
 
 		VecC initial_value = VecC::Zero();
@@ -311,7 +307,6 @@ struct CalibHessian {
 		value_zero = value;
 		value_minus_value_zero.setZero();
 
-		instanceCounter++;
 		for (int i = 0; i < 256; i++)
 			Binv[i] = B[i] = i;		// set gamma function to identity
 	}

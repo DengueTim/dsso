@@ -42,8 +42,11 @@ typedef Sophus::SE3d SE3;
 typedef Sophus::Sim3d Sim3;
 typedef Sophus::SO3d SO3;
 
-// Number of Camera intrisic params fx,fy,cx,cx.
-#define CPARS 4
+/* Number of Camera intrisic params fx,fy,cx,cx for two cameras + 6 relative pose params. 4+4+6
+ * It is unlikely that most stereo cameras(especially cheap ones) have the sensors&lens perfectly aligned.
+ * Model the individual intrisics and relative L/R pose.
+ */
+#define CPARS 14
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatXX;
 typedef Eigen::Matrix<double, CPARS, CPARS> MatCC;
@@ -118,7 +121,7 @@ typedef Eigen::Matrix<float, 4, 1> Vec4f;
 typedef Eigen::Matrix<float, 4, 4> Mat44f;
 typedef Eigen::Matrix<float, 12, 12> Mat1212f;
 typedef Eigen::Matrix<float, 12, 1> Vec12f;
-typedef Eigen::Matrix<float, 13, 13> Mat1313f;
+typedef Eigen::Matrix<float, 23, 23> Mat2323f;
 typedef Eigen::Matrix<float, 10, 10> Mat1010f;
 typedef Eigen::Matrix<float, 13, 1> Vec13f;
 typedef Eigen::Matrix<float, 9, 9> Mat99f;

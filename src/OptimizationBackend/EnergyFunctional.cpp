@@ -723,6 +723,10 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *
 			HFinal_top(i, i) *= (1 + lambda);
 
 	} else {
+//		std::cout << "HL_top:\n" << HL_top << "\n\n";
+//		std::cout << "HM:\n" << HM << "\n\n";
+//		std::cout << "HA_top:\n" << HA_top << "\n\n";
+//		std::cout << "H_sc:\n" << H_sc << "\n\n";
 
 		HFinal_top = HL_top + HM + HA_top;
 		bFinal_top = bL_top + bM_top + bA_top - b_sc;

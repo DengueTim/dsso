@@ -96,7 +96,7 @@ double PointFrameResidual::linearize(CalibHessian *HCalib) {
 
 	// How the target image X and Y pixel position change WRT camera pose, camera intrinsics and point depth
 	Vec6f d_xi_x, d_xi_y;
-	Vec4f d_C_x, d_C_y;
+	VecCf d_C_x, d_C_y;
 	float d_d_x, d_d_y;
 	{
 		float drescale, u, v, new_idepth;
@@ -116,6 +116,9 @@ double PointFrameResidual::linearize(CalibHessian *HCalib) {
 		d_d_y = drescale * (PRE_tTll_0[1] - PRE_tTll_0[2] * v) * SCALE_IDEPTH * HCalib->fyl();
 
 		// diff calib
+		d_C_x.setZero();
+		d_C_y.setZero();
+
 		d_C_x[2] = drescale * (PRE_RTll_0(2, 0) * u - PRE_RTll_0(0, 0));
 		d_C_x[3] = HCalib->fxl() * drescale * (PRE_RTll_0(2, 1) * u - PRE_RTll_0(0, 1)) * HCalib->fyli();
 		d_C_x[0] = KliP[0] * d_C_x[2];
