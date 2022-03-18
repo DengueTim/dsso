@@ -642,7 +642,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	}
 
 	/*
-	 * Params are how image x & y change with Camera intrisics(xC,yC) and pose (xXm yX). And
+	 * Params are how image x & y change with Camera intrisics(xC,yC) and pose (xX yX). And
 	 * How the point (sum of squared pixel)residual change with image x & y squared(a,b,c).
 	 *
 	 * Accumulates dRes/(dCameraP, dPose)?
@@ -897,49 +897,49 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		TopRight_Data[7] += xC[2] * TR01 + yC[2] * TR11;
 		TopRight_Data[8] += xC[2] * TR02 + yC[2] * TR12;
 
-		TopRight_Data[9] += xC[4] * TR00 + yC[4] * TR10;
-		TopRight_Data[10] += xC[4] * TR01 + yC[4] * TR11;
-		TopRight_Data[11] += xC[4] * TR02 + yC[4] * TR12;
+		TopRight_Data[9] += xC[3] * TR00 + yC[3] * TR10;
+		TopRight_Data[10] += xC[3] * TR01 + yC[3] * TR11;
+		TopRight_Data[11] += xC[3] * TR02 + yC[3] * TR12;
 
-		TopRight_Data[12] += xC[5] * TR00 + yC[5] * TR10;
-		TopRight_Data[13] += xC[5] * TR01 + yC[5] * TR11;
-		TopRight_Data[14] += xC[5] * TR02 + yC[5] * TR12;
+		TopRight_Data[12] += xC[4] * TR00 + yC[4] * TR10;
+		TopRight_Data[13] += xC[4] * TR01 + yC[4] * TR11;
+		TopRight_Data[14] += xC[4] * TR02 + yC[4] * TR12;
 
-		TopRight_Data[15] += xC[6] * TR00 + yC[6] * TR10;
-		TopRight_Data[16] += xC[6] * TR01 + yC[6] * TR11;
-		TopRight_Data[17] += xC[6] * TR02 + yC[6] * TR12;
+		TopRight_Data[15] += xC[5] * TR00 + yC[5] * TR10;
+		TopRight_Data[16] += xC[5] * TR01 + yC[5] * TR11;
+		TopRight_Data[17] += xC[5] * TR02 + yC[5] * TR12;
 
-		TopRight_Data[18] += xC[7] * TR00 + yC[7] * TR10;
-		TopRight_Data[19] += xC[7] * TR01 + yC[7] * TR11;
-		TopRight_Data[20] += xC[7] * TR02 + yC[7] * TR12;
+		TopRight_Data[18] += xC[6] * TR00 + yC[6] * TR10;
+		TopRight_Data[19] += xC[6] * TR01 + yC[6] * TR11;
+		TopRight_Data[20] += xC[6] * TR02 + yC[6] * TR12;
 
-		TopRight_Data[21] += xC[8] * TR00 + yC[8] * TR10;
-		TopRight_Data[22] += xC[8] * TR01 + yC[8] * TR11;
-		TopRight_Data[23] += xC[8] * TR02 + yC[8] * TR12;
+		TopRight_Data[21] += xC[7] * TR00 + yC[7] * TR10;
+		TopRight_Data[22] += xC[7] * TR01 + yC[7] * TR11;
+		TopRight_Data[23] += xC[7] * TR02 + yC[7] * TR12;
 
-		TopRight_Data[24] += xC[9] * TR00 + yC[9] * TR10;
-		TopRight_Data[25] += xC[9] * TR01 + yC[9] * TR11;
-		TopRight_Data[26] += xC[9] * TR02 + yC[9] * TR12;
+		TopRight_Data[24] += xC[8] * TR00 + yC[8] * TR10;
+		TopRight_Data[25] += xC[8] * TR01 + yC[8] * TR11;
+		TopRight_Data[26] += xC[8] * TR02 + yC[8] * TR12;
 
-		TopRight_Data[27] += xC[10] * TR00 + yC[10] * TR10;
-		TopRight_Data[28] += xC[10] * TR01 + yC[10] * TR11;
-		TopRight_Data[29] += xC[10] * TR02 + yC[10] * TR12;
+		TopRight_Data[27] += xC[9] * TR00 + yC[9] * TR10;
+		TopRight_Data[28] += xC[9] * TR01 + yC[9] * TR11;
+		TopRight_Data[29] += xC[9] * TR02 + yC[9] * TR12;
 
-		TopRight_Data[30] += xC[11] * TR00 + yC[11] * TR10;
-		TopRight_Data[31] += xC[11] * TR01 + yC[11] * TR11;
-		TopRight_Data[32] += xC[11] * TR02 + yC[11] * TR12;
+		TopRight_Data[30] += xC[10] * TR00 + yC[10] * TR10;
+		TopRight_Data[31] += xC[10] * TR01 + yC[10] * TR11;
+		TopRight_Data[32] += xC[10] * TR02 + yC[10] * TR12;
 
-		TopRight_Data[33] += xC[12] * TR00 + yC[12] * TR10;
-		TopRight_Data[34] += xC[12] * TR01 + yC[12] * TR11;
-		TopRight_Data[35] += xC[12] * TR02 + yC[12] * TR12;
+		TopRight_Data[33] += xC[11] * TR00 + yC[11] * TR10;
+		TopRight_Data[34] += xC[11] * TR01 + yC[11] * TR11;
+		TopRight_Data[35] += xC[11] * TR02 + yC[11] * TR12;
 
-		TopRight_Data[36] += xC[13] * TR00 + yC[13] * TR10;
-		TopRight_Data[37] += xC[13] * TR01 + yC[13] * TR11;
-		TopRight_Data[38] += xC[13] * TR02 + yC[13] * TR12;
+		TopRight_Data[36] += xC[12] * TR00 + yC[12] * TR10;
+		TopRight_Data[37] += xC[12] * TR01 + yC[12] * TR11;
+		TopRight_Data[38] += xC[12] * TR02 + yC[12] * TR12;
 
-		TopRight_Data[39] += xC[14] * TR00 + yC[14] * TR10;
-		TopRight_Data[40] += xC[14] * TR01 + yC[14] * TR11;
-		TopRight_Data[41] += xC[14] * TR02 + yC[14] * TR12;
+		TopRight_Data[39] += xC[13] * TR00 + yC[13] * TR10;
+		TopRight_Data[40] += xC[13] * TR01 + yC[13] * TR11;
+		TopRight_Data[41] += xC[13] * TR02 + yC[13] * TR12;
 
 		TopRight_Data[42] += xX[0] * TR00 + yX[0] * TR10;
 		TopRight_Data[43] += xX[0] * TR01 + yX[0] * TR11;
