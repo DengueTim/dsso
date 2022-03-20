@@ -89,10 +89,9 @@ struct PrepImageItem {
 
 class ImageFolderReader {
 public:
-	ImageFolderReader(std::string path, std::string pathR, std::string calibFile, std::string gammaFile, std::string vignetteFile) {
-		this->path = path;
+	ImageFolderReader(std::string pathL, std::string pathR, std::string calibFileL, std::string calibFileR, std::string gammaFile, std::string vignetteFile) {
+		this->pathL = pathL;
 		this->pathR = pathR;
-		this->calibfile = calibFile;
 
 #if HAS_ZIPLIB
 		ziparchive=0;
@@ -100,14 +99,14 @@ public:
 		databuffer=0;
 #endif
 
-		isZipped = (path.length() > 4 && path.substr(path.length() - 4) == ".zip");
+		isZipped = (pathL.length() > 4 && pathL.substr(pathL.length() - 4) == ".zip");
 
 		if (isZipped) {
 #if HAS_ZIPLIB
 			int ziperror = 0;
-			ziparchive = zip_open(path.c_str(), ZIP_RDONLY, &ziperror);
+			ziparchive = zip_open(pathL.c_str(), ZIP_RDONLY, &ziperror);
 			if (ziperror != 0) {
-				printf("ERROR %d reading archive %s!\n", ziperror, path.c_str());
+				printf("ERROR %d reading archive %s!\n", ziperror, pathL.c_str());
 				exit(1);
 			}
 
@@ -141,20 +140,21 @@ public:
 			exit(1);
 #endif
 		} else {
-			getdir(path, files);
+			getdir(pathL, files);
 			getdir(pathR, filesR);
 		}
 
-		undistort = Undistort::getUndistorterForFile(calibFile, gammaFile, vignetteFile);
+		undistortL = Undistort::getUndistorterForFile(calibFileL, gammaFile, vignetteFile, false);
+		undistortR = Undistort::getUndistorterForFile(calibFileR, gammaFile, vignetteFile, true);
 
-		widthOrg = undistort->getOriginalSize()[0];
-		heightOrg = undistort->getOriginalSize()[1];
-		width = undistort->getSize()[0];
-		height = undistort->getSize()[1];
+		widthOrg = undistortL->getOriginalSize()[0];
+		heightOrg = undistortL->getOriginalSize()[1];
+		width = undistortL->getSize()[0];
+		height = undistortL->getSize()[1];
 
 		// load timestamps if possible.
 		loadTimestamps();
-		printf("ImageFolderReader: got %d file pairs in %s & %s!\n", (int) files.size(), path.c_str(), pathR.c_str());
+		printf("ImageFolderReader: got %d file pairs in %s & %s!\n", (int) files.size(), pathL.c_str(), pathR.c_str());
 
 	}
 	~ImageFolderReader() {
@@ -166,18 +166,20 @@ public:
 		if(databuffer!=0) delete databuffer;
 #endif
 
-		delete undistort;
+		delete undistortL;
+		delete undistortR;
 	}
 	;
 
 	Eigen::VectorXf getOriginalCalib() {
-		return undistort->getOriginalParameter().cast<float>();
+		return undistortL->getOriginalParameter().cast<float>();
 	}
 	Eigen::Vector2i getOriginalDimensions() {
-		return undistort->getOriginalSize();
+		return undistortL->getOriginalSize();
 	}
 
-	void getCalibMono(Eigen::Matrix3f &K, int &w, int &h) {
+	void getCalibMono(Eigen::Matrix3f &K, int &w, int &h, const bool rightNotLeft = false) {
+		const Undistort *undistort = rightNotLeft ? undistortR : undistortL;
 		K = undistort->getK().cast<float>();
 		w = undistort->getSize()[0];
 		h = undistort->getSize()[1];
@@ -208,22 +210,38 @@ public:
 
 	}
 
-	MinimalImageB* getImageRaw(int id) {
-		return getImageRaw_internal(id, 0);
-	}
+	// By default allocates new ImageAndExposure else reuses what's passed in.
+	ImageAndExposure* getImage(int id, ImageAndExposure* iae = 0) {
+		MinimalImageB *minimgL = getImageRaw_internal(id, false);
+		MinimalImageB *minimgR = getImageRaw_internal(id, true);
 
-	ImageAndExposure* getImage(int id, bool forceLoadDirectly = false) {
-		return getImage_internal(id, 0);
+		const int w = 0, h = 0;
+		if (iae == 0) {
+			iae = new ImageAndExposure(w, h);
+		}
+
+		iae->timestamp = (timestamps.size() == 0 ? 0.0 : timestamps[id]);
+		iae->exposure_time = (!setting_useExposure || exposures.size() == 0) ? 1.0f : exposures[id];
+
+		//ImageAndExposure *ret2 = undistortL->undistort<unsigned char>(minimg, minimgR);
+		float factor = 1.0;
+		undistortL->undistort(minimgL, iae, factor);
+		undistortR->undistort(minimgR, iae, factor);
+
+		delete minimgL;
+		delete minimgR;
+		return iae;
 	}
 
 	inline float* getPhotometricGamma() {
-		if (undistort == 0 || undistort->photometricUndist == 0)
+		if (undistortL == 0 || undistortL->photometricUndist == 0)
 			return 0;
-		return undistort->photometricUndist->getG();
+		return undistortL->photometricUndist->getG();
 	}
 
 	// undistorter. [0] always exists, [1-2] only when MT is enabled.
-	Undistort *undistort;
+	Undistort *undistortR;
+	Undistort *undistortL;
 private:
 
 	MinimalImageB* getImageRaw_internal(int id, bool rightNotLeft) {
@@ -262,19 +280,9 @@ private:
 		}
 	}
 
-	ImageAndExposure* getImage_internal(int id, int unused) {
-		MinimalImageB *minimg = getImageRaw_internal(id, false);
-		MinimalImageB *minimgR = getImageRaw_internal(id, true);
-		ImageAndExposure *ret2 = undistort->undistort<unsigned char>(minimg, minimgR,
-				(exposures.size() == 0 ? 1.0f : exposures[id]), (timestamps.size() == 0 ? 0.0 : timestamps[id]));
-		delete minimg;
-		delete minimgR;
-		return ret2;
-	}
-
 	inline void loadTimestamps() {
 		std::ifstream tr;
-		std::string timesFile = path.substr(0, path.find_last_of('/')) + "/times.txt";
+		std::string timesFile = pathL.substr(0, pathL.find_last_of('/')) + "/times.txt";
 		tr.open(timesFile.c_str());
 		while (!tr.eof() && tr.good()) {
 			std::string line;
@@ -344,9 +352,8 @@ private:
 	int width, height;
 	int widthOrg, heightOrg;
 
-	std::string path;
+	std::string pathL;
 	std::string pathR;
-	std::string calibfile;
 
 	bool isZipped;
 

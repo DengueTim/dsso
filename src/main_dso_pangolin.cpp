@@ -49,7 +49,8 @@ std::string vignette = "";
 std::string gammaCalib = "";
 std::string sourceL = "";
 std::string sourceR = "";
-std::string calib = "";
+std::string calibL = "";
+std::string calibR = "";
 double rescale = 1;
 bool reverse = false;
 bool disableROS = false;
@@ -232,9 +233,15 @@ void parseArgument(char *arg) {
 		return;
 	}
 
-	if (1 == sscanf(arg, "calib=%s", buf)) {
-		calib = buf;
-		printf("loading calibration from %s!\n", calib.c_str());
+	if (1 == sscanf(arg, "leftCalib=%s", buf)) {
+		calibL = buf;
+		printf("loading left calibration from %s!\n", calibL.c_str());
+		return;
+	}
+
+	if (1 == sscanf(arg, "rightCalib=%s", buf)) {
+		calibR = buf;
+		printf("loading right calibration from %s!\n", calibR.c_str());
 		return;
 	}
 
@@ -311,7 +318,7 @@ int main(int argc, char **argv) {
 	// hook crtl+C.
 	boost::thread exThread = boost::thread(exitThread);
 
-	ImageFolderReader *reader = new ImageFolderReader(sourceL, sourceR, calib, gammaCalib, vignette);
+	ImageFolderReader *reader = new ImageFolderReader(sourceL, sourceR, calibL, calibR, gammaCalib, vignette);
 	reader->setGlobalCalibration();
 
 	if (setting_photometricCalibration > 0 && reader->getPhotometricGamma() == 0) {
@@ -359,6 +366,7 @@ int main(int argc, char **argv) {
 			}
 		}
 
+		ImageAndExposure *iae;
 		std::vector<ImageAndExposure*> preloadedImages;
 		if (preload) {
 			printf("LOADING ALL IMAGES!\n");
@@ -366,6 +374,8 @@ int main(int argc, char **argv) {
 				int i = idsToPlay[ii];
 				preloadedImages.push_back(reader->getImage(i));
 			}
+		} else {
+			iae = new ImageAndExposure(wG[0], hG[0]);
 		}
 
 		struct timeval tv_start;
@@ -383,11 +393,11 @@ int main(int argc, char **argv) {
 
 			int i = idsToPlay[ii];
 
-			ImageAndExposure *img;
+
 			if (preload)
-				img = preloadedImages[ii];
+				iae = preloadedImages[ii];
 			else
-				img = reader->getImage(i);
+				reader->getImage(i, iae);
 
 			bool skipFrame = false;
 			if (playbackSpeed != 0) {
@@ -404,9 +414,7 @@ int main(int argc, char **argv) {
 			}
 
 			if (!skipFrame)
-				fullSystem->addActiveFrame(img, i);
-
-			delete img;
+				fullSystem->addActiveFrame(iae, i);
 
 			if (fullSystem->initFailed || setting_fullResetRequested) {
 				if (ii < 250 || setting_fullResetRequested) {
@@ -438,6 +446,10 @@ int main(int argc, char **argv) {
 		clock_t ended = clock();
 		struct timeval tv_end;
 		gettimeofday(&tv_end, NULL);
+
+		if (!preload) {
+			delete iae;
+		}
 
 		fullSystem->printResult("result.txt");
 
