@@ -107,7 +107,8 @@ struct FrameHessian {
 	//DepthImageWrap* frame;
 	FrameShell *shell;
 
-	Eigen::Vector3f *dI;			// trace, fine tracking. Used for direction select (not for gradient histograms etc.)   dIp[0]
+	Eigen::Vector3f *dI;	// trace, fine tracking. Used for direction select (not for gradient histograms etc.)   dIp[0]
+	Eigen::Vector3f *dIr;	// dI for Right image..
 	Eigen::Vector3f *dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.  Elements: Pixel value, dx, dy
 	float *absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
 
@@ -232,6 +233,8 @@ struct FrameHessian {
 
 		}
 
+		delete[] dIr;
+
 		if (debugImage != 0)
 			delete debugImage;
 	}
@@ -247,7 +250,7 @@ struct FrameHessian {
 	}
 	;
 
-	void makeImages(float *color, CalibHessian *HCalib);
+	void makeImages(float *color, float *colorR, CalibHessian *HCalib);
 
 	inline Vec10 getPrior() {
 		Vec10 p = Vec10::Zero();

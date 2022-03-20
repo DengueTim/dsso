@@ -83,7 +83,8 @@ private:
 
 	// images rendering
 	boost::mutex openImagesMutex;
-	MinimalImageB3 *internalVideoImg;
+	MinimalImageB3 *internalVideoImgL;
+	MinimalImageB3 *internalVideoImgR;
 	MinimalImageB3 *internalKFImg;
 	MinimalImageB3 *internalResImg;
 	bool videoImgChanged, kfImgChanged, resImgChanged;

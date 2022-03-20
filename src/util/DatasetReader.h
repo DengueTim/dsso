@@ -89,12 +89,14 @@ struct PrepImageItem {
 
 class ImageFolderReader {
 public:
-	ImageFolderReader(std::string path, std::string calibFile, std::string gammaFile, std::string vignetteFile) {
+	ImageFolderReader(std::string path, std::string pathR, std::string calibFile, std::string gammaFile, std::string vignetteFile) {
 		this->path = path;
+		this->pathR = pathR;
 		this->calibfile = calibFile;
 
 #if HAS_ZIPLIB
 		ziparchive=0;
+		ziparchiveR=0;
 		databuffer=0;
 #endif
 
@@ -102,32 +104,46 @@ public:
 
 		if (isZipped) {
 #if HAS_ZIPLIB
-			int ziperror=0;
-			ziparchive = zip_open(path.c_str(),  ZIP_RDONLY, &ziperror);
-			if(ziperror!=0)
-			{
+			int ziperror = 0;
+			ziparchive = zip_open(path.c_str(), ZIP_RDONLY, &ziperror);
+			if (ziperror != 0) {
 				printf("ERROR %d reading archive %s!\n", ziperror, path.c_str());
 				exit(1);
 			}
 
-			files.clear();
-			int numEntries = zip_get_num_entries(ziparchive, 0);
-			for(int k=0;k<numEntries;k++)
-			{
-				const char* name = zip_get_name(ziparchive, k,  ZIP_FL_ENC_STRICT);
-				std::string nstr = std::string(name);
-				if(nstr == "." || nstr == "..") continue;
-				files.push_back(name);
+			ziparchiveR = zip_open(pathR.c_str(), ZIP_RDONLY, &ziperror);
+			if (ziperror != 0) {
+				printf("ERROR %d reading archive %s!\n", ziperror, pathR.c_str());
+				exit(1);
 			}
 
-			printf("got %d entries and %d files!\n", numEntries, (int)files.size());
+			files.clear();
+			filesR.clear();
+			int numEntries = zip_get_num_entries(ziparchive, 0);
+			for (int k = 0; k < numEntries; k++) {
+				const char *name = zip_get_name(ziparchive, k, ZIP_FL_ENC_STRICT);
+				std::string nstr = std::string(name);
+				if (nstr == "." || nstr == "..")
+					continue;
+				files.push_back(name);
+
+				const char *nameR = zip_get_name(ziparchiveR, k, ZIP_FL_ENC_STRICT);
+				std::string nstrR = std::string(nameR);
+				if (nstrR == "." || nstrR == "..")
+					continue;
+				filesR.push_back(nameR);
+			}
+
+			printf("got %d entries and %d files!\n", numEntries, (int) files.size());
 			std::sort(files.begin(), files.end());
 #else
 			printf("ERROR: cannot read .zip archive, as compile without ziplib!\n");
 			exit(1);
 #endif
-		} else
+		} else {
 			getdir(path, files);
+			getdir(pathR, filesR);
+		}
 
 		undistort = Undistort::getUndistorterForFile(calibFile, gammaFile, vignetteFile);
 
@@ -138,12 +154,15 @@ public:
 
 		// load timestamps if possible.
 		loadTimestamps();
-		printf("ImageFolderReader: got %d files in %s!\n", (int) files.size(), path.c_str());
+		printf("ImageFolderReader: got %d file pairs in %s & %s!\n", (int) files.size(), path.c_str(), pathR.c_str());
 
 	}
 	~ImageFolderReader() {
 #if HAS_ZIPLIB
-		if(ziparchive!=0) zip_close(ziparchive);
+		if(ziparchive!=0) {
+			zip_close(ziparchive);
+			zip_close(ziparchiveR);
+		}
 		if(databuffer!=0) delete databuffer;
 #endif
 
@@ -207,14 +226,17 @@ public:
 	Undistort *undistort;
 private:
 
-	MinimalImageB* getImageRaw_internal(int id, int unused) {
+	MinimalImageB* getImageRaw_internal(int id, bool rightNotLeft) {
 		if (!isZipped) {
 			// CHANGE FOR ZIP FILE
-			return IOWrap::readImageBW_8U(files[id]);
+			return IOWrap::readImageBW_8U(rightNotLeft ? filesR[id] : files[id]);
 		} else {
 #if HAS_ZIPLIB
+			zip_t* zip = rightNotLeft ? ziparchiveR : ziparchive;
+			std::vector<std::string> &files_ = rightNotLeft ? filesR : files;
+
 			if(databuffer==0) databuffer = new char[widthOrg*heightOrg*6+10000];
-			zip_file_t* fle = zip_fopen(ziparchive, files[id].c_str(), 0);
+			zip_file_t* fle = zip_fopen(zip, files_[id].c_str(), 0);
 			long readbytes = zip_fread(fle, databuffer, (long)widthOrg*heightOrg*6+10000);
 
 			if(readbytes > (long)widthOrg*heightOrg*6)
@@ -222,7 +244,7 @@ private:
 				printf("read %ld/%ld bytes for file %s. increase buffer!!\n", readbytes,(long)widthOrg*heightOrg*6+10000, files[id].c_str());
 				delete[] databuffer;
 				databuffer = new char[(long)widthOrg*heightOrg*30];
-				fle = zip_fopen(ziparchive, files[id].c_str(), 0);
+				fle = zip_fopen(zip, files_[id].c_str(), 0);
 				readbytes = zip_fread(fle, databuffer, (long)widthOrg*heightOrg*30+10000);
 
 				if(readbytes > (long)widthOrg*heightOrg*30)
@@ -241,10 +263,12 @@ private:
 	}
 
 	ImageAndExposure* getImage_internal(int id, int unused) {
-		MinimalImageB *minimg = getImageRaw_internal(id, 0);
-		ImageAndExposure *ret2 = undistort->undistort<unsigned char>(minimg, (exposures.size() == 0 ? 1.0f : exposures[id]),
-				(timestamps.size() == 0 ? 0.0 : timestamps[id]));
+		MinimalImageB *minimg = getImageRaw_internal(id, false);
+		MinimalImageB *minimgR = getImageRaw_internal(id, true);
+		ImageAndExposure *ret2 = undistort->undistort<unsigned char>(minimg, minimgR,
+				(exposures.size() == 0 ? 1.0f : exposures[id]), (timestamps.size() == 0 ? 0.0 : timestamps[id]));
 		delete minimg;
+		delete minimgR;
 		return ret2;
 	}
 
@@ -313,6 +337,7 @@ private:
 
 	std::vector<ImageAndExposure*> preloadedImages;
 	std::vector<std::string> files;
+	std::vector<std::string> filesR;
 	std::vector<double> timestamps;
 	std::vector<float> exposures;
 
@@ -320,12 +345,14 @@ private:
 	int widthOrg, heightOrg;
 
 	std::string path;
+	std::string pathR;
 	std::string calibfile;
 
 	bool isZipped;
 
 #if HAS_ZIPLIB
 	zip_t* ziparchive;
+	zip_t* ziparchiveR;
 	char* databuffer;
 #endif
 };

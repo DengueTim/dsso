@@ -40,12 +40,14 @@ PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread) {
 
 	{
 		boost::unique_lock<boost::mutex> lk(openImagesMutex);
-		internalVideoImg = new MinimalImageB3(w, h);
+		internalVideoImgL = new MinimalImageB3(w, h);
+		internalVideoImgR = new MinimalImageB3(w, h);
 		internalKFImg = new MinimalImageB3(w, h);
 		internalResImg = new MinimalImageB3(w, h);
 		videoImgChanged = kfImgChanged = resImgChanged = true;
 
-		internalVideoImg->setBlack();
+		internalVideoImgL->setBlack();
+		internalVideoImgR->setBlack();
 		internalKFImg->setBlack();
 		internalResImg->setBlack();
 	}
@@ -64,6 +66,10 @@ PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread) {
 PangolinDSOViewer::~PangolinDSOViewer() {
 	close();
 	runThread.join();
+	delete internalResImg;
+	delete internalKFImg;
+	delete internalVideoImgR;
+	delete internalVideoImgL;
 }
 
 void PangolinDSOViewer::run() {
@@ -81,19 +87,21 @@ void PangolinDSOViewer::run() {
 	pangolin::View &Visualization3D_display = pangolin::CreateDisplay().SetBounds(0.0, 1.0, pangolin::Attach::Pix(UI_WIDTH), 1.0,
 			-w / (float) h).SetHandler(new pangolin::Handler3D(Visualization3D_camera));
 
-	// 3 images
+	// 4 images
 	pangolin::View &d_kfDepth = pangolin::Display("imgKFDepth").SetAspect(w / (float) h);
 
-	pangolin::View &d_video = pangolin::Display("imgVideo").SetAspect(w / (float) h);
+	pangolin::View &d_videoL = pangolin::Display("imgLVideo").SetAspect(w / (float) h);
+	pangolin::View &d_videoR = pangolin::Display("imgRVideo").SetAspect(w / (float) h);
 
 	pangolin::View &d_residual = pangolin::Display("imgResidual").SetAspect(w / (float) h);
 
 	pangolin::GlTexture texKFDepth(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
-	pangolin::GlTexture texVideo(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+	pangolin::GlTexture texVideoL(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+	pangolin::GlTexture texVideoR(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
 	pangolin::GlTexture texResidual(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
 
-	pangolin::CreateDisplay().SetBounds(0.0, 0.3, pangolin::Attach::Pix(UI_WIDTH), 1.0).SetLayout(pangolin::LayoutEqual).AddDisplay(
-			d_kfDepth).AddDisplay(d_video).AddDisplay(d_residual);
+	pangolin::CreateDisplay().SetBounds(0.0, 0.23, pangolin::Attach::Pix(UI_WIDTH), 1.0).SetLayout(pangolin::LayoutEqual).AddDisplay(
+			d_kfDepth).AddDisplay(d_videoL).AddDisplay(d_videoR).AddDisplay(d_residual);
 
 	// parameter reconfigure gui
 	pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
@@ -160,7 +168,8 @@ void PangolinDSOViewer::run() {
 
 		openImagesMutex.lock();
 		if (videoImgChanged)
-			texVideo.Upload(internalVideoImg->data, GL_BGR, GL_UNSIGNED_BYTE);
+			texVideoL.Upload(internalVideoImgL->data, GL_BGR, GL_UNSIGNED_BYTE);
+			texVideoR.Upload(internalVideoImgR->data, GL_BGR, GL_UNSIGNED_BYTE);
 		if (kfImgChanged)
 			texKFDepth.Upload(internalKFImg->data, GL_BGR, GL_UNSIGNED_BYTE);
 		if (resImgChanged)
@@ -187,9 +196,12 @@ void PangolinDSOViewer::run() {
 		}
 
 		if (setting_render_displayVideo) {
-			d_video.Activate();
+			d_videoL.Activate();
 			glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-			texVideo.RenderToViewportFlipY();
+			texVideoL.RenderToViewportFlipY();
+			d_videoR.Activate();
+			glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+			texVideoR.RenderToViewportFlipY();
 		}
 
 		if (setting_render_displayDepth) {
@@ -277,7 +289,8 @@ void PangolinDSOViewer::reset_internal() {
 	model3DMutex.unlock();
 
 	openImagesMutex.lock();
-	internalVideoImg->setBlack();
+	internalVideoImgL->setBlack();
+	internalVideoImgR->setBlack();
 	internalKFImg->setBlack();
 	internalResImg->setBlack();
 	videoImgChanged = kfImgChanged = resImgChanged = true;
@@ -445,9 +458,12 @@ void PangolinDSOViewer::pushLiveFrame(FrameHessian *image) {
 
 	boost::unique_lock<boost::mutex> lk(openImagesMutex);
 
-	for (int i = 0; i < w * h; i++)
-		internalVideoImg->data[i][0] = internalVideoImg->data[i][1] = internalVideoImg->data[i][2] =
+	for (int i = 0; i < w * h; i++) {
+		internalVideoImgL->data[i][0] = internalVideoImgL->data[i][1] = internalVideoImgL->data[i][2] =
 				image->dI[i][0] * 0.8 > 255.0f ? 255.0 : image->dI[i][0] * 0.8;
+		internalVideoImgR->data[i][0] = internalVideoImgR->data[i][1] = internalVideoImgR->data[i][2] =
+				image->dIr[i][0] * 0.8 > 255.0f ? 255.0 : image->dIr[i][0] * 0.8;
+	}
 
 	videoImgChanged = true;
 }

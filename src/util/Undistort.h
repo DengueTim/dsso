@@ -40,7 +40,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	// affine normalizes values to 0 <= I < 256.
 	// raw irradiance = a*I + b.
 	// output will be written in [output].
-	template<typename T> void processFrame(T *image_in, float exposure_time, float factor = 1);
+	template<typename T> void processFrame(T *image_in, T *imageR_in, float exposure_time, float factor = 1);
 	void unMapFloatImage(float *image);
 
 	ImageAndExposure *output;
@@ -90,7 +90,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
 
 	template<typename T>
-	ImageAndExposure* undistort(const MinimalImage<T> *image_raw, float exposure = 0, double timestamp = 0, float factor = 1) const;
+	ImageAndExposure* undistort(const MinimalImage<T> *image_raw, const MinimalImage<T> *imageR_raw, float exposure = 0, double timestamp = 0, float factor = 1) const;
 	static Undistort* getUndistorterForFile(std::string configFilename, std::string gammaFilename, std::string vignetteFilename);
 
 	void loadPhotometricCalibration(std::string file, std::string noiseImage, std::string vignetteImage);

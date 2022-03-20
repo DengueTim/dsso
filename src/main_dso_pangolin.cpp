@@ -47,7 +47,8 @@
 
 std::string vignette = "";
 std::string gammaCalib = "";
-std::string source = "";
+std::string sourceL = "";
+std::string sourceR = "";
 std::string calib = "";
 double rescale = 1;
 bool reverse = false;
@@ -219,9 +220,15 @@ void parseArgument(char *arg) {
 		return;
 	}
 
-	if (1 == sscanf(arg, "files=%s", buf)) {
-		source = buf;
-		printf("loading data from %s!\n", source.c_str());
+	if (1 == sscanf(arg, "leftFiles=%s", buf)) {
+		sourceL = buf;
+		printf("loading left images from %s!\n", sourceL.c_str());
+		return;
+	}
+
+	if (1 == sscanf(arg, "rightFiles=%s", buf)) {
+		sourceR = buf;
+		printf("loading right images from %s!\n", sourceR.c_str());
 		return;
 	}
 
@@ -304,7 +311,7 @@ int main(int argc, char **argv) {
 	// hook crtl+C.
 	boost::thread exThread = boost::thread(exitThread);
 
-	ImageFolderReader *reader = new ImageFolderReader(source, calib, gammaCalib, vignette);
+	ImageFolderReader *reader = new ImageFolderReader(sourceL, sourceR, calib, gammaCalib, vignette);
 	reader->setGlobalCalibration();
 
 	if (setting_photometricCalibration > 0 && reader->getPhotometricGamma() == 0) {
