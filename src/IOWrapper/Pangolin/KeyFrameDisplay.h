@@ -76,19 +76,21 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	// renders cam & pointcloud.
 	void drawCam(float lineWidth = 1, float *color = 0, float sizeFactor = 1);
+	void drawCamFrustum(const SE3 &pose, const float fxi, const float fyi, const float cx, const float cy, const float sz);
 	void drawPC(float pointSize);
 
 	int id;
 	bool active;
 	SE3 camToWorld;
+	SE3 leftToRight;
 
 	inline bool operator <(const KeyFrameDisplay &other) const {
 		return (id < other.id);
 	}
 
 private:
-	float fx, fy, cx, cy;
-	float fxi, fyi, cxi, cyi;
+	float fxiL, fyiL, cxL, cyL, cxiL, cyiL;
+	float fxiR, fyiR, cxR, cyR, cxiR, cyiR;
 	int width, height;
 
 	float my_scaledTH, my_absTH, my_scale;

@@ -167,9 +167,10 @@ void PangolinDSOViewer::run() {
 		}
 
 		openImagesMutex.lock();
-		if (videoImgChanged)
+		if (videoImgChanged) {
 			texVideoL.Upload(internalVideoImgL->data, GL_BGR, GL_UNSIGNED_BYTE);
 			texVideoR.Upload(internalVideoImgR->data, GL_BGR, GL_UNSIGNED_BYTE);
+		}
 		if (kfImgChanged)
 			texKFDepth.Upload(internalKFImg->data, GL_BGR, GL_UNSIGNED_BYTE);
 		if (resImgChanged)

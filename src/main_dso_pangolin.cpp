@@ -338,7 +338,10 @@ int main(int argc, char **argv) {
 		linc = -1;
 	}
 
-	FullSystem *fullSystem = new FullSystem();
+	SE3 leftToRight = SE3(); // TODO: Load from config files.
+	leftToRight.translation()[0] = 0.11; // EuRoC camera baseline is 110mm.
+
+	FullSystem *fullSystem = new FullSystem(reader->undistortL->getK(), reader->undistortR->getK(), leftToRight);
 	fullSystem->setGammaFunction(reader->getPhotometricGamma());
 	fullSystem->linearizeOperation = (playbackSpeed == 0);
 
@@ -393,7 +396,6 @@ int main(int argc, char **argv) {
 
 			int i = idsToPlay[ii];
 
-
 			if (preload)
 				iae = preloadedImages[ii];
 			else
@@ -426,7 +428,7 @@ int main(int argc, char **argv) {
 					for (IOWrap::Output3DWrapper *ow : wraps)
 						ow->reset();
 
-					fullSystem = new FullSystem();
+					fullSystem = new FullSystem(reader->undistortL->getK(), reader->undistortR->getK(), leftToRight);
 					fullSystem->setGammaFunction(reader->getPhotometricGamma());
 					fullSystem->linearizeOperation = (playbackSpeed == 0);
 

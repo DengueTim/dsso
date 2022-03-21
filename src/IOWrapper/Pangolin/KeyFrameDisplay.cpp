@@ -45,6 +45,7 @@ KeyFrameDisplay::KeyFrameDisplay() {
 	id = 0;
 	active = true;
 	camToWorld = SE3();
+	leftToRight = SE3();
 
 	needRefresh = true;
 
@@ -59,17 +60,25 @@ KeyFrameDisplay::KeyFrameDisplay() {
 }
 void KeyFrameDisplay::setFromF(FrameShell *frame, CalibHessian *HCalib) {
 	id = frame->id;
-	fx = HCalib->fxl();
-	fy = HCalib->fyl();
-	cx = HCalib->cxl();
-	cy = HCalib->cyl();
 	width = wG[0];
 	height = hG[0];
-	fxi = 1 / fx;
-	fyi = 1 / fy;
-	cxi = -cx / fx;
-	cyi = -cy / fy;
+
+	fxiL = HCalib->fxli();
+	fyiL = HCalib->fyli();
+	cxL = HCalib->cxl();
+	cyL = HCalib->cyl();
+	cxiL = -cxL * fxiL;
+	cyiL = -cyL * fyiL;
+
+	fxiR = HCalib->fxliR();
+	fyiR = HCalib->fyliR();
+	cxR = HCalib->cxlR();
+	cyR = HCalib->cylR();
+	cxiR = -cxR * fxiR;
+	cyiR = -cyR * fyiR;
+
 	camToWorld = frame->camToWorld;
+	leftToRight = HCalib->getLeftToRight();
 	needRefresh = true;
 }
 
@@ -145,6 +154,7 @@ void KeyFrameDisplay::setFromKF(FrameHessian *fh, CalibHessian *HCalib) {
 	assert(numSparsePoints <= npoints);
 
 	camToWorld = fh->PRE_camToWorld;
+	leftToRight = HCalib->getLeftToRight();
 	needRefresh = true;
 }
 
@@ -217,9 +227,9 @@ bool KeyFrameDisplay::refreshPC(bool canRefresh, float scaledTH, float absTH, in
 			int dx = patternP[pnt][0];
 			int dy = patternP[pnt][1];
 
-			tmpVertexBuffer[vertexBufferNumPoints][0] = ((originalInputSparse[i].u + dx) * fxi + cxi) * depth;
-			tmpVertexBuffer[vertexBufferNumPoints][1] = ((originalInputSparse[i].v + dy) * fyi + cyi) * depth;
-			tmpVertexBuffer[vertexBufferNumPoints][2] = depth * (1 + 2 * fxi * (rand() / (float) RAND_MAX - 0.5f));
+			tmpVertexBuffer[vertexBufferNumPoints][0] = ((originalInputSparse[i].u + dx) * fxiL + cxiL) * depth;
+			tmpVertexBuffer[vertexBufferNumPoints][1] = ((originalInputSparse[i].v + dy) * fyiL + cyiL) * depth;
+			tmpVertexBuffer[vertexBufferNumPoints][2] = depth * (1 + 2 * fxiL * (rand() / (float) RAND_MAX - 0.5f));
 
 			if (my_displayMode == 0) {
 				if (originalInputSparse[i].status == 0) {
@@ -280,40 +290,44 @@ void KeyFrameDisplay::drawCam(float lineWidth, float *color, float sizeFactor) {
 	if (width == 0)
 		return;
 
-	float sz = sizeFactor;
-
-	glPushMatrix();
-
-	Sophus::Matrix4f m = camToWorld.matrix().cast<float>();
-	glMultMatrixf((GLfloat*) m.data());
-
 	if (color == 0) {
 		glColor3f(1, 0, 0);
 	} else
 		glColor3f(color[0], color[1], color[2]);
 
 	glLineWidth(lineWidth);
+
+	drawCamFrustum(camToWorld, fxiL, fyiL, cxL, cyL, sizeFactor);
+	drawCamFrustum(camToWorld * leftToRight, fxiR, fyiR, cxR, cyR, sizeFactor);
+}
+
+void KeyFrameDisplay::drawCamFrustum(const SE3 &pose, const float fxi, const float fyi, const float cx, const float cy,
+		const float sz) {
+	glPushMatrix();
+	Sophus::Matrix4f m = pose.matrix().cast<float>();
+	glMultMatrixf((GLfloat*) m.data());
+
 	glBegin(GL_LINES);
 	glVertex3f(0, 0, 0);
-	glVertex3f(sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz);
+	glVertex3f(sz * (0 - cx) * fxi, sz * (0 - cy) * fyi, sz);
 	glVertex3f(0, 0, 0);
-	glVertex3f(sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
+	glVertex3f(sz * (0 - cx) * fxi, sz * (height - 1 - cy) * fyi, sz);
 	glVertex3f(0, 0, 0);
-	glVertex3f(sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
+	glVertex3f(sz * (width - 1 - cx) * fxi, sz * (height - 1 - cy) * fyi, sz);
 	glVertex3f(0, 0, 0);
-	glVertex3f(sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz);
+	glVertex3f(sz * (width - 1 - cx) * fxi, sz * (0 - cy) * fyi, sz);
 
-	glVertex3f(sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz);
-	glVertex3f(sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
+	glVertex3f(sz * (width - 1 - cx) * fxi, sz * (0 - cy) * fyi, sz);
+	glVertex3f(sz * (width - 1 - cx) * fxi, sz * (height - 1 - cy) * fyi, sz);
 
-	glVertex3f(sz * (width - 1 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
-	glVertex3f(sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
+	glVertex3f(sz * (width - 1 - cx) * fxi, sz * (height - 1 - cy) * fyi, sz);
+	glVertex3f(sz * (0 - cx) * fxi, sz * (height - 1 - cy) * fyi, sz);
 
-	glVertex3f(sz * (0 - cx) / fx, sz * (height - 1 - cy) / fy, sz);
-	glVertex3f(sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz);
+	glVertex3f(sz * (0 - cx) * fxi, sz * (height - 1 - cy) * fyi, sz);
+	glVertex3f(sz * (0 - cx) * fxi, sz * (0 - cy) * fyi, sz);
 
-	glVertex3f(sz * (0 - cx) / fx, sz * (0 - cy) / fy, sz);
-	glVertex3f(sz * (width - 1 - cx) / fx, sz * (0 - cy) / fy, sz);
+	glVertex3f(sz * (0 - cx) * fxi, sz * (0 - cy) * fyi, sz);
+	glVertex3f(sz * (width - 1 - cx) * fxi, sz * (0 - cy) * fyi, sz);
 
 	glEnd();
 	glPopMatrix();

@@ -91,7 +91,8 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	template<typename T>
 	void undistort(const MinimalImage<T> *image_raw, const ImageAndExposure *iae, const float factor = 1) const;
-	static Undistort* getUndistorterForFile(std::string configFilename, std::string gammaFilename, std::string vignetteFilename, const bool rightNotLeft);
+	static Undistort* getUndistorterForFile(std::string configFilename, std::string gammaFilename, std::string vignetteFilename,
+			const bool rightNotLeft);
 
 	void loadPhotometricCalibration(std::string file, std::string noiseImage, std::string vignetteImage);
 

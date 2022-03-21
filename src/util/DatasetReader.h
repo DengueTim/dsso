@@ -89,7 +89,8 @@ struct PrepImageItem {
 
 class ImageFolderReader {
 public:
-	ImageFolderReader(std::string pathL, std::string pathR, std::string calibFileL, std::string calibFileR, std::string gammaFile, std::string vignetteFile) {
+	ImageFolderReader(std::string pathL, std::string pathR, std::string calibFileL, std::string calibFileR, std::string gammaFile,
+			std::string vignetteFile) {
 		this->pathL = pathL;
 		this->pathR = pathR;
 
@@ -178,18 +179,10 @@ public:
 		return undistortL->getOriginalSize();
 	}
 
-	void getCalibMono(Eigen::Matrix3f &K, int &w, int &h, const bool rightNotLeft = false) {
-		const Undistort *undistort = rightNotLeft ? undistortR : undistortL;
-		K = undistort->getK().cast<float>();
-		w = undistort->getSize()[0];
-		h = undistort->getSize()[1];
-	}
-
 	void setGlobalCalibration() {
-		int w_out, h_out;
-		Eigen::Matrix3f K;
-		getCalibMono(K, w_out, h_out);
-		setGlobalCalib(w_out, h_out, K);
+		int w = undistortL->getSize()[0];
+		int h = undistortL->getSize()[1];
+		setGlobalCalib(w, h);
 	}
 
 	int getNumImages() {
@@ -211,7 +204,7 @@ public:
 	}
 
 	// By default allocates new ImageAndExposure else reuses what's passed in.
-	ImageAndExposure* getImage(int id, ImageAndExposure* iae = 0) {
+	ImageAndExposure* getImage(int id, ImageAndExposure *iae = 0) {
 		MinimalImageB *minimgL = getImageRaw_internal(id, false);
 		MinimalImageB *minimgR = getImageRaw_internal(id, true);
 

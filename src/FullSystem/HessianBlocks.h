@@ -183,7 +183,7 @@ struct FrameHessian {
 		state_scaled[8] = SCALE_A * state[8];
 		state_scaled[9] = SCALE_B * state[9];
 
-		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
+		PRE_worldToCam = SE3::exp(w2c_leftEps()) * worldToCam_evalPT;
 		PRE_camToWorld = PRE_worldToCam.inverse();
 		//setCurrentNullspace();
 	}
@@ -198,7 +198,7 @@ struct FrameHessian {
 		state[8] = SCALE_A_INVERSE * state_scaled[8];
 		state[9] = SCALE_B_INVERSE * state_scaled[9];
 
-		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
+		PRE_worldToCam = SE3::exp(w2c_leftEps()) * worldToCam_evalPT;
 		PRE_camToWorld = PRE_worldToCam.inverse();
 		//setCurrentNullspace();
 	}
@@ -298,13 +298,21 @@ struct CalibHessian {
 	VecC value_backup;
 	VecC value_minus_value_zero;
 
-	inline CalibHessian() {
+	inline CalibHessian(const Mat33 &leftK, const Mat33 &rightK, const SE3 leftToRight) {
 
 		VecC initial_value = VecC::Zero();
-		initial_value[0] = fxG[0];
-		initial_value[1] = fyG[0];
-		initial_value[2] = cxG[0];
-		initial_value[3] = cyG[0];
+
+		initial_value[0] = leftK(0, 0); // fx
+		initial_value[1] = leftK(1, 1); // fy
+		initial_value[2] = leftK(0, 2); // cx
+		initial_value[3] = leftK(1, 2); // cy
+
+		initial_value[4] = rightK(0, 0);
+		initial_value[5] = rightK(1, 1);
+		initial_value[6] = rightK(0, 2);
+		initial_value[7] = rightK(1, 2);
+
+		initial_value.segment<6>(8) = leftToRight.log();
 
 		setValueScaled(initial_value);
 		value_zero = value;
@@ -341,6 +349,31 @@ struct CalibHessian {
 		return value_scaledi[3];
 	}
 
+	inline float& fxlR() {
+		return value_scaledf[4];
+	}
+	inline float& fylR() {
+		return value_scaledf[5];
+	}
+	inline float& cxlR() {
+		return value_scaledf[6];
+	}
+	inline float& cylR() {
+		return value_scaledf[7];
+	}
+	inline float& fxliR() {
+		return value_scaledi[4];
+	}
+	inline float& fyliR() {
+		return value_scaledi[5];
+	}
+	inline float& cxliR() {
+		return value_scaledi[6];
+	}
+	inline float& cyliR() {
+		return value_scaledi[7];
+	}
+
 	inline void setValue(const VecC &value) {
 		// [0-3: Kl, 4-7: Kr, 8-12: l2r]
 		this->value = value;
@@ -349,11 +382,30 @@ struct CalibHessian {
 		value_scaled[2] = SCALE_C * value[2];
 		value_scaled[3] = SCALE_C * value[3];
 
+		value_scaled[4] = SCALE_F * value[4];
+		value_scaled[5] = SCALE_F * value[5];
+		value_scaled[6] = SCALE_C * value[6];
+		value_scaled[7] = SCALE_C * value[7];
+
+		// TODO: Scale...
+		value_scaled[8] = value[8];
+		value_scaled[9] = value[9];
+		value_scaled[10] = value[10];
+		value_scaled[11] = value[11];
+		value_scaled[12] = value[12];
+		value_scaled[13] = value[13];
+
 		this->value_scaledf = this->value_scaled.cast<float>();
 		this->value_scaledi[0] = 1.0f / this->value_scaledf[0];
 		this->value_scaledi[1] = 1.0f / this->value_scaledf[1];
 		this->value_scaledi[2] = -this->value_scaledf[2] / this->value_scaledf[0];
 		this->value_scaledi[3] = -this->value_scaledf[3] / this->value_scaledf[1];
+
+		this->value_scaledi[4] = 1.0f / this->value_scaledf[4];
+		this->value_scaledi[5] = 1.0f / this->value_scaledf[5];
+		this->value_scaledi[6] = -this->value_scaledf[6] / this->value_scaledf[4];
+		this->value_scaledi[7] = -this->value_scaledf[7] / this->value_scaledf[5];
+
 		this->value_minus_value_zero = this->value - this->value_zero;
 	}
 	;
@@ -366,11 +418,29 @@ struct CalibHessian {
 		value[2] = SCALE_C_INVERSE * value_scaled[2];
 		value[3] = SCALE_C_INVERSE * value_scaled[3];
 
+		value[4] = SCALE_F_INVERSE * value_scaled[4];
+		value[5] = SCALE_F_INVERSE * value_scaled[5];
+		value[6] = SCALE_C_INVERSE * value_scaled[6];
+		value[7] = SCALE_C_INVERSE * value_scaled[7];
+
+		// TODO: Scale...
+		value[8] = value_scaled[8];
+		value[9] = value_scaled[9];
+		value[10] = value_scaled[10];
+		value[11] = value_scaled[11];
+		value[12] = value_scaled[12];
+		value[13] = value_scaled[13];
+
 		this->value_minus_value_zero = this->value - this->value_zero;
 		this->value_scaledi[0] = 1.0f / this->value_scaledf[0];
 		this->value_scaledi[1] = 1.0f / this->value_scaledf[1];
 		this->value_scaledi[2] = -this->value_scaledf[2] / this->value_scaledf[0];
 		this->value_scaledi[3] = -this->value_scaledf[3] / this->value_scaledf[1];
+
+		this->value_scaledi[4] = 1.0f / this->value_scaledf[4];
+		this->value_scaledi[5] = 1.0f / this->value_scaledf[5];
+		this->value_scaledi[6] = -this->value_scaledf[6] / this->value_scaledf[4];
+		this->value_scaledi[7] = -this->value_scaledf[7] / this->value_scaledf[5];
 	}
 	;
 
@@ -393,6 +463,10 @@ struct CalibHessian {
 		if (c > 250)
 			c = 250;
 		return Binv[c + 1] - Binv[c];
+	}
+
+	SE3 getLeftToRight() {
+		return SE3::exp(value.segment<6>(8).cast<double>());
 	}
 };
 

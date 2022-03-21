@@ -113,7 +113,7 @@ inline bool eigenTestNan(const MatXX &m, std::string msg) {
 
 class FullSystem {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-	FullSystem();
+	FullSystem(const Eigen::Matrix3d &leftK, const Eigen::Matrix3d &rightK, const SE3 &leftToRight);
 	virtual ~FullSystem();
 
 	// adds a new frame, and creates point & residual structs.
@@ -143,7 +143,6 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	void setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH);
 
 private:
-
 	CalibHessian Hcalib;
 
 	// opt single point

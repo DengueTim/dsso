@@ -59,7 +59,8 @@ namespace dso {
 int FrameHessian::instanceCounter = 0;
 int PointHessian::instanceCounter = 0;
 
-FullSystem::FullSystem() {
+FullSystem::FullSystem(const Mat33 &leftK, const Mat33 &rightK, const SE3 &leftToRight) :
+		Hcalib(leftK, rightK, leftToRight) {
 
 	int retstat = 0;
 	if (setting_logStuff) {
@@ -709,7 +710,6 @@ void FullSystem::flagPointsForRemoval() {
 			}
 		}
 	}
-
 }
 
 void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {

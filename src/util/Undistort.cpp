@@ -216,7 +216,8 @@ Undistort::~Undistort() {
 		delete[] remapY;
 }
 
-Undistort* Undistort::getUndistorterForFile(std::string configFilename, std::string gammaFilename, std::string vignetteFilename, const bool rightNotLeft) {
+Undistort* Undistort::getUndistorterForFile(std::string configFilename, std::string gammaFilename, std::string vignetteFilename,
+		const bool rightNotLeft) {
 	printf("Reading Calibration from file %s for %s camera", configFilename.c_str(), rightNotLeft ? "right" : "left");
 
 	std::ifstream f(configFilename.c_str());
@@ -410,10 +411,10 @@ void Undistort::undistort(const MinimalImage<T> *image_raw, const ImageAndExposu
 
 	return;
 }
-template void Undistort::undistort<unsigned char>(const MinimalImage<unsigned char> *image_raw,
-		const ImageAndExposure *iae, float factor) const;
-template void Undistort::undistort<unsigned short>(const MinimalImage<unsigned short> *image_raw,
-		const ImageAndExposure *iae, float factor) const;
+template void Undistort::undistort<unsigned char>(const MinimalImage<unsigned char> *image_raw, const ImageAndExposure *iae,
+		float factor) const;
+template void Undistort::undistort<unsigned short>(const MinimalImage<unsigned short> *image_raw, const ImageAndExposure *iae,
+		float factor) const;
 
 void Undistort::applyBlurNoise(float *img) const {
 	if (benchmark_varBlurNoise == 0)
