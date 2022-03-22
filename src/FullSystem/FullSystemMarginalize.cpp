@@ -150,7 +150,7 @@ void FullSystem::marginalizeFrame(FrameHessian *frame) {
 					else if (ph->lastResiduals[1].first == r)
 						ph->lastResiduals[1].first = 0;
 
-					if (r->host->frameID < r->target->frameID)
+					if (r->point->host->frameID < r->target->frameID)
 						statistics_numForceDroppedResFwd++;
 					else
 						statistics_numForceDroppedResBwd++;

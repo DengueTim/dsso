@@ -946,7 +946,7 @@ void FullSystem::makeKeyFrame(FrameHessian *fh) {
 		if (fh1 == fh)
 			continue;
 		for (PointHessian *ph : fh1->pointHessians) {
-			PointFrameResidual *r = new PointFrameResidual(ph, fh1, fh);
+			PointFrameResidual *r = new PointFrameResidual(ph, fh);
 			r->setState(ResState::IN);
 			ph->residuals.push_back(r);
 			ef->insertResidual(r);

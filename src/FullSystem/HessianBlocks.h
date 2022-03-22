@@ -470,7 +470,14 @@ struct CalibHessian {
 	}
 };
 
-// hessian component associated with one point.
+/* Hessian component associated with one point.
+ * A point belongs to a "host" frame.
+ * A point has a residual(PointFrameResidual) for each "target" frame it appears in.
+ * Each PointFrameResidual has a RawResidualJacobian which holds:
+ * 		The pixel residual's for each pixel in the point appearance
+ * 		Various computed derivative components used to compute the Jacobian & Hessian partial derivatives.
+ * The inverse depth is optimised using the residual error from the point's projection into the target frame.
+ */
 struct PointHessian {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;

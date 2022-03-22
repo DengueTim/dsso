@@ -54,8 +54,8 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 			if (r->efResidual->isActive()) {
 				if (r->isNew) {
 					PointHessian *p = r->point;
-					Vec3f ptp_inf = r->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u, p->v, 1); // projected point assuming infinite depth.
-					Vec3f ptp = ptp_inf + r->host->targetPrecalc[r->target->idx].PRE_KtTll * p->idepth_scaled; // projected point with real depth.
+					Vec3f ptp_inf = p->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u, p->v, 1); // projected point assuming infinite depth.
+					Vec3f ptp = ptp_inf + p->host->targetPrecalc[r->target->idx].PRE_KtTll * p->idepth_scaled; // projected point with real depth.
 					float relBS = 0.01 * ((ptp_inf.head<2>() / ptp_inf[2]) - (ptp.head<2>() / ptp[2])).norm();	// 0.01 = one pixel.
 
 					if (relBS > p->maxRelBaseline)

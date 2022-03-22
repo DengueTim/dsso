@@ -357,7 +357,7 @@ double EnergyFunctional::calcLEnergyF_MT() {
 }
 
 EFResidual* EnergyFunctional::insertResidual(PointFrameResidual *r) {
-	EFResidual *efr = new EFResidual(r, r->point->efPoint, r->host->efFrame, r->target->efFrame);
+	EFResidual *efr = new EFResidual(r, r->point->efPoint, r->point->host->efFrame, r->target->efFrame);
 	efr->idxInAll = r->point->efPoint->residualsAll.size();
 	r->point->efPoint->residualsAll.push_back(efr);
 

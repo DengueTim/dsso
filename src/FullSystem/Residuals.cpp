@@ -50,19 +50,14 @@ int PointFrameResidual::instanceCounter = 0;
 
 long runningResID = 0;
 
-PointFrameResidual::PointFrameResidual() {
-	assert(false);
-	instanceCounter++;
-}
-
 PointFrameResidual::~PointFrameResidual() {
 	assert(efResidual==0);
 	instanceCounter--;
 	delete J;
 }
 
-PointFrameResidual::PointFrameResidual(PointHessian *point_, FrameHessian *host_, FrameHessian *target_) :
-		point(point_), host(host_), target(target_) {
+PointFrameResidual::PointFrameResidual(PointHessian *point_, FrameHessian *target_) :
+		point(point_), target(target_) {
 	efResidual = 0;
 	instanceCounter++;
 	resetOOB();
@@ -80,7 +75,9 @@ double PointFrameResidual::linearize(CalibHessian *HCalib) {
 		return state_energy;
 	}
 
-	FrameFramePrecalc *precalc = &(host->targetPrecalc[target->idx]);
+	const FrameHessian *host = point->host;
+
+	const FrameFramePrecalc *precalc = &(host->targetPrecalc[target->idx]);
 	float energyLeft = 0;
 	const Eigen::Vector3f *dIl = target->dI;
 	//const float* const Il = target->I;

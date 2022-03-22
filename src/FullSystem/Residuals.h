@@ -68,7 +68,6 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	}
 
 	PointHessian *point;
-	FrameHessian *host;
 	FrameHessian *target;
 	RawResidualJacobian *J;
 
@@ -80,8 +79,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	Vec3f centerProjectedTo;
 
 	~PointFrameResidual();
-	PointFrameResidual();
-	PointFrameResidual(PointHessian *point_, FrameHessian *host_, FrameHessian *target_);
+	PointFrameResidual(PointHessian *point_, FrameHessian *target_);
 	double linearize(CalibHessian *HCalib);
 
 	void resetOOB() {
