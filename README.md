@@ -1,18 +1,15 @@
 # ~~DSO: Direct Sparse Odometry~~
-# DSSO: Direct Sparse Stereo Odometry
+# DSSO: Direct Spares Stereo Odometry
 
-WIP 
+The changes from DSO are outlined [here](DSSO.md).
 
-An attempt at extenting DSO to stereo image pairs. The intention is to remove scale abiguity by using a fixed stereo baseline and to improve initialisation and initial estimates using the image pairs.
 
-Ideas/approach:
- - Change FrameHessian to have left and right images with shared(but offset) pose...
- - Assuming a stereo camera uses the same exposure for both images determine if/how to share a and b illumination params.
- - Keep number of points per image or share same number of points between image pairs?
- - ...
+Doc TODO:
 
-For more information see
-[https://vision.in.tum.de/dso](https://vision.in.tum.de/dso)
+ - [ ] Change instructions on running it
+ - [ ] Data sets/requirements
+ - [ ] About cameras...
+
 
 ### 1. Related Papers
 * **Direct Sparse Odometry**, *J. Engel, V. Koltun, D. Cremers*, In arXiv:1607.02565, 2016
