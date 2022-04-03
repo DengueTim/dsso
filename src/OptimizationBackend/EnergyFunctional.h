@@ -77,7 +77,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	void setDeltaF(CalibHessian *HCalib);
 
-	void setAdjointsF(CalibHessian *Hcalib);
+	void setAdjointsF();
 
 	std::vector<EFFrame*> frames;
 	int nPoints, nFrames, nResiduals;
@@ -124,7 +124,6 @@ private:
 
 	VecC cPrior;
 	VecCf cDeltaF;
-	VecCf cPriorF;
 
 	AccumulatedTopHessianSSE *accTop_L;  // Contribution from Linearized points.
 	AccumulatedTopHessianSSE *accTop_A;  // Contribution from Active points. Used for marginalization and GN step

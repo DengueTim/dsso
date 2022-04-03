@@ -834,12 +834,12 @@ void FullSystem::deliverTrackedFrame(FrameHessian *fh, bool needKF) {
 void FullSystem::mappingLoop() {
 	boost::unique_lock<boost::mutex> lock(trackMapSyncMutex);
 
-	while (runMapping) {
-		while (unmappedTrackedFrames.size() == 0) {
+	while (true) {
+		while (runMapping && unmappedTrackedFrames.size() == 0) {
 			trackedFrameSignal.wait(lock);
-			if (!runMapping)
-				return;
 		}
+		if (!runMapping)
+			break;
 
 		FrameHessian *fh = unmappedTrackedFrames.front();
 		unmappedTrackedFrames.pop_front();
@@ -856,20 +856,20 @@ void FullSystem::mappingLoop() {
 		if (unmappedTrackedFrames.size() > 3)
 			needToKetchupMapping = true;
 
-		if (unmappedTrackedFrames.size() > 0) // if there are other frames to track, do that first.
-				{
+		if (unmappedTrackedFrames.size() > 0) { // if there are other frames to track, do that first.
 			lock.unlock();
 			makeNonKeyFrame(fh);
 			lock.lock();
 
 			if (needToKetchupMapping && unmappedTrackedFrames.size() > 0) {
+				// Here we're just updating the camToWorld in the FrameShell and discarding the FrameHessian..
 				FrameHessian *fh = unmappedTrackedFrames.front();
 				unmappedTrackedFrames.pop_front();
 				{
 					boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 					assert(fh->shell->trackingRef != 0);
 					fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-					fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(), fh->shell->aff_g2l);
+					//fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(), fh->shell->aff_g2l); // Pointless as we delete fh?!
 				}
 				delete fh;
 			}

@@ -153,12 +153,13 @@ struct FrameHessian {
 		return state_scaled;
 	}
 	EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const {
-		return get_state() - get_state_zero();
+		return get_state() - state_zero;
 	}
 
 	// precalc values
 	SE3 PRE_worldToCam;
 	SE3 PRE_camToWorld;
+	// Pre-calculate relative translations between this(host) frame and all other active(target) frames.
 	std::vector<FrameFramePrecalc, Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
 	MinimalImageB3 *debugImage;
 
@@ -172,7 +173,7 @@ struct FrameHessian {
 		return AffLight(get_state_zero()[6] * SCALE_A, get_state_zero()[7] * SCALE_B);
 	}
 
-	void setStateZero(const Vec10 &state_zero);
+	void setStateZero();
 	inline void setState(const Vec10 &state) {
 
 		this->state = state;
@@ -204,10 +205,9 @@ struct FrameHessian {
 	}
 	;
 	inline void setEvalPT(const SE3 &worldToCam_evalPT, const Vec10 &state) {
-
 		this->worldToCam_evalPT = worldToCam_evalPT;
 		setState(state);
-		setStateZero(state);
+		setStateZero();
 	}
 	;
 
@@ -217,7 +217,7 @@ struct FrameHessian {
 		initial_state[7] = aff_g2l.b;
 		this->worldToCam_evalPT = worldToCam_evalPT;
 		setStateScaled(initial_state);
-		setStateZero(this->get_state());
+		setStateZero();
 	}
 	;
 
@@ -288,15 +288,25 @@ struct CalibHessian {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
 
-	VecC value_zero;
-	VecC value_scaled;
+	VecC value_zero; // Start values from config files.
+	VecC value_scaled; // The scaled value is actually the real value.
 	VecCf value_scaledf;
 	VecCf value_scaledi;
-	VecC value;
+	VecC value; // This value is the one that is optimised on.
 	VecC step;
 	VecC step_backup;
 	VecC value_backup;
 	VecC value_minus_value_zero;
+
+	// For left-right camera pose estimation.
+	Mat33f PRE_RTll_0;
+	Vec3f PRE_tTll_0;
+
+	Mat33f PRE_RTll;
+	Vec3f PRE_tTll;
+
+	Mat33f PRE_KRKiTll;
+	Vec3f PRE_KtTll;
 
 	inline CalibHessian(const Mat33 &leftK, const Mat33 &rightK, const SE3 leftToRight) {
 
@@ -315,8 +325,10 @@ struct CalibHessian {
 		initial_value.segment<6>(8) = leftToRight.log();
 
 		setValueScaled(initial_value);
-		value_zero = value;
-		value_minus_value_zero.setZero();
+		// Take initial value as eval PT.
+		setZero();
+
+		precalculateTransforms();
 
 		for (int i = 0; i < 256; i++)
 			Binv[i] = B[i] = i;		// set gamma function to identity
@@ -374,8 +386,9 @@ struct CalibHessian {
 		return value_scaledi[7];
 	}
 
+	// Called every GN step..
 	inline void setValue(const VecC &value) {
-		// [0-3: Kl, 4-7: Kr, 8-12: l2r]
+		// [0-3: Kl, 4-7: Kr, 8-13: l2r]
 		this->value = value;
 		value_scaled[0] = SCALE_F * value[0];
 		value_scaled[1] = SCALE_F * value[1];
@@ -410,6 +423,33 @@ struct CalibHessian {
 	}
 	;
 
+	float Binv[256];
+	float B[256];
+
+	EIGEN_STRONG_INLINE float getBGradOnly(float color) {
+		int c = color + 0.5f;
+		if (c < 5)
+			c = 5;
+		if (c > 250)
+			c = 250;
+		return B[c + 1] - B[c];
+	}
+
+	EIGEN_STRONG_INLINE float getBInvGradOnly(float color) {
+		int c = color + 0.5f;
+		if (c < 5)
+			c = 5;
+		if (c > 250)
+			c = 250;
+		return Binv[c + 1] - Binv[c];
+	}
+	
+	SE3 getLeftToRight() {
+		return SE3::exp(value_scaled.segment<6>(8));
+	}
+
+private:
+	// Called only at start up with config values.
 	inline void setValueScaled(const VecC &value_scaled) {
 		this->value_scaled = value_scaled;
 		this->value_scaledf = this->value_scaled.cast<float>();
@@ -444,29 +484,35 @@ struct CalibHessian {
 	}
 	;
 
-	float Binv[256];
-	float B[256];
-
-	EIGEN_STRONG_INLINE float getBGradOnly(float color) {
-		int c = color + 0.5f;
-		if (c < 5)
-			c = 5;
-		if (c > 250)
-			c = 250;
-		return B[c + 1] - B[c];
+	// Take current value as eval PT/0
+	void setZero() {
+		value_zero = value;
+		value_minus_value_zero.setZero();
+		PRE_RTll_0 = PRE_RTll;
+		PRE_tTll_0 = PRE_tTll;
 	}
 
-	EIGEN_STRONG_INLINE float getBInvGradOnly(float color) {
-		int c = color + 0.5f;
-		if (c < 5)
-			c = 5;
-		if (c > 250)
-			c = 250;
-		return Binv[c + 1] - Binv[c];
-	}
+	void precalculateTransforms() {
+		SE3 se3_zero = SE3::exp(value_scaled.segment<6>(8));
+		PRE_RTll = se3_zero.rotationMatrix().cast<float>();
+		PRE_tTll = se3_zero.translation().cast<float>();
 
-	SE3 getLeftToRight() {
-		return SE3::exp(value.segment<6>(8).cast<double>());
+		Mat33f KL = Mat33f::Zero();
+		KL(0, 0) = fxl();
+		KL(1, 1) = fyl();
+		KL(0, 2) = cxl();
+		KL(1, 2) = cyl();
+		KL(2, 2) = 1;
+
+		Mat33f KR = Mat33f::Zero();
+		KR(0, 0) = fxlR();
+		KR(1, 1) = fylR();
+		KR(0, 2) = cxlR();
+		KR(1, 2) = cylR();
+		KR(2, 2) = 1;
+
+		PRE_KRKiTll = KL * PRE_RTll * KR.inverse();
+		PRE_KtTll = KL * PRE_tTll;
 	}
 };
 

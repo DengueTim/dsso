@@ -68,14 +68,23 @@ PointFrameResidual::PointFrameResidual(PointHessian *point_, FrameHessian *targe
 }
 
 double PointFrameResidual::linearize(CalibHessian *HCalib) {
+	if (point->host != target) {
+		return linearizeHostTarget(HCalib);
+	} else {
+		return linearizeLeftRight(HCalib);
+	}
+}
+
+double PointFrameResidual::linearizeHostTarget(CalibHessian *HCalib) {
+	const FrameHessian *host = point->host;
+	assert(host != target);
+
 	state_NewEnergyWithOutlier = -1;
 
 	if (state_state == ResState::OOB) {
 		state_NewState = ResState::OOB;
 		return state_energy;
 	}
-
-	const FrameHessian *host = point->host;
 
 	const FrameFramePrecalc *precalc = &(host->targetPrecalc[target->idx]);
 	float energyLeft = 0;
@@ -162,6 +171,194 @@ double PointFrameResidual::linearize(CalibHessian *HCalib) {
 		J->Jpdd[1] = d_d_y;
 
 	}
+
+	float JIdxJIdx_00 = 0, JIdxJIdx_11 = 0, JIdxJIdx_10 = 0;
+	float JabJIdx_00 = 0, JabJIdx_01 = 0, JabJIdx_10 = 0, JabJIdx_11 = 0;
+	float JabJab_00 = 0, JabJab_01 = 0, JabJab_11 = 0;
+
+	float wJI2_sum = 0;
+
+	for (int idx = 0; idx < patternNum; idx++) {
+		float Ku, Kv;
+		if (!projectPoint(point->u + patternP[idx][0], point->v+patternP[idx][1], point->idepth_scaled, PRE_KRKiTll, PRE_KtTll, Ku, Kv))
+		{	state_NewState = ResState::OOB; return state_energy;}
+
+		projectedTo[idx][0] = Ku;
+		projectedTo[idx][1] = Kv;
+
+		Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0]));
+		float residual = hitColor[0] - (float) (affLL[0] * color[idx] + affLL[1]);
+
+		float drdA = (color[idx] - b0);
+		if (!std::isfinite((float) hitColor[0])) {
+			state_NewState = ResState::OOB;
+			return state_energy;
+		}
+
+		float w = sqrtf(setting_outlierTHSumComponent / (setting_outlierTHSumComponent + hitColor.tail<2>().squaredNorm()));
+		w = 0.5f * (w + weights[idx]);
+
+		float hw = fabsf(residual) < setting_huberTH ? 1 : setting_huberTH / fabsf(residual);
+		energyLeft += w * w * hw * residual * residual * (2 - hw);
+
+		{
+			if (hw < 1)
+				hw = sqrtf(hw);
+			hw = hw * w;
+
+			hitColor[1] *= hw;
+			hitColor[2] *= hw;
+
+			J->resF[idx] = residual * hw;
+
+			J->JIdx[0][idx] = hitColor[1]; // image gradient in x * hw
+			J->JIdx[1][idx] = hitColor[2]; // image gradient in y * hw
+			J->JabF[0][idx] = drdA * hw;
+			J->JabF[1][idx] = hw;
+
+			JIdxJIdx_00 += hitColor[1] * hitColor[1];
+			JIdxJIdx_11 += hitColor[2] * hitColor[2];
+			JIdxJIdx_10 += hitColor[1] * hitColor[2];
+
+			JabJIdx_00 += drdA * hw * hitColor[1];
+			JabJIdx_01 += drdA * hw * hitColor[2];
+			JabJIdx_10 += hw * hitColor[1];
+			JabJIdx_11 += hw * hitColor[2];
+
+			JabJab_00 += drdA * drdA * hw * hw;
+			JabJab_01 += drdA * hw * hw;
+			JabJab_11 += hw * hw;
+
+			wJI2_sum += hw * hw * (hitColor[1] * hitColor[1] + hitColor[2] * hitColor[2]);
+
+			if (setting_affineOptModeA < 0)
+				J->JabF[0][idx] = 0;
+			if (setting_affineOptModeB < 0)
+				J->JabF[1][idx] = 0;
+
+		}
+	}
+
+	J->JIdx2(0, 0) = JIdxJIdx_00;
+	J->JIdx2(0, 1) = JIdxJIdx_10;
+	J->JIdx2(1, 0) = JIdxJIdx_10;
+	J->JIdx2(1, 1) = JIdxJIdx_11;
+	J->JabJIdx(0, 0) = JabJIdx_00;
+	J->JabJIdx(0, 1) = JabJIdx_01;
+	J->JabJIdx(1, 0) = JabJIdx_10;
+	J->JabJIdx(1, 1) = JabJIdx_11;
+	J->Jab2(0, 0) = JabJab_00;
+	J->Jab2(0, 1) = JabJab_01;
+	J->Jab2(1, 0) = JabJab_01;
+	J->Jab2(1, 1) = JabJab_11;
+
+	state_NewEnergyWithOutlier = energyLeft;
+
+	if (energyLeft > std::max<float>(host->frameEnergyTH, target->frameEnergyTH) || wJI2_sum < 2) {
+		energyLeft = std::max<float>(host->frameEnergyTH, target->frameEnergyTH);
+		state_NewState = ResState::OUTLIER;
+	} else {
+		state_NewState = ResState::IN;
+	}
+
+	state_NewEnergy = energyLeft;
+	return energyLeft;
+}
+
+double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
+	const FrameHessian *host = point->host;
+	assert(host == target);
+
+	state_NewEnergyWithOutlier = -1;
+
+	if (state_state == ResState::OOB) {
+		state_NewState = ResState::OOB;
+		return state_energy;
+	}
+
+	float energyLeft = 0;
+	const Eigen::Vector3f *dIl = host->dIr;
+	const Mat33f &PRE_KRKiTll = HCalib->PRE_KRKiTll;
+	const Vec3f &PRE_KtTll = HCalib->PRE_KtTll;
+	const Mat33f &PRE_RTll_0 = HCalib->PRE_RTll_0;
+	const Vec3f &PRE_tTll_0 = HCalib->PRE_tTll_0;
+
+	{
+		// No information for between frame pose.
+		J->Jpdxi[0].setZero();
+		J->Jpdxi[1].setZero();
+
+		// How the target image u and v pixel position change WRT camera intrinsics
+		VecCf d_C_u, d_C_v;
+
+		float drescale, u, v, new_idepth;
+		float Ku, Kv;
+		Vec3f KliP; // For the point in the left image holds (p - c) / f
+
+		if (!projectPointLR(point->u, point->v, point->idepth_zero_scaled, HCalib, drescale, u, v, Ku, Kv, KliP, new_idepth)) {
+			state_NewState = ResState::OOB;
+			return state_energy;
+		}
+
+		centerProjectedTo = Vec3f(Ku, Kv, new_idepth);
+
+		// diff calib left intrisics
+		float pre_ux = HCalib->fxlR() * drescale * (PRE_RTll_0(2, 0) * u - PRE_RTll_0(0, 0)) * HCalib->fxli();
+		float pre_uy = HCalib->fxlR() * drescale * (PRE_RTll_0(2, 1) * u - PRE_RTll_0(0, 1)) * HCalib->fyli();
+
+		float pre_vx = HCalib->fyl() * drescale * (PRE_RTll_0(2, 0) * v - PRE_RTll_0(1, 0)) * HCalib->fxli();
+		float pre_vy = HCalib->fylR() * drescale * (PRE_RTll_0(2, 1) * v - PRE_RTll_0(1, 1)) * HCalib->fyli();
+
+		d_C_u[0] = pre_ux * KliP[0] * SCALE_F;
+		d_C_u[1] = pre_uy * KliP[1] * SCALE_F;
+		d_C_u[2] = pre_ux * SCALE_C;
+		d_C_u[3] = pre_uy * SCALE_C;
+		d_C_v[0] = pre_vx * KliP[0] * SCALE_F;
+		d_C_v[1] = pre_vy * KliP[1] * SCALE_F;
+		d_C_v[2] = pre_vx * SCALE_C;
+		d_C_v[3] = pre_vy * SCALE_C;
+
+
+		// diff calib right intrisics
+		d_C_u[4] = u * SCALE_F;
+		d_C_u[5] = 0;
+		d_C_u[6] = SCALE_C;
+		d_C_u[7] = 0;
+		d_C_v[4] = 0;
+		d_C_v[5] = v * SCALE_F;
+		d_C_v[6] = 0;
+		d_C_v[7] = SCALE_C;
+
+		// diff calib left-right pose.
+		d_C_u[8] = new_idepth * HCalib->fxlR();
+		d_C_u[9] = 0;
+		d_C_u[10] = -new_idepth * u * HCalib->fxlR();
+		d_C_u[11] = -u * v * HCalib->fxlR();
+		d_C_u[12] = (1 + u * u) * HCalib->fxlR();
+		d_C_u[13] = -v * HCalib->fxlR();
+
+		d_C_v[8] = 0;
+		d_C_v[9] = new_idepth * HCalib->fylR();
+		d_C_v[10] = -new_idepth * v * HCalib->fylR();
+		d_C_v[11] = -(1 + v * v) * HCalib->fylR();
+		d_C_v[12] = u * v * HCalib->fylR();
+		d_C_v[13] = u * HCalib->fylR();
+
+
+		J->Jpdc[0] = d_C_u;
+		J->Jpdc[1] = d_C_v;
+
+		// diff d_idepth
+		J->Jpdd[0] = drescale * (PRE_tTll_0[0] - PRE_tTll_0[2] * u) * SCALE_IDEPTH * HCalib->fxlR();
+		J->Jpdd[1] = drescale * (PRE_tTll_0[1] - PRE_tTll_0[2] * v) * SCALE_IDEPTH * HCalib->fylR();
+	}
+
+	const float *const color = point->color;
+	const float *const weights = point->weights;
+
+	// Not estimating exposure params between L/R images. Assuming they are the same.
+	Vec2f affLL = Vec2f(1.0, 0.0);
+	float b0 = host->aff_g2l_0().b;
 
 	float JIdxJIdx_00 = 0, JIdxJIdx_11 = 0, JIdxJIdx_10 = 0;
 	float JabJIdx_00 = 0, JabJIdx_01 = 0, JabJIdx_10 = 0, JabJIdx_11 = 0;

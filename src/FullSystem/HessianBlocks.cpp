@@ -63,10 +63,11 @@ void PointHessian::release() {
 	residuals.clear();
 }
 
-void FrameHessian::setStateZero(const Vec10 &state_zero) {
-	assert(state_zero.head<6>().squaredNorm() < 1e-20);
+// Call when setting the Eval_PT. Takes current state as state_zero and updates nullspaces.
+void FrameHessian::setStateZero() {
+	assert(state.head<6>().squaredNorm() < 1e-20);
 
-	this->state_zero = state_zero;
+	this->state_zero = state;
 
 	for (int i = 0; i < 6; i++) {
 		Vec6 eps;
@@ -193,10 +194,18 @@ void FrameFramePrecalc::set(FrameHessian *host, FrameHessian *target, CalibHessi
 	this->host = host;
 	this->target = target;
 
+	if (host == target) {
+		return;
+	}
+
+	// evalPT set when frame added and after GN optimisation.
+	// The paper says the evalPT is fixed when any residual dependent on the transform is marginalised...
+	// Guess if it's only set in the above cases it will be fixed when marginalizing points/frames??..
 	SE3 leftToLeft_0 = target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse();
 	PRE_RTll_0 = (leftToLeft_0.rotationMatrix()).cast<float>();
 	PRE_tTll_0 = (leftToLeft_0.translation()).cast<float>();
 
+	// PREcalculated transform set when evalPT updated and for every GN step.
 	SE3 leftToLeft = target->PRE_worldToCam * host->PRE_camToWorld;
 	PRE_RTll = (leftToLeft.rotationMatrix()).cast<float>();
 	PRE_tTll = (leftToLeft.translation()).cast<float>();

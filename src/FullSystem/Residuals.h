@@ -73,14 +73,21 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	bool isNew;
 
-	// All pattern pixel coords from projection into target frame using PRE_ pose estimate. Assigned in PointFrameResidual::linearize())
+	/* Only used for debug.
+	 * All pattern pixel coords from projection into target frame using PRE_ pose estimate. Assigned in PointFrameResidual::linearize())
+	 */
 	Eigen::Vector2f projectedTo[MAX_RES_PER_POINT];
 	// Center pixel coords from projection into target frame using PRE_ pose estimate. Assigned in PointFrameResidual::linearize())
 	Vec3f centerProjectedTo;
 
 	~PointFrameResidual();
 	PointFrameResidual(PointHessian *point_, FrameHessian *target_);
+
 	double linearize(CalibHessian *HCalib);
+	// Linearise point projection from host frame to target frame.
+	double linearizeHostTarget(CalibHessian *HCalib);
+	// Linearise point projection from left to right images in host frame.
+	double linearizeLeftRight(CalibHessian *HCalib);
 
 	void resetOOB() {
 		state_NewEnergy = state_energy = 0;

@@ -39,7 +39,7 @@ bool EFAdjointsValid = false;
 bool EFIndicesValid = false;
 bool EFDeltaValid = false;
 
-void EnergyFunctional::setAdjointsF(CalibHessian *Hcalib) {
+void EnergyFunctional::setAdjointsF() {
 
 	if (adHost != 0)
 		delete[] adHost;
@@ -89,13 +89,12 @@ void EnergyFunctional::setAdjointsF(CalibHessian *Hcalib) {
 	adHostF = new Mat88f[nFrames * nFrames];
 	adTargetF = new Mat88f[nFrames * nFrames];
 
-	for (int h = 0; h < nFrames; h++)
+	for (int h = 0; h < nFrames; h++) {
 		for (int t = 0; t < nFrames; t++) {
 			adHostF[h + t * nFrames] = adHost[h + t * nFrames].cast<float>();
 			adTargetF[h + t * nFrames] = adTarget[h + t * nFrames].cast<float>();
 		}
-
-	cPriorF = cPrior.cast<float>();
+	}
 
 	EFAdjointsValid = true;
 }
@@ -164,7 +163,7 @@ void EnergyFunctional::setDeltaF(CalibHessian *HCalib) {
 					+ frames[t]->data->get_state_minus_stateZero().head<8>().cast<float>().transpose() * adTargetF[idx];
 		}
 
-	cDeltaF = HCalib->value_minus_value_zero.cast<float>();
+	cDeltaF = HCalib->value_minus_value_zero.cast<float>(); // Unscaled!?
 	for (EFFrame *f : frames) {
 		f->delta = f->data->get_state_minus_stateZero().head<8>();
 		f->delta_prior = (f->data->get_state() - f->data->getPriorZero()).head<8>();
@@ -349,7 +348,7 @@ double EnergyFunctional::calcLEnergyF_MT() {
 	for (EFFrame *f : frames)
 		E += f->delta_prior.cwiseProduct(f->prior).dot(f->delta_prior);
 
-	E += cDeltaF.cwiseProduct(cPriorF).dot(cDeltaF);
+	E += cDeltaF.cwiseProduct(cPrior.cast<float>()).dot(cDeltaF);
 
 	red->reduce(boost::bind(&EnergyFunctional::calcLEnergyPt, this, _1, _2, _3, _4), 0, allPoints.size(), 50);
 
@@ -386,7 +385,7 @@ EFFrame* EnergyFunctional::insertFrame(FrameHessian *fh, CalibHessian *Hcalib) {
 	EFAdjointsValid = false;
 	EFDeltaValid = false;
 
-	setAdjointsF(Hcalib);
+	setAdjointsF();
 	makeIDX();
 
 	for (EFFrame *fh2 : frames) {

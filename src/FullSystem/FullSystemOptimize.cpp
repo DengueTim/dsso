@@ -208,7 +208,7 @@ bool FullSystem::doStepFromBackup(float stepfacC, float stepfacT, float stepfacR
 			}
 		}
 	} else {
-		Hcalib.setValue(Hcalib.value_backup + stepfacC * Hcalib.step);
+		Hcalib.setValue(Hcalib.value_backup + Hcalib.step * stepfacC);
 		for (FrameHessian *fh : frameHessians) {
 			fh->setState(fh->state_backup + pstepfac.cwiseProduct(fh->step));
 			sumA += fh->step[6] * fh->step[6];
@@ -420,6 +420,7 @@ float FullSystem::optimize(int mnumOptIts) {
 
 			lambda *= 0.25;
 		} else {
+			// New energy > old energy, Restore last State and try again with bigger lamba..
 			loadSateBackup();
 			lastEnergy = linearizeAll(false);
 			lastEnergyL = calcLEnergy();
@@ -437,7 +438,7 @@ float FullSystem::optimize(int mnumOptIts) {
 	frameHessians.back()->setEvalPT(frameHessians.back()->PRE_worldToCam, newStateZero);
 	EFDeltaValid = false;
 	EFAdjointsValid = false;
-	ef->setAdjointsF(&Hcalib);
+	ef->setAdjointsF();
 	setPrecalcValues();
 
 	lastEnergy = linearizeAll(true);

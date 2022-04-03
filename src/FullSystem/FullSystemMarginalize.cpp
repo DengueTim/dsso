@@ -178,7 +178,7 @@ void FullSystem::marginalizeFrame(FrameHessian *frame) {
 		frameHessians[i]->idx = i;
 
 	setPrecalcValues();
-	ef->setAdjointsF(&Hcalib);
+	ef->setAdjointsF();
 }
 
 }

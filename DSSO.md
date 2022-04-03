@@ -5,10 +5,10 @@
 An attempt at extending DSO to stereo image pairs. The intention is to remove scale abiguity by using a fixed stereo baseline and to improve initialisation and initial estimates using the image pairs.
 
 Ideas/approach:
- - [x] Change FrameHessian to have left and right images with shared(but offset) pose...
- - [ ] Assuming a stereo camera uses the same exposure for both images determine if/how to share a and b illumination params.
- - [ ] Keep number of points per image or share same number of points between image pairs?
- - [ ] ...
+ - Change FrameHessian to have left and right images with shared(but offset) pose...
+ - Assuming a stereo camera uses the same exposure for both images determine if/how to share a and b illumination params.
+ - Keep number of points per image or share same number of points between image pairs?
+ - ...
 
 For more information see
 [https://vision.in.tum.de/dso](https://vision.in.tum.de/dso)
