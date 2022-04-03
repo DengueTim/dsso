@@ -22,107 +22,48 @@ See [Tong Ling's DSO Blog posts](https://tongling916.github.io/tags/#DSO) for an
 
 Elements of *RawResidualJacobian.Jpdc* in DSO:
 
-![](https://latex.codecogs.com/svg.latex?\LARGE&space;\frac{\partial \mathbf{p}_{j}}{\partial \mathbf{C_K}} = \begin{bmatrix} \frac{\partial u_j}{\partial f_{x}} & \frac{\partial u_j}{\partial f_{y}} & \frac{\partial u_j}{\partial c_{x}} & \frac{\partial u_j}{\partial c_y} \\ \frac{\partial v_j}{\partial f_x} & \frac{\partial v_j}{\partial f_y} & \frac{\partial v_j}{\partial c_x} & \frac{\partial v_j}{\partial c_y}\end{bmatrix})
+![](https://latex.codecogs.com/svg.latex?\Large&space;%5Cfrac%7B%5Cpartial%20%5Cmathbf%7Bp%7D%7Bj%7D%7D%7B%5Cpartial%20%5Cmathbf%7BC_K%7D%7D%20%3D%20%5Cbegin%7Bbmatrix%7D%20%5Cfrac%7B%5Cpartial%20u_j%7D%7B%5Cpartial%20f%7Bx%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_j%7D%7B%5Cpartial%20f_%7By%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_j%7D%7B%5Cpartial%20c_%7Bx%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_j%7D%7B%5Cpartial%20c_y%7D%20%5C%20%5Cfrac%7B%5Cpartial%20v_j%7D%7B%5Cpartial%20f_x%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_j%7D%7B%5Cpartial%20f_y%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_j%7D%7B%5Cpartial%20c_x%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_j%7D%7B%5Cpartial%20c_y%7D%5Cend%7Bbmatrix%7D)
 
 In DSSO *Jpdc* is expanded from a 2x4 to a 2x14 matrix.  Between images in time(left to left) DSSO uses the same computation as DSO as both images are from the same camera. **p**<sub>j</sub> and **K** are always for the left camera. The additional elements of Jpdc are set to 0 for left-left image pairs as there is no information about the right camera's intrisics or relative pose.
 
 
 For left-right pairs, **p**<sub>*j*</sub> becomes **p**<sub>*r*</sub> and the element of *Jpdc* are computed with respect to **K**<sub>*l*</sub> and **K**<sub>*r*</sub>:
 
-![](https://latex.codecogs.com/svg.latex?\LARGE&space;\begin{matrix}\frac{\partial \mathbf{p}_{r}}{\partial \mathbf{C_{K_l}}} = \begin{bmatrix}\frac{\partial u_r}{\partial f_{lx}} & \frac{\partial u_r}{\partial f_{ly}} & \frac{\partial u_r}{\partial c_{lx}} & \frac{\partial u_r}{\partial c_{ly}} \\ \frac{\partial v_r}{\partial f_{lx}} & \frac{\partial v_r}{\partial f_{ly}} & \frac{\partial v_r}{\partial c_{lx}} & \frac{\partial v_r}{\partial c_{ly}}\end{bmatrix} & \frac{\partial \mathbf{p}_{r}}{\partial \mathbf{C_{K_r}}} = \begin{bmatrix}\frac{\partial u_r}{\partial f_{rx}} & \frac{\partial u_r}{\partial f_{ry}} & \frac{\partial u_r}{\partial c_{rx}} & \frac{\partial u_r}{\partial c_{ry}} \\ \frac{\partial v_r}{\partial f_{rx}} & \frac{\partial v_r}{\partial f_{ry}} & \frac{\partial v_r}{\partial c_{rx}} & \frac{\partial v_r}{\partial c_{ry}}\end{bmatrix}\end{matrix})
+![](https://latex.codecogs.com/svg.latex?\LARGE&space;%5Cbegin%7Bmatrix%7D%5Cfrac%7B%5Cpartial%20%5Cmathbf%7Bp%7D_%7Br%7D%7D%7B%5Cpartial%20%5Cmathbf%7BC_%7BK_l%7D%7D%7D%20%3D%20%5Cbegin%7Bbmatrix%7D%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20f_%7Blx%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20f_%7Bly%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20c_%7Blx%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20c_%7Bly%7D%7D%20%5C%5C%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20f_%7Blx%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20f_%7Bly%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20c_%7Blx%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20c_%7Bly%7D%7D%5Cend%7Bbmatrix%7D%20%26%20%5Cfrac%7B%5Cpartial%20%5Cmathbf%7Bp%7D_%7Br%7D%7D%7B%5Cpartial%20%5Cmathbf%7BC_%7BK_r%7D%7D%7D%20%3D%20%5Cbegin%7Bbmatrix%7D%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20f_%7Brx%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20f_%7Bry%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20c_%7Brx%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20c_%7Bry%7D%7D%20%5C%5C%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20f_%7Brx%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20f_%7Bry%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20c_%7Brx%7D%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20c_%7Bry%7D%7D%5Cend%7Bbmatrix%7D%5Cend%7Bmatrix%7D)
 
 Additionally **p**<sub>*r*</sub> WRT the left-right transform **Rt**<sub>rl</sub> is added as below. The derivertives are the same as for the left-left transform:
 
-![](https://latex.codecogs.com/svg.latex?\LARGE&space;\frac{\partial \mathbf{p}_{r}}{\partial \mathbf{C_{Rt_{lr}}}} = \begin{bmatrix}\frac{\partial u_r}{\partial R_x} & \frac{\partial u_r}{\partial R_y} & \frac{\partial u_r}{\partial R_z} & \frac{\partial u_r}{\partial t_x} & \frac{\partial u_r}{\partial t_y} & \frac{\partial u_r}{\partial t_z} \\ \frac{\partial v_r}{\partial R_x} & \frac{\partial v_r}{\partial R_y} & \frac{\partial v_r}{\partial R_z} & \frac{\partial v_r}{\partial t_x} & \frac{\partial v_r}{\partial r_y} & \frac{\partial v_r}{\partial t_z}\end{bmatrix})
-
-
+![](https://latex.codecogs.com/svg.latex?\Large&space;%5Cfrac%7B%5Cpartial%20%5Cmathbf%7Bp%7D_%7Br%7D%7D%7B%5Cpartial%20%5Cmathbf%7BC_%7BRt_%7Blr%7D%7D%7D%7D%20%3D%20%5Cbegin%7Bbmatrix%7D%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20R_x%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20R_y%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20R_z%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20t_x%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20t_y%7D%20%26%20%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20t_z%7D%20%5C%5C%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20R_x%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20R_y%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20R_z%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20t_x%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20r_y%7D%20%26%20%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20t_z%7D%5Cend%7Bbmatrix%7D)
 
 
 Given a pixel position in the left image plane **p**<sub>l</sub>, the projected position in the right image plane **p**<sub>*r*</sub> is:
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;{
-\mathbf{p}_r = \mathbf{K}_r \mathbf{p}^n_r = \mathbf{K}_r \left ( \frac{\rho_r}{\rho_l}\mathbf{R}_{rl}\mathbf{K}^{-1}_l\mathbf{p}_l + \rho_r\mathbf{t}_{rl} \right )
-}"/>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;%7B%0A%5Cmathbf%7Bp%7D_r%20%3D%20%5Cmathbf%7BK%7D_r%20%5Cmathbf%7Bp%7D%5En_r%20%3D%20%5Cmathbf%7BK%7D_r%20%5Cleft%20(%20%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cmathbf%7BR%7D_%7Brl%7D%5Cmathbf%7BK%7D%5E%7B-1%7D_l%5Cmathbf%7Bp%7D_l%20%2B%20%5Crho_r%5Cmathbf%7Bt%7D_%7Brl%7D%20%5Cright%20)%0A%7D"/>
 
 
 The derivertive of **p**<sub>*r*</sub> WRT **C**<sub>**K**<sub>*l*</sub></sub> can be computed as:
 
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;{
-\frac{\partial \mathbf{p}_r}{\partial \mathbf{C_K}_l} =
-\frac{\partial \mathbf{p}_r}{\partial \mathbf{p}^n_r} \frac{\partial \mathbf{p}^n_r}{\partial \mathbf{C_K}_l} 
-}"/>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;%7B%0A%5Cfrac%7B%5Cpartial%20%5Cmathbf%7Bp%7D_r%7D%7B%5Cpartial%20%5Cmathbf%7BC_K%7D_l%7D%20%3D%0A%5Cfrac%7B%5Cpartial%20%5Cmathbf%7Bp%7D_r%7D%7B%5Cpartial%20%5Cmathbf%7Bp%7D%5En_r%7D%20%5Cfrac%7B%5Cpartial%20%5Cmathbf%7Bp%7D%5En_r%7D%7B%5Cpartial%20%5Cmathbf%7BC_K%7D_l%7D%20%0A%7D"/>
 
 Where **p**<sub>*r*</sub> WRT **p**<sub>*r*</sub><sup>n</sup> is:
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;{
-\begin{aligned}
-\mathbf{p}_r = \mathbf{K} \mathbf{p}^n_r &=
-\begin{bmatrix}f_x u^n_r + c_x \\ f_y v^n_r + c_y\\ 1 \end{bmatrix} \\
-\frac{\partial \mathbf{p}_r}{\partial \mathbf{p}^n_r} &=
-\begin{bmatrix}f_x & 0 & 0 \\ 0 & f_y & 0 \\ 0 & 0 & 0\end{bmatrix}
-\end{aligned}
-}"/>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;%7B%0A%5Cbegin%7Baligned%7D%0A%5Cmathbf%7Bp%7D_r%20%3D%20%5Cmathbf%7BK%7D%20%5Cmathbf%7Bp%7D%5En_r%20%26%3D%0A%5Cbegin%7Bbmatrix%7Df_x%20u%5En_r%20%2B%20c_x%20%5C%5C%20f_y%20v%5En_r%20%2B%20c_y%5C%5C%201%20%5Cend%7Bbmatrix%7D%20%5C%5C%0A%5Cfrac%7B%5Cpartial%20%5Cmathbf%7Bp%7D_r%7D%7B%5Cpartial%20%5Cmathbf%7Bp%7D%5En_r%7D%20%26%3D%0A%5Cbegin%7Bbmatrix%7Df_x%20%26%200%20%26%200%20%5C%5C%200%20%26%20f_y%20%26%200%20%5C%5C%200%20%26%200%20%26%200%5Cend%7Bbmatrix%7D%0A%5Cend%7Baligned%7D%0A%7D"/>
 
 .. and **p**<sub>*r*</sub><sup>n</sup> WRT **C**<sub>**K**<sub>*l*</sub></sub> is(see Tong's blog):
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;{
-\begin{aligned}
-\frac{\partial u_r^n}{\partial f_{lx}}&=
-\frac{\rho_r}{\rho_l}\left(r_{20} u_r^n-r_{00}\right) f_{lx}^{-2}\left(u_l-c_{lx}\right) \\ 
-\frac{\partial u_r^n}{\partial f_{ly}}&=
-\frac{\rho_r}{\rho_l}\left(r_{21} u_r^n-r_{01}\right) f_{ly}^{-2}\left(v_l-c_{ly}\right)\\
-\frac{\partial u_r^n}{\partial c_{lx}}&=
-\frac{\rho_r}{\rho_l}\left(r_{20} u_r^n-r_{00}\right) f_{lx}^{-1} \\ 
-\frac{\partial u_r^n}{\partial c_{ly}}&=
-\frac{\rho_r}{\rho_l}\left(r_{21} u_r^n-r_{01}\right) f_{ly}^{-1}\\
-\frac{\partial v_r^n}{\partial f_{lx}}&=
-\frac{\rho_r}{\rho_l}\left(r_{20} v_r^n-r_{10}\right) f_{lx}^{-2}\left(u_l-c_{lx}\right) \\
-\frac{\partial v_r^n}{\partial f_{ly}}&=
-\frac{\rho_r}{\rho_l}\left(r_{21} v_r^n-r_{11}\right) f_{ly}^{-2}\left(v_l-c_{ly}\right)\\
-\frac{\partial v_r^n}{\partial c_{lx}}&=
-\frac{\rho_r}{\rho_l}\left(r_{20} v_r^n-r_{10}\right) f_{lx}^{-1} \\
-\frac{\partial v_r^n}{\partial c_{ly}}&=
-\frac{\rho_r}{\rho_l}\left(r_{21} v_r^n-r_{11}\right) f_{ly}^{-1}
-\end{aligned}
-}"/>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;%7B%0A%5Cbegin%7Baligned%7D%0A%5Cfrac%7B%5Cpartial%20u_r%5En%7D%7B%5Cpartial%20f_%7Blx%7D%7D%26%3D%0A%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B20%7D%20u_r%5En-r_%7B00%7D%5Cright)%20f_%7Blx%7D%5E%7B-2%7D%5Cleft(u_l-c_%7Blx%7D%5Cright)%20%5C%5C%20%0A%5Cfrac%7B%5Cpartial%20u_r%5En%7D%7B%5Cpartial%20f_%7Bly%7D%7D%26%3D%0A%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B21%7D%20u_r%5En-r_%7B01%7D%5Cright)%20f_%7Bly%7D%5E%7B-2%7D%5Cleft(v_l-c_%7Bly%7D%5Cright)%5C%5C%0A%5Cfrac%7B%5Cpartial%20u_r%5En%7D%7B%5Cpartial%20c_%7Blx%7D%7D%26%3D%0A%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B20%7D%20u_r%5En-r_%7B00%7D%5Cright)%20f_%7Blx%7D%5E%7B-1%7D%20%5C%5C%20%0A%5Cfrac%7B%5Cpartial%20u_r%5En%7D%7B%5Cpartial%20c_%7Bly%7D%7D%26%3D%0A%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B21%7D%20u_r%5En-r_%7B01%7D%5Cright)%20f_%7Bly%7D%5E%7B-1%7D%5C%5C%0A%5Cfrac%7B%5Cpartial%20v_r%5En%7D%7B%5Cpartial%20f_%7Blx%7D%7D%26%3D%0A%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B20%7D%20v_r%5En-r_%7B10%7D%5Cright)%20f_%7Blx%7D%5E%7B-2%7D%5Cleft(u_l-c_%7Blx%7D%5Cright)%20%5C%5C%0A%5Cfrac%7B%5Cpartial%20v_r%5En%7D%7B%5Cpartial%20f_%7Bly%7D%7D%26%3D%0A%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B21%7D%20v_r%5En-r_%7B11%7D%5Cright)%20f_%7Bly%7D%5E%7B-2%7D%5Cleft(v_l-c_%7Bly%7D%5Cright)%5C%5C%0A%5Cfrac%7B%5Cpartial%20v_r%5En%7D%7B%5Cpartial%20c_%7Blx%7D%7D%26%3D%0A%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B20%7D%20v_r%5En-r_%7B10%7D%5Cright)%20f_%7Blx%7D%5E%7B-1%7D%20%5C%5C%0A%5Cfrac%7B%5Cpartial%20v_r%5En%7D%7B%5Cpartial%20c_%7Bly%7D%7D%26%3D%0A%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B21%7D%20v_r%5En-r_%7B11%7D%5Cright)%20f_%7Bly%7D%5E%7B-1%7D%0A%5Cend%7Baligned%7D%0A%7D"/>
 
 
-So for ![](https://latex.codecogs.com/svg.latex?\Large&space;{\frac{\partial \mathbf{p}_r}{\partial \mathbf{C_K}_l}}) we get:
+So for ![](https://latex.codecogs.com/svg.latex?\Large&space;%7B%5Cfrac%7B%5Cpartial%20%5Cmathbf%7Bp%7D_r%7D%7B%5Cpartial%20%5Cmathbf%7BC_K%7D_l%7D%7D) we get:
 
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;{
-\begin{aligned}
-\frac{\partial u_r}{\partial f_{lx}}&=f_{rx}
-\frac{\rho_r}{\rho_l}\left(r_{20} u_r^n-r_{00}\right) f_{lx}^{-2}\left(u_l-c_{lx}\right) \\ 
-\frac{\partial u_r}{\partial f_{ly}}&=f_{rx}
-\frac{\rho_r}{\rho_l}\left(r_{21} u_r^n-r_{01}\right) f_{ly}^{-2}\left(v_l-c_{ly}\right)\\
-\frac{\partial u_r}{\partial c_{lx}}&=f_{rx}
-\frac{\rho_r}{\rho_l}\left(r_{20} u_r^n-r_{00}\right) f_{lx}^{-1} \\ 
-\frac{\partial u_r}{\partial c_{ly}}&=f_{rx}
-\frac{\rho_r}{\rho_l}\left(r_{21} u_r^n-r_{01}\right) f_{ly}^{-1}\\
-\frac{\partial v_r}{\partial f_{lx}}&=f_{ry}
-\frac{\rho_r}{\rho_l}\left(r_{20} v_r^n-r_{10}\right) f_{lx}^{-2}\left(u_l-c_{lx}\right) \\
-\frac{\partial v_r}{\partial f_{ly}}&=f_{ry}
-\frac{\rho_r}{\rho_l}\left(r_{21} v_r^n-r_{11}\right) f_{ly}^{-2}\left(v_l-c_{ly}\right)\\
-\frac{\partial v_r}{\partial c_{lx}}&=f_{ry}
-\frac{\rho_r}{\rho_l}\left(r_{20} v_r^n-r_{10}\right) f_{lx}^{-1} \\
-\frac{\partial v_r}{\partial c_{ly}}&=f_{ry}
-\frac{\rho_r}{\rho_l}\left(r_{21} v_r^n-r_{11}\right) f_{ly}^{-1}
-\end{aligned}
-}"/>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;%7B%0A%5Cbegin%7Baligned%7D%0A%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20f_%7Blx%7D%7D%26%3Df_%7Brx%7D%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B20%7D%20u_r%5En-r_%7B00%7D%5Cright)%20f_%7Blx%7D%5E%7B-2%7D%5Cleft(u_l-c_%7Blx%7D%5Cright)%5C%5C%20%0A%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20f_%7Bly%7D%7D%26%3Df_%7Brx%7D%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B21%7D%20u_r%5En-r_%7B01%7D%5Cright)%20f_%7Bly%7D%5E%7B-2%7D%5Cleft(v_l-c_%7Bly%7D%5Cright)%5C%5C%0A%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20c_%7Blx%7D%7D%26%3Df_%7Brx%7D%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B20%7D%20u_r%5En-r_%7B00%7D%5Cright)%20f_%7Blx%7D%5E%7B-1%7D%5C%5C%20%0A%5Cfrac%7B%5Cpartial%20u_r%7D%7B%5Cpartial%20c_%7Bly%7D%7D%26%3Df_%7Brx%7D%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B21%7D%20u_r%5En-r_%7B01%7D%5Cright)%20f_%7Bly%7D%5E%7B-1%7D%5C%5C%0A%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20f_%7Blx%7D%7D%26%3Df_%7Bry%7D%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B20%7D%20v_r%5En-r_%7B10%7D%5Cright)%20f_%7Blx%7D%5E%7B-2%7D%5Cleft(u_l-c_%7Blx%7D%5Cright)%5C%5C%0A%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20f_%7Bly%7D%7D%26%3Df_%7Bry%7D%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B21%7D%20v_r%5En-r_%7B11%7D%5Cright)%20f_%7Bly%7D%5E%7B-2%7D%5Cleft(v_l-c_%7Bly%7D%5Cright)%5C%5C%0A%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20c_%7Blx%7D%7D%26%3Df_%7Bry%7D%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B20%7D%20v_r%5En-r_%7B10%7D%5Cright)%20f_%7Blx%7D%5E%7B-1%7D%5C%5C%0A%5Cfrac%7B%5Cpartial%20v_r%7D%7B%5Cpartial%20c_%7Bly%7D%7D%26%3Df_%7Bry%7D%5Cfrac%7B%5Crho_r%7D%7B%5Crho_l%7D%5Cleft(r_%7B21%7D%20v_r%5En-r_%7B11%7D%5Cright)%20f_%7Bly%7D%5E%7B-1%7D%0A%5Cend%7Baligned%7D%0A%7D"/>
 
 
 As **p**<sup>n</sup><sub>*r*</sub> doesn't depend on **C**<sub>**K**<sub>*r*</sub></sub> the derivertive of **p**<sub>*r*</sub> WRT **C**<sub>**K**<sub>*r*</sub></sub> is **p**<sub>*r*</sub> WRT **p**<sub>*r*</sub><sup>n</sup> with *u*<sup>n</sup><sub>r</sub> and *v*<sup>n</sup><sub>r</sub> substituted:
 
-<img src="https://latex.codecogs.com/svg.latex?\Large&space;{
-\begin{aligned}
-\mathbf{p}_r = \mathbf{K} \mathbf{p}^n_r &=
-\begin{bmatrix}f_x u^n_r + c_x \\ f_y u^n_r + c_y\\ 1 \end{bmatrix} \\
-\frac{\partial \mathbf{p}_r}{\partial \mathbf{K}} &=
-\begin{bmatrix}u^n_r & 0 & 1 & 0 \\ 0 & v^n_r & 0 & 1 \\ 0 & 0 & 0 & 0\end{bmatrix}
-\end{bmatrix}
-}"/>
+<img src="https://latex.codecogs.com/svg.latex?\Large&space;%7B%0A%5Cbegin%7Baligned%7D%0A%5Cmathbf%7Bp%7D_r%20%3D%20%5Cmathbf%7BK%7D%20%5Cmathbf%7Bp%7D%5En_r%20%26%3D%0A%5Cbegin%7Bbmatrix%7Df_x%20u%5En_r%20%2B%20c_x%20%5C%5C%20f_y%20u%5En_r%20%2B%20c_y%5C%5C%201%20%5Cend%7Bbmatrix%7D%20%5C%5C%0A%5Cfrac%7B%5Cpartial%20%5Cmathbf%7Bp%7D_r%7D%7B%5Cpartial%20%5Cmathbf%7BK%7D%7D%20%26%3D%0A%5Cbegin%7Bbmatrix%7Du%5En_r%20%26%200%20%26%201%20%26%200%20%5C%5C%200%20%26%20v%5En_r%20%26%200%20%26%201%20%5C%5C%200%20%26%200%20%26%200%20%26%200%5Cend%7Bbmatrix%7D%0A%5Cend%7Bbmatrix%7D%0A%7D"/>
 
 
 
