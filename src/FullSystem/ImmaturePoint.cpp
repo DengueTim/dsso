@@ -368,20 +368,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian *frame, const Mat33f &ho
 	return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
 }
 
-float ImmaturePoint::getdPixdd(CalibHessian *HCalib, ImmaturePointTemporaryResidual *tmpRes, float idepth) {
-	FrameFramePrecalc *precalc = &(host->targetPrecalc[tmpRes->target->idx]);
-	const Vec3f &PRE_tTll = precalc->PRE_tTll;
-	float drescale, u = 0, v = 0, new_idepth;
-	float Ku, Kv;
-	Vec3f KliP;
-
-	projectPoint(this->u, this->v, idepth, HCalib, precalc->PRE_RTll, PRE_tTll, drescale, u, v, Ku, Kv, KliP, new_idepth);
-
-	float dxdd = (PRE_tTll[0] - PRE_tTll[2] * u) * HCalib->fxl();
-	float dydd = (PRE_tTll[1] - PRE_tTll[2] * v) * HCalib->fyl();
-	return drescale * sqrtf(dxdd * dxdd + dydd * dydd);
-}
-
 float ImmaturePoint::calcResidual(CalibHessian *HCalib, const float outlierTHSlack, ImmaturePointTemporaryResidual *tmpRes,
 		float idepth) {
 	FrameFramePrecalc *precalc = &(host->targetPrecalc[tmpRes->target->idx]);
@@ -443,7 +429,7 @@ double ImmaturePoint::linearizeResidual(CalibHessian *HCalib, const float outlie
 		Vec3f KliP;
 
 		if(!projectPoint(this->u + dx,this->v + dy, idepth, HCalib,
-						PRE_RTll,PRE_tTll, drescale, u, v, Ku, Kv, KliP, new_idepth))
+						PRE_RTll,PRE_tTll, drescale, u, v, Ku, Kv, KliP, new_idepth, false))
 		{	tmpRes->state_NewState = ResState::OOB; return tmpRes->state_energy;}
 
 		Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0]));

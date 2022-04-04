@@ -82,7 +82,6 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	double linearizeResidual(CalibHessian *HCalib, const float outlierTHSlack, ImmaturePointTemporaryResidual *tmpRes, float &Hdd,
 			float &bd, float idepth);
-	float getdPixdd(CalibHessian *HCalib, ImmaturePointTemporaryResidual *tmpRes, float idepth);
 
 	float calcResidual(CalibHessian *HCalib, const float outlierTHSlack, ImmaturePointTemporaryResidual *tmpRes, float idepth);
 

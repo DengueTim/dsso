@@ -298,16 +298,6 @@ struct CalibHessian {
 	VecC value_backup;
 	VecC value_minus_value_zero;
 
-	// For left-right camera pose estimation.
-	Mat33f PRE_RTll_0;
-	Vec3f PRE_tTll_0;
-
-	Mat33f PRE_RTll;
-	Vec3f PRE_tTll;
-
-	Mat33f PRE_KRKiTll;
-	Vec3f PRE_KtTll;
-
 	inline CalibHessian(const Mat33 &leftK, const Mat33 &rightK, const SE3 leftToRight) {
 
 		VecC initial_value = VecC::Zero();
@@ -325,10 +315,9 @@ struct CalibHessian {
 		initial_value.segment<6>(8) = leftToRight.log();
 
 		setValueScaled(initial_value);
-		// Take initial value as eval PT.
-		setZero();
-
-		precalculateTransforms();
+		// Take initial value as eval PT (zero).
+		value_zero = value;
+		value_minus_value_zero.setZero();
 
 		for (int i = 0; i < 256; i++)
 			Binv[i] = B[i] = i;		// set gamma function to identity
@@ -419,9 +408,10 @@ struct CalibHessian {
 		this->value_scaledi[6] = -this->value_scaledf[6] / this->value_scaledf[4];
 		this->value_scaledi[7] = -this->value_scaledf[7] / this->value_scaledf[5];
 
+		//TODO Left/Right transform inverse.
+
 		this->value_minus_value_zero = this->value - this->value_zero;
 	}
-	;
 
 	float Binv[256];
 	float B[256];
@@ -443,13 +433,18 @@ struct CalibHessian {
 			c = 250;
 		return Binv[c + 1] - Binv[c];
 	}
-	
+
+	SE3 getLeftToRightZero() {
+		// TODO the transform is not scaled yet.
+		return SE3::exp(value_zero.segment<6>(8));
+	}
+
 	SE3 getLeftToRight() {
 		return SE3::exp(value_scaled.segment<6>(8));
 	}
 
 private:
-	// Called only at start up with config values.
+	// Called only at startup with config values.
 	inline void setValueScaled(const VecC &value_scaled) {
 		this->value_scaled = value_scaled;
 		this->value_scaledf = this->value_scaled.cast<float>();
@@ -481,38 +476,6 @@ private:
 		this->value_scaledi[5] = 1.0f / this->value_scaledf[5];
 		this->value_scaledi[6] = -this->value_scaledf[6] / this->value_scaledf[4];
 		this->value_scaledi[7] = -this->value_scaledf[7] / this->value_scaledf[5];
-	}
-	;
-
-	// Take current value as eval PT/0
-	void setZero() {
-		value_zero = value;
-		value_minus_value_zero.setZero();
-		PRE_RTll_0 = PRE_RTll;
-		PRE_tTll_0 = PRE_tTll;
-	}
-
-	void precalculateTransforms() {
-		SE3 se3_zero = SE3::exp(value_scaled.segment<6>(8));
-		PRE_RTll = se3_zero.rotationMatrix().cast<float>();
-		PRE_tTll = se3_zero.translation().cast<float>();
-
-		Mat33f KL = Mat33f::Zero();
-		KL(0, 0) = fxl();
-		KL(1, 1) = fyl();
-		KL(0, 2) = cxl();
-		KL(1, 2) = cyl();
-		KL(2, 2) = 1;
-
-		Mat33f KR = Mat33f::Zero();
-		KR(0, 0) = fxlR();
-		KR(1, 1) = fylR();
-		KR(0, 2) = cxlR();
-		KR(1, 2) = cylR();
-		KR(2, 2) = 1;
-
-		PRE_KRKiTll = KL * PRE_RTll * KR.inverse();
-		PRE_KtTll = KL * PRE_tTll;
 	}
 };
 

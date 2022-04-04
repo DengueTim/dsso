@@ -195,35 +195,64 @@ void FrameFramePrecalc::set(FrameHessian *host, FrameHessian *target, CalibHessi
 	this->target = target;
 
 	if (host == target) {
-		return;
+		SE3 leftToRightZero = HCalib->getLeftToRightZero();
+		PRE_RTll_0 = leftToRightZero.rotationMatrix().cast<float>();
+		PRE_tTll_0 = leftToRightZero.translation().cast<float>();
+
+		SE3 leftToRight = HCalib->getLeftToRight(); // SE3::exp(value_scaled.segment<6>(8));
+		PRE_RTll = leftToRight.rotationMatrix().cast<float>();
+		PRE_tTll = leftToRight.translation().cast<float>();
+		distanceLL = leftToRight.translation().norm();
+
+		Mat33f KL = Mat33f::Zero();
+		KL(0, 0) = HCalib->fxl();
+		KL(1, 1) = HCalib->fyl();
+		KL(0, 2) = HCalib->cxl();
+		KL(1, 2) = HCalib->cyl();
+		KL(2, 2) = 1;
+
+		Mat33f KR = Mat33f::Zero();
+		KR(0, 0) = HCalib->fxlR();
+		KR(1, 1) = HCalib->fylR();
+		KR(0, 2) = HCalib->cxlR();
+		KR(1, 2) = HCalib->cylR();
+		KR(2, 2) = 1;
+
+		PRE_KRKiTll = KR * PRE_RTll * KL.inverse();
+		PRE_RKiTll = PRE_RTll * KL.inverse();
+		PRE_KtTll = KR * PRE_tTll;
+
+		// Not estimating exposure params between L/R images. Assuming they are the same.
+		PRE_aff_mode = Vec2f(1.0, 0.0);
+		PRE_b0_mode = host->aff_g2l_0().b;
+	} else {
+		// evalPT set when frame added and after GN optimisation.
+		// The paper says the evalPT is fixed when any residual dependent on the transform is marginalised...
+		// Guess if it's only set in the above cases it will be fixed when marginalizing points/frames??..
+		SE3 leftToLeft_0 = target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse();
+		PRE_RTll_0 = (leftToLeft_0.rotationMatrix()).cast<float>();
+		PRE_tTll_0 = (leftToLeft_0.translation()).cast<float>();
+
+		// PREcalculated transform set when evalPT updated and for every GN step.
+		SE3 leftToLeft = target->PRE_worldToCam * host->PRE_camToWorld;
+		PRE_RTll = (leftToLeft.rotationMatrix()).cast<float>();
+		PRE_tTll = (leftToLeft.translation()).cast<float>();
+		distanceLL = leftToLeft.translation().norm();
+
+		Mat33f K = Mat33f::Zero();
+		K(0, 0) = HCalib->fxl();
+		K(1, 1) = HCalib->fyl();
+		K(0, 2) = HCalib->cxl();
+		K(1, 2) = HCalib->cyl();
+		K(2, 2) = 1;
+		PRE_KRKiTll = K * PRE_RTll * K.inverse();
+		PRE_RKiTll = PRE_RTll * K.inverse();
+		PRE_KtTll = K * PRE_tTll;
+
+		PRE_aff_mode = AffLight::fromToVecExposure(host->ab_exposure, target->ab_exposure, host->aff_g2l(), target->aff_g2l()).cast<
+				float>();
+		PRE_b0_mode = host->aff_g2l_0().b;
 	}
-
-	// evalPT set when frame added and after GN optimisation.
-	// The paper says the evalPT is fixed when any residual dependent on the transform is marginalised...
-	// Guess if it's only set in the above cases it will be fixed when marginalizing points/frames??..
-	SE3 leftToLeft_0 = target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse();
-	PRE_RTll_0 = (leftToLeft_0.rotationMatrix()).cast<float>();
-	PRE_tTll_0 = (leftToLeft_0.translation()).cast<float>();
-
-	// PREcalculated transform set when evalPT updated and for every GN step.
-	SE3 leftToLeft = target->PRE_worldToCam * host->PRE_camToWorld;
-	PRE_RTll = (leftToLeft.rotationMatrix()).cast<float>();
-	PRE_tTll = (leftToLeft.translation()).cast<float>();
-	distanceLL = leftToLeft.translation().norm();
-
-	Mat33f K = Mat33f::Zero();
-	K(0, 0) = HCalib->fxl();
-	K(1, 1) = HCalib->fyl();
-	K(0, 2) = HCalib->cxl();
-	K(1, 2) = HCalib->cyl();
-	K(2, 2) = 1;
-	PRE_KRKiTll = K * PRE_RTll * K.inverse();
-	PRE_RKiTll = PRE_RTll * K.inverse();
-	PRE_KtTll = K * PRE_tTll;
-
-	PRE_aff_mode = AffLight::fromToVecExposure(host->ab_exposure, target->ab_exposure, host->aff_g2l(), target->aff_g2l()).cast<
-			float>();
-	PRE_b0_mode = host->aff_g2l_0().b;
 }
 
 }

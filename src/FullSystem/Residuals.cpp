@@ -110,7 +110,7 @@ double PointFrameResidual::linearizeHostTarget(CalibHessian *HCalib) {
 		Vec3f KliP;
 
 		if (!projectPoint(point->u, point->v, point->idepth_zero_scaled, HCalib, PRE_RTll_0, PRE_tTll_0, drescale, u, v, Ku, Kv,
-				KliP, new_idepth)) {
+				KliP, new_idepth, false)) {
 			state_NewState = ResState::OOB;
 			return state_energy;
 		}
@@ -276,12 +276,13 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 		return state_energy;
 	}
 
+	const FrameFramePrecalc *precalc = &(host->targetPrecalc[target->idx]);
 	float energyLeft = 0;
 	const Eigen::Vector3f *dIl = host->dIr;
-	const Mat33f &PRE_KRKiTll = HCalib->PRE_KRKiTll;
-	const Vec3f &PRE_KtTll = HCalib->PRE_KtTll;
-	const Mat33f &PRE_RTll_0 = HCalib->PRE_RTll_0;
-	const Vec3f &PRE_tTll_0 = HCalib->PRE_tTll_0;
+	const Mat33f &PRE_KRKiTll = precalc->PRE_KRKiTll;
+	const Vec3f &PRE_KtTll = precalc->PRE_KtTll;
+	const Mat33f &PRE_RTll_0 = precalc->PRE_RTll_0;
+	const Vec3f &PRE_tTll_0 = precalc->PRE_tTll_0;
 
 	{
 		// No information for between frame pose.
@@ -295,7 +296,8 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 		float Ku, Kv;
 		Vec3f KliP; // For the point in the left image holds (p - c) / f
 
-		if (!projectPointLR(point->u, point->v, point->idepth_zero_scaled, HCalib, drescale, u, v, Ku, Kv, KliP, new_idepth)) {
+		if (!projectPoint(point->u, point->v, point->idepth_zero_scaled, HCalib, PRE_RTll_0, PRE_tTll_0, drescale, u, v, Ku, Kv,
+				KliP, new_idepth, true)) {
 			state_NewState = ResState::OOB;
 			return state_energy;
 		}
@@ -317,7 +319,6 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 		d_C_v[1] = pre_vy * KliP[1] * SCALE_F;
 		d_C_v[2] = pre_vx * SCALE_C;
 		d_C_v[3] = pre_vy * SCALE_C;
-
 
 		// diff calib right intrisics
 		d_C_u[4] = u * SCALE_F;
@@ -344,7 +345,6 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 		d_C_v[12] = u * v * HCalib->fylR();
 		d_C_v[13] = u * HCalib->fylR();
 
-
 		J->Jpdc[0] = d_C_u;
 		J->Jpdc[1] = d_C_v;
 
@@ -356,9 +356,8 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 	const float *const color = point->color;
 	const float *const weights = point->weights;
 
-	// Not estimating exposure params between L/R images. Assuming they are the same.
-	Vec2f affLL = Vec2f(1.0, 0.0);
-	float b0 = host->aff_g2l_0().b;
+	Vec2f affLL = precalc->PRE_aff_mode;
+	float b0 = precalc->PRE_b0_mode;
 
 	float JIdxJIdx_00 = 0, JIdxJIdx_11 = 0, JIdxJIdx_10 = 0;
 	float JabJIdx_00 = 0, JabJIdx_01 = 0, JabJIdx_10 = 0, JabJIdx_11 = 0;
