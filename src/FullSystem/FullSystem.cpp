@@ -943,8 +943,6 @@ void FullSystem::makeKeyFrame(FrameHessian *fh) {
 	int numFwdResAdde = 0;
 	for (FrameHessian *fh1 : frameHessians)		// go through all active frames
 	{
-		if (fh1 == fh)
-			continue;
 		for (PointHessian *ph : fh1->pointHessians) {
 			PointFrameResidual *r = new PointFrameResidual(ph, fh);
 			r->setState(ResState::IN);

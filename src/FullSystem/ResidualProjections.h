@@ -30,8 +30,8 @@
 
 namespace dso {
 
-EIGEN_STRONG_INLINE float derive_idepth(const Vec3f &t, const float &u, const float &v, const int &dx, const int &dy,
-		const float &dxInterp, const float &dyInterp, const float &drescale) {
+EIGEN_STRONG_INLINE float derive_idepth(const Vec3f &t, const float &u, const float &v, const float &dxInterp,
+		const float &dyInterp, const float &drescale) {
 	return (dxInterp * drescale * (t[0] - t[2] * u) + dyInterp * drescale * (t[1] - t[2] * v)) * SCALE_IDEPTH;
 }
 

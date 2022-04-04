@@ -408,12 +408,14 @@ double ImmaturePoint::linearizeResidual(CalibHessian *HCalib, const float outlie
 		return tmpRes->state_energy;
 	}
 
+	const bool leftToRight = host == tmpRes->target;
+
 	FrameFramePrecalc *precalc = &(host->targetPrecalc[tmpRes->target->idx]);
 
 	// check OOB due to scale angle change.
 
 	float energyLeft = 0;
-	const Eigen::Vector3f *dIl = tmpRes->target->dI;
+	const Eigen::Vector3f *dIl = leftToRight ? host->dIr : tmpRes->target->dI;
 	const Mat33f &PRE_RTll = precalc->PRE_RTll;
 	const Vec3f &PRE_tTll = precalc->PRE_tTll;
 	//const float * const Il = tmpRes->target->I;
@@ -428,9 +430,10 @@ double ImmaturePoint::linearizeResidual(CalibHessian *HCalib, const float outlie
 		float Ku, Kv;
 		Vec3f KliP;
 
-		if(!projectPoint(this->u + dx,this->v + dy, idepth, HCalib,
-						PRE_RTll,PRE_tTll, drescale, u, v, Ku, Kv, KliP, new_idepth, false))
-		{	tmpRes->state_NewState = ResState::OOB; return tmpRes->state_energy;}
+		if (!projectPoint(this->u + dx,this->v + dy, idepth, HCalib, PRE_RTll,PRE_tTll, drescale, u, v, Ku, Kv, KliP, new_idepth, leftToRight)) {
+			tmpRes->state_NewState = ResState::OOB;
+			return tmpRes->state_energy;
+		}
 
 		Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0]));
 
@@ -441,9 +444,11 @@ double ImmaturePoint::linearizeResidual(CalibHessian *HCalib, const float outlie
 		energyLeft += weights[idx]*weights[idx]*hw *residual*residual*(2-hw);
 
 		// depth derivatives.
-		float dxInterp = hitColor[1]*HCalib->fxl();
-		float dyInterp = hitColor[2]*HCalib->fyl();
-		float d_idepth = derive_idepth(PRE_tTll, u, v, dx, dy, dxInterp, dyInterp, drescale);
+		float dxInterp = hitColor[1];
+		float dyInterp = hitColor[2];
+		dxInterp *= leftToRight ? HCalib->fxlR() : HCalib->fxl();
+		dyInterp *= leftToRight ? HCalib->fylR() : HCalib->fyl();
+		float d_idepth = derive_idepth(PRE_tTll, u, v, dxInterp, dyInterp, drescale);
 
 		hw *= weights[idx]*weights[idx];
 

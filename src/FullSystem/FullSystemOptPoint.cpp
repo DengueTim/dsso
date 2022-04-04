@@ -47,15 +47,13 @@ namespace dso {
 PointHessian* FullSystem::optimizeImmaturePoint(ImmaturePoint *point, int minObs, ImmaturePointTemporaryResidual *residuals) {
 	int nres = 0;
 	for (FrameHessian *fh : frameHessians) {
-		if (fh != point->host) {
-			residuals[nres].state_NewEnergy = residuals[nres].state_energy = 0;
-			residuals[nres].state_NewState = ResState::OUTLIER;
-			residuals[nres].state_state = ResState::IN;
-			residuals[nres].target = fh;
-			nres++;
-		}
+		residuals[nres].state_NewEnergy = residuals[nres].state_energy = 0;
+		residuals[nres].state_NewState = ResState::OUTLIER;
+		residuals[nres].state_state = ResState::IN;
+		residuals[nres].target = fh;
+		nres++;
 	}
-	assert(nres == ((int)frameHessians.size())-1);
+	assert(nres == ((int)frameHessians.size()));
 
 	bool print = false; //rand()%50==0;
 
