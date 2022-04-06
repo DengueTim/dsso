@@ -186,7 +186,6 @@ template<typename T>
 void PhotometricUndistorter::processFrame(T *image_in, float exposure_time, float factor) {
 	int wh = w * h;
 
-	assert(output->w == w && output->h == h);
 	assert(image_out != 0);
 
 	if (!valid || exposure_time <= 0 || setting_photometricCalibration == 0) { // disable full photometric calibration.

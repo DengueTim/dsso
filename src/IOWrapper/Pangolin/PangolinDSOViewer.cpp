@@ -386,7 +386,8 @@ void PangolinDSOViewer::publishGraph(
 
 		assert(host >= 0 && target >= 0);
 		if (host == target) {
-			assert(p.second[0] == 0 && p.second[1] == 0);
+			// Left right transform
+			// assert(p.second[0] == 0 && p.second[1] == 0);
 			continue;
 		}
 

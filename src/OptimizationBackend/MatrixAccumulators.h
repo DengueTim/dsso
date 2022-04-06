@@ -596,12 +596,6 @@ private:
 	EIGEN_ALIGN16 float SSEData[4 * 105];
 };
 
-/*
- * computes the outer sum of 10x2 matrices, weighted with a 2x2 matrix:
- * 			H = [x y] * [a b; b c] * [x y]^T
- * (assuming x,y are column-vectors).
- * numerically robust to large sums.
- */
 class AccumulatorApprox {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
@@ -643,9 +637,14 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	/*
 	 * Params are how image x & y change with Camera intrisics(xC,yC) and pose (xX yX). And
-	 * How the point (sum of squared pixel)residual change with image x & y squared(a,b,c).
+	 * how the point (sum of squared pixel)residual change with image x & y squared(a,b,c).
 	 *
 	 * Accumulates dRes/(dCameraP, dPose)?
+	 * 
+	 * computes the outer sum of 20x2 matrices, weighted with a 2x2 matrix:
+	 * 	[x y] * [a b; b c] * [x y]^T
+	 * (assuming x,y are column-vectors).
+ 	 * numerically robust to large sums.
 	 */
 	inline void update(const float *const xC, const float *const xX, const float *const yC, const float *const yX, const float a,
 			const float b, const float c) {
