@@ -46,6 +46,9 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 	VecCf Hcd_acc = VecCf::Zero();
 
 	for (EFResidual *r : p->residualsAll) {
+		bool leftToRight = r->hostIDX == r->targetIDX;
+		if (leftToRight) continue;
+
 		if (mode == 0) {
 			if (r->isLinearized || !r->isActive())
 				continue;
@@ -196,27 +199,31 @@ void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFun
 //			abort();
 //		}
 
-		H[tid].block<8, 8>(hIdx, hIdx).noalias() += EF->adHost[aidx] * accH.block<8, 8>(CPARS, CPARS)
-				* EF->adHost[aidx].transpose();
+		if (h != t) {
+			const Eigen::Ref<Mat88> &poseAbDiagBlk = accH.block<8, 8>(CIPARS, CIPARS);
+			H[tid].block<8, 8>(hIdx, hIdx).noalias() += EF->adHost[aidx] * poseAbDiagBlk * EF->adHost[aidx].transpose();
+			H[tid].block<8, 8>(tIdx, tIdx).noalias() += EF->adTarget[aidx] * poseAbDiagBlk	* EF->adTarget[aidx].transpose();
+			H[tid].block<8, 8>(hIdx, tIdx).noalias() += EF->adHost[aidx] * poseAbDiagBlk * EF->adTarget[aidx].transpose();
 
-		H[tid].block<8, 8>(tIdx, tIdx).noalias() += EF->adTarget[aidx] * accH.block<8, 8>(CPARS, CPARS)
-				* EF->adTarget[aidx].transpose();
+			// For left-left residuals only copy the intrisics, LR bit is zero for h != t
+			const Eigen::Ref<Mat88> &poseAbIntrinsicsLowerBlk = accH.block<8, CIPARS>(CIPARS, 0);
+			H[tid].block<8, CIPARS>(hIdx, 0).noalias() += EF->adHost[aidx] * poseAbIntrinsicsLowerBlk;
+			H[tid].block<8, CIPARS>(tIdx, 0).noalias() += EF->adTarget[aidx] * poseAbIntrinsicsLowerBlk;
 
-		H[tid].block<8, 8>(hIdx, tIdx).noalias() += EF->adHost[aidx] * accH.block<8, 8>(CPARS, CPARS)
-				* EF->adTarget[aidx].transpose();
+			// Intrisics only, again.. Top Left block
+			H[tid].topLeftCorner<CIPARS, CIPARS>().noalias() += accH.block<CIPARS, CIPARS>(0, 0);
 
-		H[tid].block<8, CPARS>(hIdx, 0).noalias() += EF->adHost[aidx] * accH.block<8, CPARS>(CPARS, 0);
+			// Accumulate residual to host and target pose & AB.
+			const Eigen::Ref<Vec8> &poseAbResidual = accH.block<8, 1>(CIPARS, CIPARS + 8);
+			b[tid].segment<8>(hIdx).noalias() += EF->adHost[aidx] * poseAbResidual;
+			b[tid].segment<8>(tIdx).noalias() += EF->adTarget[aidx] * poseAbResidual;
 
-		H[tid].block<8, CPARS>(tIdx, 0).noalias() += EF->adTarget[aidx] * accH.block<8, CPARS>(CPARS, 0);
+			// Accumulate intrisics residual only, LR pose for LL res is zero.
+			b[tid].head<CIPARS>().noalias() += accH.block<CIPARS, 1>(0, CIPARS + 8);
+		} else {
+			// TODO h == t
 
-		H[tid].topLeftCorner<CPARS, CPARS>().noalias() += accH.block<CPARS, CPARS>(0, 0);
-
-		b[tid].segment<8>(hIdx).noalias() += EF->adHost[aidx] * accH.block<8, 1>(CPARS, CPARS + 8);
-
-		b[tid].segment<8>(tIdx).noalias() += EF->adTarget[aidx] * accH.block<8, 1>(CPARS, CPARS + 8);
-
-		b[tid].head<CPARS>().noalias() += accH.block<CPARS, 1>(0, CPARS + 8);
-
+		}
 	}
 
 	// only do this on one thread.

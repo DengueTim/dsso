@@ -43,10 +43,11 @@ typedef Sophus::Sim3d Sim3;
 typedef Sophus::SO3d SO3;
 
 /* Number of Camera intrisic params fx,fy,cx,cx for two cameras + 6 relative pose params. 4+4+6
- * It is unlikely that most stereo cameras(especially cheap ones) have the sensors&lens perfectly aligned.
+ * Assuming it's unlikely that most stereo cameras have the sensors&lens perfectly aligned.
  * Model the individual intrisics and relative L/R pose.
  */
-#define CPARS 14
+#define CIPARS 8
+#define CPARS (CIPARS + 6)
 
 typedef Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic> MatXX;
 typedef Eigen::Matrix<double, CPARS, CPARS> MatCC;
@@ -121,7 +122,6 @@ typedef Eigen::Matrix<float, 4, 1> Vec4f;
 typedef Eigen::Matrix<float, 4, 4> Mat44f;
 typedef Eigen::Matrix<float, 12, 12> Mat1212f;
 typedef Eigen::Matrix<float, 12, 1> Vec12f;
-typedef Eigen::Matrix<float, 23, 23> Mat2323f;
 typedef Eigen::Matrix<float, 10, 10> Mat1010f;
 typedef Eigen::Matrix<float, 13, 1> Vec13f;
 typedef Eigen::Matrix<float, 9, 9> Mat99f;
@@ -134,10 +134,11 @@ typedef Eigen::Matrix<float, 1, 2> Mat12f;
 typedef Eigen::Matrix<float, Eigen::Dynamic, 1> VecXf;
 typedef Eigen::Matrix<float, Eigen::Dynamic, Eigen::Dynamic> MatXXf;
 
-typedef Eigen::Matrix<double, 8 + CPARS + 1, 8 + CPARS + 1> MatPCPC;
-typedef Eigen::Matrix<float, 8 + CPARS + 1, 8 + CPARS + 1> MatPCPCf;
-typedef Eigen::Matrix<double, 8 + CPARS + 1, 1> VecPC;
-typedef Eigen::Matrix<float, 8 + CPARS + 1, 1> VecPCf;
+// These hold the left & right intrinsics(CIPARS), a pose + photometric params A & B(8) and the residual(1).
+typedef Eigen::Matrix<double, 8 + CIPARS + 1, 8 + CIPARS + 1> MatPCPC;
+typedef Eigen::Matrix<float, 8 + CIPARS + 1, 8 + CIPARS + 1> MatPCPCf;
+typedef Eigen::Matrix<double, 8 + CIPARS + 1, 1> VecPC;
+typedef Eigen::Matrix<float, 8 + CIPARS + 1, 1> VecPCf;
 
 typedef Eigen::Matrix<float, 14, 14> Mat1414f;
 typedef Eigen::Matrix<float, 14, 1> Vec14f;
