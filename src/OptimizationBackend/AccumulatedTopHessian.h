@@ -74,7 +74,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		nres[tid] = 0;
 
 	}
-	void stitchDouble(MatXX &H, VecX &b, EnergyFunctional const *const EF, bool usePrior, bool useDelta, int tid = 0);
+	void stitchDouble(MatXX &H, VecX &b, EnergyFunctional const *const EF, bool usePrior, bool useDelta);
 
 	template<int mode> void addPoint(EFPoint *p, EnergyFunctional const *const ef, int tid = 0);
 

@@ -78,6 +78,7 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 		accEB[tid][r1ht].update(r1->JpJdF, p->HdiF * p->bdSumF);
 	}
 }
+
 void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunctional const *const EF, int min, int max,
 		Vec10 *stats, int tid) {
 	int toAggregate = NUM_THREADS;
@@ -120,9 +121,8 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 			Mat88 accDM = Mat88::Zero();
 
 			for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-				if (accD[tid2][ijkIdx].num == 0)
-					continue;
-				accDM += accD[tid2][ijkIdx].A.cast<double>();
+				if (accD[tid2][ijkIdx].num > 0)
+					accDM += accD[tid2][ijkIdx].A.cast<double>();
 			}
 
 			H[tid].block<8, 8>(iIdx, iIdx) += EF->adHost[ijIdx] * accDM * EF->adHost[ikIdx].transpose();
@@ -138,64 +138,21 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 			b[tid].head<CPARS>() += accbc[tid2].A.cast<double>();
 		}
 	}
-
-//	// ----- new: copy transposed parts for calibration only.
-//	for(int h=0;h<nf;h++)
-//	{
-//		int hIdx = 4+h*8;
-//		H.block<4,8>(0,hIdx).noalias() = H.block<8,4>(hIdx,0).transpose();
-//	}
 }
 
-void AccumulatedSCHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional const *const EF, int tid) {
+void AccumulatedSCHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional const *const EF) {
+	H = MatXX::Zero(nframes[0] * 8 + CPARS, nframes[0] * 8 + CPARS);
+	b = VecX::Zero(nframes[0] * 8 + CPARS);
 
-	int nf = nframes[0];
-	int nframes2 = nf * nf;
+	stitchDoubleInternal(&H, &b, EF, 0, nframes[0] * nframes[0], 0, -1);
+	copyUpperToLowerDiagonal(&H);
+}
 
-	H = MatXX::Zero(nf * 8 + CPARS, nf * 8 + CPARS);
-	b = VecX::Zero(nf * 8 + CPARS);
-
-	for (int i = 0; i < nf; i++)
-		for (int j = 0; j < nf; j++) {
-			int iIdx = CPARS + i * 8;
-			int jIdx = CPARS + j * 8;
-			int ijIdx = i + nf * j;
-
-			Mat8C accEM = accE[tid][ijIdx].A.cast<double>();
-			Vec8 accEBV = accEB[tid][ijIdx].A.cast<double>();
-
-			H.block<8, CPARS>(iIdx, 0) += EF->adHost[ijIdx] * accEM;
-			H.block<8, CPARS>(jIdx, 0) += EF->adTarget[ijIdx] * accEM;
-
-			b.segment<8>(iIdx) += EF->adHost[ijIdx] * accEBV;
-			b.segment<8>(jIdx) += EF->adTarget[ijIdx] * accEBV;
-
-			for (int k = 0; k < nf; k++) {
-				int kIdx = CPARS + k * 8;
-				int ijkIdx = ijIdx + k * nframes2;
-				int ikIdx = i + nf * k;
-
-				if (accD[tid][ijkIdx].num == 0)
-					continue;
-				Mat88 accDM = accD[tid][ijkIdx].A.cast<double>();
-
-				H.block<8, 8>(iIdx, iIdx) += EF->adHost[ijIdx] * accDM * EF->adHost[ikIdx].transpose();
-
-				H.block<8, 8>(jIdx, kIdx) += EF->adTarget[ijIdx] * accDM * EF->adTarget[ikIdx].transpose();
-
-				H.block<8, 8>(jIdx, iIdx) += EF->adTarget[ijIdx] * accDM * EF->adHost[ikIdx].transpose();
-
-				H.block<8, 8>(iIdx, kIdx) += EF->adHost[ijIdx] * accDM * EF->adTarget[ikIdx].transpose();
-			}
-		}
-
-	H.topLeftCorner<CPARS, CPARS>() = accHcc[tid].A.cast<double>();
-	b.head<CPARS>() = accbc[tid].A.cast<double>();
-
-	// ----- new: copy transposed parts for calibration only.
-	for (int h = 0; h < nf; h++) {
+void AccumulatedSCHessianSSE::copyUpperToLowerDiagonal(MatXX *H) {
+	// make diagonal by copying over parts.
+	for (int h = 0; h < nframes[0]; h++) {
 		int hIdx = CPARS + h * 8;
-		H.block<CPARS, 8>(0, hIdx).noalias() = H.block<8, CPARS>(hIdx, 0).transpose();
+		H->block<CPARS, 8>(0, hIdx).noalias() = H->block<8, CPARS>(hIdx, 0).transpose();
 	}
 }
 

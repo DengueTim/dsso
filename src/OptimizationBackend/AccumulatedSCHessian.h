@@ -82,7 +82,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		}
 		nframes[tid] = n;
 	}
-	void stitchDouble(MatXX &H_sc, VecX &b_sc, EnergyFunctional const *const EF, int tid = 0);
+	void stitchDouble(MatXX &H_sc, VecX &b_sc, EnergyFunctional const *const EF);
 	void addPoint(EFPoint *p, bool shiftPriorToZero, int tid = 0);
 
 	void stitchDoubleMT(IndexThreadReduce<Vec10> *red, MatXX &H, VecX &b, EnergyFunctional const *const EF, bool MT) {
@@ -113,11 +113,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 			stitchDoubleInternal(&H, &b, EF, 0, nframes[0] * nframes[0], 0, -1);
 		}
 
-		// make diagonal by copying over parts.
-		for (int h = 0; h < nframes[0]; h++) {
-			int hIdx = CPARS + h * 8;
-			H.block<CPARS, 8>(0, hIdx).noalias() = H.block<8, CPARS>(hIdx, 0).transpose();
-		}
+		copyUpperToLowerDiagonal(&H);
 	}
 
 	AccumulatorXX<8, CPARS> *accE[NUM_THREADS];
@@ -134,8 +130,8 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	}
 
 private:
-
 	void stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunctional const *const EF, int min, int max, Vec10 *stats, int tid);
+	void copyUpperToLowerDiagonal(MatXX *H);
 };
 
 }
