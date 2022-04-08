@@ -1,5 +1,5 @@
 # ~~DSO: Direct Sparse Odometry~~
-# DSSO: Direct Spares Stereo Odometry
+# DSSO: Direct Sparse Stereo Odometry
 
 The changes from DSO are outlined [here](DSSO.md).
 
