@@ -47,7 +47,6 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 
 	for (EFResidual *r : p->residualsAll) {
 		bool leftToRight = r->hostIDX == r->targetIDX;
-		if (leftToRight) continue;
 
 		if (mode == 0) {
 			if (r->isLinearized || !r->isActive())
@@ -67,6 +66,9 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 		int htIDX = r->hostIDX + r->targetIDX * nframes[tid];
 		Mat18f dp = ef->adHTdeltaF[htIDX];
 
+		const dso::Vec6f &jpdxiX = leftToRight ? rJ->Jpdc[0].segment(CIPARS, 6) : rJ->Jpdxi[0];
+		const dso::Vec6f &jpdxiY = leftToRight ? rJ->Jpdc[1].segment(CIPARS, 6) : rJ->Jpdxi[1];
+
 		VecNRf resApprox;
 		if (mode == 0)
 			resApprox = rJ->resF;
@@ -74,8 +76,8 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 			resApprox = r->res_toZeroF;
 		if (mode == 1) {
 			// compute Jp*delta
-			__m128 Jp_delta_x = _mm_set1_ps(rJ->Jpdxi[0].dot(dp.head<6>()) + rJ->Jpdc[0].dot(dc) + rJ->Jpdd[0] * dd);
-			__m128 Jp_delta_y = _mm_set1_ps(rJ->Jpdxi[1].dot(dp.head<6>()) + rJ->Jpdc[1].dot(dc) + rJ->Jpdd[1] * dd);
+			__m128 Jp_delta_x = _mm_set1_ps(jpdxiX.dot(dp.head<6>()) + rJ->Jpdc[0].dot(dc) + rJ->Jpdd[0] * dd);
+			__m128 Jp_delta_y = _mm_set1_ps(jpdxiY.dot(dp.head<6>()) + rJ->Jpdc[1].dot(dc) + rJ->Jpdd[1] * dd);
 			__m128 delta_a = _mm_set1_ps((float) (dp[6]));
 			__m128 delta_b = _mm_set1_ps((float) (dp[7]));
 
@@ -102,13 +104,13 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 			rr += resApprox[i] * resApprox[i];
 		}
 
-		acc[tid][htIDX].update(rJ->Jpdc[0].data(), rJ->Jpdxi[0].data(), rJ->Jpdc[1].data(), rJ->Jpdxi[1].data(), rJ->JIdx2(0, 0),
+		acc[tid][htIDX].update(rJ->Jpdc[0].data(), jpdxiX.data(), rJ->Jpdc[1].data(), jpdxiY.data(), rJ->JIdx2(0, 0),
 				rJ->JIdx2(0, 1), rJ->JIdx2(1, 1));
 
 		acc[tid][htIDX].updateBotRight(rJ->Jab2(0, 0), rJ->Jab2(0, 1), Jab_r[0], rJ->Jab2(1, 1), Jab_r[1], rr);
 
-		acc[tid][htIDX].updateTopRight(rJ->Jpdc[0].data(), rJ->Jpdxi[0].data(), rJ->Jpdc[1].data(), rJ->Jpdxi[1].data(),
-				rJ->JabJIdx(0, 0), rJ->JabJIdx(0, 1), rJ->JabJIdx(1, 0), rJ->JabJIdx(1, 1), JI_r[0], JI_r[1]);
+		acc[tid][htIDX].updateTopRight(rJ->Jpdc[0].data(), jpdxiX.data(), rJ->Jpdc[1].data(), jpdxiY.data(), rJ->JabJIdx(0, 0),
+				rJ->JabJIdx(0, 1), rJ->JabJIdx(1, 0), rJ->JabJIdx(1, 1), JI_r[0], JI_r[1]);
 
 		Vec2f Ji2_Jpdd = rJ->JIdx2 * rJ->Jpdd;
 		bd_acc += JI_r[0] * rJ->Jpdd[0] + JI_r[1] * rJ->Jpdd[1];
@@ -146,17 +148,22 @@ void AccumulatedTopHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional 
 
 	stitchDoubleInternal(&H, &b, EF, usePrior, 0, nframes[0] * nframes[0], 0, -1);
 
-	// ----- new: copy transposed parts.
-	for (int h = 0; h < nframes[tid]; h++) {
-		int hIdx = CPARS + h * 8;
-		H.block<CPARS, 8>(0, hIdx).noalias() = H.block<8, CPARS>(hIdx, 0).transpose();
+	copyUpperToLowerDiagonal(&H);
+}
 
-		for (int t = h + 1; t < nframes[tid]; t++) {
+void AccumulatedTopHessianSSE::copyUpperToLowerDiagonal(MatXX *H) {
+	// make diagonal by copying over parts.
+	for (int h = 0; h < nframes[0]; h++) {
+		int hIdx = CPARS + h * 8;
+		H->block<CPARS, 8>(0, hIdx).noalias() = H->block<8, CPARS>(hIdx, 0).transpose();
+
+		for (int t = h + 1; t < nframes[0]; t++) {
 			int tIdx = CPARS + t * 8;
-			H.block<8, 8>(hIdx, tIdx).noalias() += H.block<8, 8>(tIdx, hIdx).transpose();
-			H.block<8, 8>(tIdx, hIdx).noalias() = H.block<8, 8>(hIdx, tIdx).transpose();
+			H->block<8, 8>(hIdx, tIdx).noalias() += H->block<8, 8>(tIdx, hIdx).transpose();
+			H->block<8, 8>(tIdx, hIdx).noalias() = H->block<8, 8>(hIdx, tIdx).transpose();
 		}
 	}
+	H->block<CIPARS, 6>(0, CIPARS).noalias() = H->block<6, CIPARS>(CIPARS, 0).transpose();
 }
 
 void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunctional const *const EF, bool usePrior, int min,
@@ -181,7 +188,7 @@ void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFun
 
 		MatPCPC accH = MatPCPC::Zero();
 		int num = 0;
-		
+
 		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
 			acc[tid2][aidx].finish();
 			if (acc[tid2][aidx].num > 0) {
@@ -202,7 +209,7 @@ void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFun
 		if (h != t) {
 			const Eigen::Ref<Mat88> &poseAbDiagBlk = accH.block<8, 8>(CIPARS, CIPARS);
 			H[tid].block<8, 8>(hIdx, hIdx).noalias() += EF->adHost[aidx] * poseAbDiagBlk * EF->adHost[aidx].transpose();
-			H[tid].block<8, 8>(tIdx, tIdx).noalias() += EF->adTarget[aidx] * poseAbDiagBlk	* EF->adTarget[aidx].transpose();
+			H[tid].block<8, 8>(tIdx, tIdx).noalias() += EF->adTarget[aidx] * poseAbDiagBlk * EF->adTarget[aidx].transpose();
 			H[tid].block<8, 8>(hIdx, tIdx).noalias() += EF->adHost[aidx] * poseAbDiagBlk * EF->adTarget[aidx].transpose();
 
 			// For left-left residuals only copy the intrisics, LR bit is zero for h != t
@@ -221,8 +228,19 @@ void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFun
 			// Accumulate intrisics residual only, LR pose for LL res is zero.
 			b[tid].head<CIPARS>().noalias() += accH.block<CIPARS, 1>(0, CIPARS + 8);
 		} else {
-			// TODO h == t
+			// h == t. Accumulate just the CPARS to the top left corner of H and first elements of b
 
+			// Intrinsics
+			H[tid].topLeftCorner<CIPARS, CIPARS>().noalias() += accH.block<CIPARS, CIPARS>(0, 0);
+			b[tid].head<CIPARS>().noalias() += accH.block<CIPARS, 1>(0, CIPARS + 8);
+
+			// LR pose with adjoint...
+			// const Eigen::Ref<Mat66> &adjoint = EF->adHost[aidx].topLeftCorner(6, 6);
+			//std::cout << adjoint << "\n\n";
+			const Mat66 adjoint = Mat66::Identity().topLeftCorner(6, 6); // TODO why does using EF->adHost not work...
+			H[tid].block<6, 6>(CIPARS, CIPARS).noalias() += adjoint * accH.block<6, 6>(CIPARS, CIPARS) * adjoint.transpose();
+			H[tid].block<6, CIPARS>(CIPARS, 0).noalias() += adjoint * accH.block<6, CIPARS>(CIPARS, 0); // Is copied/flipped in copyUpperToLowerDiagonal
+			b[tid].segment<6>(CIPARS).noalias() += adjoint * accH.block<6, 1>(CIPARS, CIPARS + 8);
 		}
 	}
 

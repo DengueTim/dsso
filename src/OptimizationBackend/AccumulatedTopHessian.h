@@ -108,17 +108,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 			stitchDoubleInternal(&H, &b, EF, usePrior, 0, nframes[0] * nframes[0], 0, -1);
 		}
 
-		// make diagonal by copying over parts.
-		for (int h = 0; h < nframes[0]; h++) {
-			int hIdx = CPARS + h * 8;
-			H.block<CPARS, 8>(0, hIdx).noalias() = H.block<8, CPARS>(hIdx, 0).transpose();
-
-			for (int t = h + 1; t < nframes[0]; t++) {
-				int tIdx = CPARS + t * 8;
-				H.block<8, 8>(hIdx, tIdx).noalias() += H.block<8, 8>(tIdx, hIdx).transpose();
-				H.block<8, 8>(tIdx, hIdx).noalias() = H.block<8, 8>(hIdx, tIdx).transpose();
-			}
-		}
+		copyUpperToLowerDiagonal(&H);
 	}
 
 	int nframes[NUM_THREADS];
@@ -137,6 +127,8 @@ private:
 
 	void stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunctional const *const EF, bool usePrior, int min, int max, Vec10 *stats,
 			int tid);
+
+	void copyUpperToLowerDiagonal(MatXX *H);
 };
 }
 
