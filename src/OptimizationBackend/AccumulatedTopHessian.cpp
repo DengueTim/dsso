@@ -114,7 +114,7 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 
 		Vec2f Ji2_Jpdd = rJ->JIdx2 * rJ->Jpdd;
 		bd_acc += JI_r[0] * rJ->Jpdd[0] + JI_r[1] * rJ->Jpdd[1];
-		Hdd_acc += Ji2_Jpdd.dot(rJ->Jpdd);
+		Hdd_acc += Ji2_Jpdd.dot(rJ->Jpdd);   // dRes^2/dDepth^2
 		Hcd_acc += rJ->Jpdc[0] * Ji2_Jpdd[0] + rJ->Jpdc[1] * Ji2_Jpdd[1];
 
 		nres[tid]++;
@@ -122,17 +122,17 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 
 	if (mode == 0) {
 		p->Hdd_accAF = Hdd_acc;
-		p->bd_accAF = bd_acc;
 		p->Hcd_accAF = Hcd_acc;
+		p->bd_accAF = bd_acc;
 	}
 	if (mode == 1 || mode == 2) {
 		p->Hdd_accLF = Hdd_acc;
-		p->bd_accLF = bd_acc;
 		p->Hcd_accLF = Hcd_acc;
+		p->bd_accLF = bd_acc;
 	}
 	if (mode == 2) {
-		p->Hcd_accAF.setZero();
 		p->Hdd_accAF = 0;
+		p->Hcd_accAF.setZero();
 		p->bd_accAF = 0;
 	}
 

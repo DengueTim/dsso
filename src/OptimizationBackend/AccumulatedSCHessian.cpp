@@ -48,10 +48,16 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 
 	p->data->idepth_hessian = H;
 
+	/* Depth part of H(H_bb) is a diagonal matrix. We need it's inverse for the Schur-Complement.
+	 * Just save the inverted diagonal element:
+	 *    1 / (dRes^2/dDepth^2)
+	 * One element per point (not pixel)
+	 */
 	p->HdiF = 1.0 / H;
 	p->bdSumF = p->bd_accAF + p->bd_accLF;
 	if (shiftPriorToZero)
 		p->bdSumF += p->priorF * p->deltaF;
+
 	VecCf Hcd = p->Hcd_accAF + p->Hcd_accLF;
 	accHcc[tid].update(Hcd, Hcd, p->HdiF);
 	accbc[tid].update(Hcd, p->bdSumF * p->HdiF);
@@ -62,16 +68,60 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 	for (EFResidual *r1 : p->residualsAll) {
 		if (!r1->isActive())
 			continue;
+
 		int r1ht = r1->hostIDX + r1->targetIDX * nf;
+		int i = r1->hostIDX;
+		int j = r1->targetIDX;
+		int ii = i + nf * i;
 
 		for (EFResidual *r2 : p->residualsAll) {
 			if (!r2->isActive())
 				continue;
 
+			int k = r2->targetIDX;
+
 			/* Contribution factor of pair of depth residuals on pose-pose block Haa...
 			 * Accumulation over pairs of residuals that have a common host targets
+			 *
+			 * Why 4 updates?
+			 * We're computing the H_ab * H_bb' * H_ba bit of the Schur Compliment.
+			 * H_bb is a diagonal matrix with one entry for each point, the point's inverse depth.
+			 * A point's host frame poseAB info is held in a block on the diagonal of H_aa.
+			 * H_ab and H_ba have column and row entries for the influences between each point in H_bb and each frame poseAB in H_aa.
+			 * r1 and r2 go through all combinations of these H_ab & H_ba entries.
+			 * In H_aa, the host frame's poseAB entry and the poseAB entry that correspond to the selected entries in H_ab and H_ba form a square.
+			 * The four updates are to the corners of this square.
+			 * i - Indexes the host frame's poseAB on the diagonal of H_aa
+			 * j - Indexes the row of the column in H_ab
+			 * k - Indexes the column of the row in H_ba
+			 *
+			 * The Adjoints...
+			 *
+			 * Symmetric...   Seems this computes for a pair of residuals the updates for r1,r2 and then r2,r1. which keeps the Pose-Pose block symmetric..
+			 * Could be cheaper to compute only the upper half and make it symmetric by copying/transposing blocks...
+			 *
 			 */
-			accD[tid][r1ht + r2->targetIDX * nf * nf].update(r1->JpJdF, r2->JpJdF, p->HdiF);
+			if (i == j && i == k) {
+				// Both r1 and r2 are to the right image
+
+			} else if (i == j) {
+				// r1 is to right image
+
+			} else if (i == k) {
+				// r2 is to right image
+
+			} else {
+				int ji = j + nf * i;
+				int ik = i + nf * k;
+				int jk = j + nf * k;
+
+				accD[tid][ii].update(r1->JpJdAdH, r2->JpJdAdH, p->HdiF);
+				accD[tid][jk].update(r1->JpJdAdT, r2->JpJdAdT, p->HdiF);
+				accD[tid][ji].update(r1->JpJdAdT, r2->JpJdAdH, p->HdiF);
+				accD[tid][ik].update(r1->JpJdAdH, r2->JpJdAdT, p->HdiF);
+			}
+
+			//accD[tid][r1ht + r2->targetIDX * nf * nf].update(r1->JpJdF, r2->JpJdF, p->HdiF);
 		}
 
 		accE[tid][r1ht].update(r1->JpJdF, Hcd, p->HdiF);
@@ -90,48 +140,58 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 		return;
 
 	int nf = nframes[0];
-	int nframes2 = nf * nf;
 
-	for (int k = min; k < max; k++) {
-		int i = k % nf;
-		int j = k / nf;
+	for (int ij = min; ij < max; ij++) {
+		int i = ij % nf;
+		int j = ij / nf;
 
 		int iIdx = CPARS + i * 8;
 		int jIdx = CPARS + j * 8;
-		int ijIdx = i + nf * j;   // = k!?
 
-		Mat8C Hpc = Mat8C::Zero();
-		Vec8 bp = Vec8::Zero();
-
+		// Nframes Pose-Camera Params blocks.
+		Mat8C E = Mat8C::Zero();
+		Vec8 EB = Vec8::Zero();
+		Mat88 D = Mat88::Zero();
 		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-			Hpc += accE[tid2][ijIdx].A.cast<double>();
-			bp += accEB[tid2][ijIdx].A.cast<double>();
+			E += accE[tid2][ij].A.cast<double>();
+			EB += accEB[tid2][ij].A.cast<double>();
+			D += accD[tid2][ij].A.cast<double>();
 		}
 
-		H[tid].block<8, CPARS>(iIdx, 0) += EF->adHost[ijIdx] * Hpc;
-		H[tid].block<8, CPARS>(jIdx, 0) += EF->adTarget[ijIdx] * Hpc;
-		b[tid].segment<8>(iIdx) += EF->adHost[ijIdx] * bp;
-		b[tid].segment<8>(jIdx) += EF->adTarget[ijIdx] * bp;
+		H[tid].block<8, CPARS>(iIdx, 0) += EF->adHost[ij] * E;
+		H[tid].block<8, CPARS>(jIdx, 0) += EF->adTarget[ij] * E;
+		b[tid].segment<8>(iIdx) += EF->adHost[ij] * EB;
+		b[tid].segment<8>(jIdx) += EF->adTarget[ij] * EB;
 
-		for (int fi = 0; fi < nf; fi++) {
-			int kIdx = CPARS + fi * 8;
-			int ijkIdx = ijIdx + fi * nframes2;
-			int ikIdx = i + nf * fi;
+		H[tid].block<8, 8>(iIdx, jIdx) = D;
 
-			Mat88 accDM = Mat88::Zero();
-
-			for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-				if (accD[tid2][ijkIdx].num > 0)
-					accDM += accD[tid2][ijkIdx].A.cast<double>();
-			}
-
-			H[tid].block<8, 8>(iIdx, iIdx) += EF->adHost[ijIdx] * accDM * EF->adHost[ikIdx].transpose();
-			H[tid].block<8, 8>(jIdx, kIdx) += EF->adTarget[ijIdx] * accDM * EF->adTarget[ikIdx].transpose();
-			H[tid].block<8, 8>(jIdx, iIdx) += EF->adTarget[ijIdx] * accDM * EF->adHost[ikIdx].transpose();
-			H[tid].block<8, 8>(iIdx, kIdx) += EF->adHost[ijIdx] * accDM * EF->adTarget[ikIdx].transpose();
-		}
+		// Nframes^2 Pose-pose blocks
+//		for (int k = 0; k < nf; k++) {
+//			int ijk = ij + k * nf * nf;
+//			int ik = i + nf * k;
+//
+//			int kIdx = CPARS + k * 8;
+//
+//			Mat88 D = Mat88::Zero();
+//
+//			int num = 0;
+//			for (int tid2 = 0; tid2 < toAggregate; tid2++) {
+//				if (accD[tid2][ijk].num > 0) {
+//					D += accD[tid2][ijk].A.cast<double>();
+//					num += accD[tid2][ijk].num;
+//				}
+//			}
+//
+//			if (num > 0) {
+//				H[tid].block<8, 8>(iIdx, iIdx) += EF->adHost[ij] * D * EF->adHost[ik].transpose();
+//				H[tid].block<8, 8>(jIdx, kIdx) += EF->adTarget[ij] * D * EF->adTarget[ik].transpose();
+//				H[tid].block<8, 8>(jIdx, iIdx) += EF->adTarget[ij] * D * EF->adHost[ik].transpose();
+//				H[tid].block<8, 8>(iIdx, kIdx) += EF->adHost[ij] * D * EF->adTarget[ik].transpose();
+//			}
+//		}
 	}
 
+	// One camera params block
 	if (min == 0) {
 		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
 			H[tid].topLeftCorner<CPARS, CPARS>() += accHcc[tid2].A.cast<double>();

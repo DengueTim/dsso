@@ -72,6 +72,8 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	VecNRf res_toZeroF; // Set when point is marginalized.
 	Vec8f JpJdF; // How pose changes with depth?
+	Vec8f JpJdAdH; // Above in host frames pose tangent space.
+	Vec8f JpJdAdT; // Above in target...
 
 	// status.
 	bool isLinearized;
@@ -118,10 +120,10 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	 * Point diagonal element of Schur Comp. Hbb^-1 in the paper (eq.17)?
 	 */
 	float HdiF;
-	float Hdd_accLF; // Depth to Depth Hessian value Accumulator for Linearized point.
+	float Hdd_accLF; // dRes^2/dDepth^2 diagonal element of depth/depth bit of Hessian for Linearized point.
 	VecCf Hcd_accLF; // Depth to Camera params Hessian value Accumulator for Linearized point.
 	float bd_accLF;  // Depth B(residual) value Accumulator for Linearized point.
-	float Hdd_accAF; // Depth to Depth Hessian value Accumulator for Active point.
+	float Hdd_accAF; // dRes^2/dDepth^2 diagonal element of depth/depth bit of Hessian for Active point.
 	VecCf Hcd_accAF; // Depth to Camera params Hessian value Accumulator for Active point.
 	float bd_accAF;  // Depth B(residual) value Accumulator for Active point.
 
@@ -131,11 +133,13 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 class EFFrame {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
-	EFFrame(FrameHessian *d) :
-			data(d) {
+	EFFrame(EnergyFunctional *ef, FrameHessian *d) :
+			ef(ef), data(d) {
 		takeData();
 	}
 	void takeData();
+
+	EnergyFunctional *ef;
 
 	Vec8 prior;				// prior hessian (diagonal)
 	Vec8 delta_prior;		// = state-state_prior (E_prior = (delta_prior)' * diag(prior) * (delta_prior)

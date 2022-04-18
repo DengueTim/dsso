@@ -68,7 +68,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 				delete[] accD[tid];
 			accE[tid] = new AccumulatorXX<8, CPARS> [n * n];
 			accEB[tid] = new AccumulatorX<8> [n * n];
-			accD[tid] = new AccumulatorXX<8, 8> [n * n * n];
+			accD[tid] = new AccumulatorXX<8, 8> [n * n];
 		}
 		accbc[tid].initialize();
 		accHcc[tid].initialize();
@@ -76,9 +76,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		for (int i = 0; i < n * n; i++) {
 			accE[tid][i].initialize();
 			accEB[tid][i].initialize();
-
-			for (int j = 0; j < n; j++)
-				accD[tid][i * n + j].initialize();
+			accD[tid][i].initialize();
 		}
 		nframes[tid] = n;
 	}

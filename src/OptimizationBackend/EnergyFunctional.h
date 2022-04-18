@@ -116,8 +116,8 @@ private:
 	void orthogonalize(VecX *b, MatXX *H);
 	Mat18f *adHTdeltaF;
 
-	Mat88 *adHost;
-	Mat88 *adTarget;
+	Mat88 *adHost; // Host to target tangent space transform. Scaled..
+	Mat88 *adTarget; //  tangent space transform "I"?. Scaled.
 
 	Mat88f *adHostF;
 	Mat88f *adTargetF;
