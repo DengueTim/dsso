@@ -49,6 +49,30 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	}
 };
 
+class AccumulatorCC {
+public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+	;
+
+	Eigen::Matrix<float, CPARS, CPARS> A;
+	size_t num;
+
+	inline void initialize() {
+		A.setZero();
+		num = 0;
+	}
+
+	inline void update(const Eigen::Matrix<float, CPARS, 1> &L, const Eigen::Matrix<float, CPARS, 1> &R, float w) {
+		A += w * L * R.transpose();
+		num++;
+	}
+
+	inline void updateLrPose(const Eigen::Matrix<float, 8, 1> &L, const Eigen::Matrix<float, 8, 1> &R, float w) {
+		// Camera params don't have photometric params A & B
+		A.bottomRightCorner(6, 6) += w * L.topLeftCorner(6, 6) * R.topLeftCorner(6, 6).transpose();
+		num++;
+	}
+};
+
 class Accumulator11 {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;

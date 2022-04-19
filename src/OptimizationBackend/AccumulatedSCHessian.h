@@ -66,16 +66,18 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 				delete[] accEB[tid];
 			if (accD[tid] != 0)
 				delete[] accD[tid];
-			accE[tid] = new AccumulatorXX<8, CPARS> [n * n];
-			accEB[tid] = new AccumulatorX<8> [n * n];
+			accE[tid] = new AccumulatorXX<8, CPARS> [ n];
+			accEB[tid] = new AccumulatorX<8> [n];
 			accD[tid] = new AccumulatorXX<8, 8> [n * n];
 		}
 		accbc[tid].initialize();
 		accHcc[tid].initialize();
 
-		for (int i = 0; i < n * n; i++) {
+		for (int i = 0; i < n; i++) {
 			accE[tid][i].initialize();
 			accEB[tid][i].initialize();
+		}
+		for (int i = 0; i < n * n; i++) {
 			accD[tid][i].initialize();
 		}
 		nframes[tid] = n;
@@ -117,7 +119,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	AccumulatorXX<8, CPARS> *accE[NUM_THREADS];
 	AccumulatorX<8> *accEB[NUM_THREADS];
 	AccumulatorXX<8, 8> *accD[NUM_THREADS];
-	AccumulatorXX<CPARS, CPARS> accHcc[NUM_THREADS];
+	AccumulatorCC accHcc[NUM_THREADS];
 	AccumulatorX<CPARS> accbc[NUM_THREADS];
 	int nframes[NUM_THREADS];
 
