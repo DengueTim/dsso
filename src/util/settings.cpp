@@ -22,7 +22,6 @@
  */
 
 #include "util/settings.h"
-#include <boost/bind.hpp>
 
 namespace dso {
 int pyrLevelsUsed = PYR_LEVELS;
