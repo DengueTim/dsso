@@ -74,10 +74,10 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 		int ii = i + nf * i;
 
 		for (EFResidual *r2 : p->residualsAll) {
-			int k = r2->targetIDX;
-
-			if (!r2->isActive() || j > k)
+			if (!r2->isActive())
 				continue;
+
+			int k = r2->targetIDX;
 
 			/* Contribution factor of pair of depth residuals on pose-pose block Haa...
 			 * Accumulation over pairs of residuals that have a common host targets
@@ -109,7 +109,7 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 			} else if (i == k) {
 				// r2 is to right image
 
-			} else if (j == k) {
+			} else {
 				int jk = j + nf * k;
 				int ji = j + nf * i;
 				int ik = i + nf * k;
@@ -118,33 +118,6 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 				accD[tid][jk].update(r1->JpJdAdT, r2->JpJdAdT, p->HdiF);
 				accD[tid][ji].update(r1->JpJdAdT, r2->JpJdAdH, p->HdiF);
 				accD[tid][ik].update(r1->JpJdAdH, r2->JpJdAdT, p->HdiF);
-			} else {
-				accD[tid][ii].update(r1->JpJdAdH, r2->JpJdAdH, p->HdiF);
-				accD[tid][ii].update(r2->JpJdAdH, r1->JpJdAdH, p->HdiF);
-
-				if (j < k) {
-					int jk = j + nf * k;
-					accD[tid][jk].update(r1->JpJdAdT, r2->JpJdAdT, p->HdiF);
-				} else {
-					int kj = k + nf * j;
-					accD[tid][kj].update(r2->JpJdAdT, r1->JpJdAdT, p->HdiF);
-				}
-
-				if (j < i) {
-					int ji = j + nf * i;
-					accD[tid][ji].update(r1->JpJdAdT, r2->JpJdAdH, p->HdiF);
-				} else {
-					int ij = i + nf * j;
-					accD[tid][ij].update(r2->JpJdAdH, r1->JpJdAdT, p->HdiF);
-				}
-
-				if (i < k) {
-					int ik = i + nf * k;
-					accD[tid][ik].update(r1->JpJdAdH, r2->JpJdAdT, p->HdiF);
-				} else {
-					int ki = k + nf * i;
-					accD[tid][ki].update(r2->JpJdAdT, r1->JpJdAdH, p->HdiF);
-				}
 			}
 
 			//accD[tid][r1ht + r2->targetIDX * nf * nf].update(r1->JpJdF, r2->JpJdF, p->HdiF);
@@ -191,12 +164,10 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 //			b[tid].segment<8>(jIdx) += EF->adTarget[ij] * EB;
 		}
 
-		if (j >= i) {
-			for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-				H[tid].block<8, 8>(iIdx, jIdx) += accD[tid2][ij].A.cast<double>();
-			}
+		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
+			H[tid].block<8, 8>(iIdx, jIdx) += accD[tid2][ij].A.cast<double>();
 		}
-
+		
 		// Nframes^2 Pose-pose blocks
 //		for (int k = 0; k < nf; k++) {
 //			int ijk = ij + k * nf * nf;
@@ -245,11 +216,6 @@ void AccumulatedSCHessianSSE::copyUpperToLowerDiagonal(MatXX *H) {
 	for (int h = 0; h < nframes[0]; h++) {
 		int hIdx = CPARS + h * 8;
 		H->block<CPARS, 8>(0, hIdx).noalias() = H->block<8, CPARS>(hIdx, 0).transpose();
-
-		for (int t = h + 1; t < nframes[0]; t++) {
-			int tIdx = CPARS + t * 8;
-			H->block<8, 8>(tIdx, hIdx).noalias() = H->block<8, 8>(hIdx, tIdx).transpose();
-		}
 	}
 }
 
