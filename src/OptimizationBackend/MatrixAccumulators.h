@@ -151,7 +151,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 				H(r, c) = H(c, r) = d;
 				idx += 4;
 			}
-		assert(idx==4*105);
+		assert(idx == 4 * 105);
 	}
 
 	inline void updateSSE(const __m128 J0, const __m128 J1, const __m128 J2, const __m128 J3, const __m128 J4, const __m128 J5,
@@ -669,7 +669,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	 * computes the outer sum of 14x2 matrices, weighted with a 2x2 matrix:
 	 * 	[x y] * [a b; b c] * [x y]^T
 	 * (assuming x,y are column-vectors).
- 	 * numerically robust to large sums.
+	 * numerically robust to large sums.
 	 */
 	inline void update(const float *const xC, const float *const xX, const float *const yC, const float *const yX, const float a,
 			const float b, const float c) {
@@ -896,7 +896,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 				H(r, c) = H(c, r) = d;
 				idx += 4;
 			}
-		assert(idx==4*45);
+		assert(idx == 4 * 45);
 	}
 
 	inline void updateSSE(const __m128 J0, const __m128 J1, const __m128 J2, const __m128 J3, const __m128 J4, const __m128 J5,

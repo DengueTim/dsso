@@ -49,8 +49,8 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		isLinearized = false;
 		isActiveAndIsGoodNEW = false;
 		J = new RawResidualJacobian();
-		assert(((long)this)%16==0);
-		assert(((long)J)%16==0);
+		assert(((long )this) % 16 == 0);
+		assert(((long )J) % 16 == 0);
 	}
 	inline ~EFResidual() {
 		delete J;

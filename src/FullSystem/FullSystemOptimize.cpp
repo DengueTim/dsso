@@ -94,7 +94,7 @@ void FullSystem::setNewFrameEnergyTH() {
 
 	int nthIdx = setting_frameEnergyTHN * allResVec.size();
 
-	assert(nthIdx < (int)allResVec.size());
+	assert(nthIdx < (int )allResVec.size());
 	assert(setting_frameEnergyTHN < 1);
 
 	std::nth_element(allResVec.begin(), allResVec.begin() + nthIdx, allResVec.end());

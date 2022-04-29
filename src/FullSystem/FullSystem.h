@@ -86,7 +86,7 @@ template<typename T> inline void deleteOutOrder(std::vector<T*> &v, const T *ele
 			break;
 		}
 	}
-	assert(i!=-1);
+	assert(i != -1);
 
 	for (unsigned int k = i + 1; k < v.size(); k++)
 		v[k - 1] = v[k];

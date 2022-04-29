@@ -224,7 +224,7 @@ struct FrameHessian {
 	void release();
 
 	inline ~FrameHessian() {
-		assert(efFrame==0);
+		assert(efFrame == 0);
 		release();
 		instanceCounter--;
 		for (int i = 0; i < pyrLevelsUsed; i++) {
@@ -547,7 +547,7 @@ struct PointHessian {
 	void release();
 	PointHessian(const ImmaturePoint *const rawPoint);
 	inline ~PointHessian() {
-		assert(efPoint==0);
+		assert(efPoint == 0);
 		release();
 		instanceCounter--;
 	}

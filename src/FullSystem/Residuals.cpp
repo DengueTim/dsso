@@ -51,7 +51,7 @@ int PointFrameResidual::instanceCounter = 0;
 long runningResID = 0;
 
 PointFrameResidual::~PointFrameResidual() {
-	assert(efResidual==0);
+	assert(efResidual == 0);
 	instanceCounter--;
 	delete J;
 }
@@ -62,7 +62,7 @@ PointFrameResidual::PointFrameResidual(PointHessian *point_, FrameHessian *targe
 	instanceCounter++;
 	resetOOB();
 	J = new RawResidualJacobian();
-	assert(((long)J)%16==0);
+	assert(((long )J) % 16 == 0);
 
 	isNew = true;
 }

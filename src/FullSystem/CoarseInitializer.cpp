@@ -548,7 +548,7 @@ void CoarseInitializer::updateIdepthRegularisation(int lvl) {
 }
 
 void CoarseInitializer::propagateUp(int srcLvl) {
-	assert(srcLvl+1<pyrLevelsUsed);
+	assert(srcLvl + 1 < pyrLevelsUsed);
 	// set idepth of target
 
 	int nptss = numPoints[srcLvl];
@@ -585,7 +585,7 @@ void CoarseInitializer::propagateUp(int srcLvl) {
 }
 
 void CoarseInitializer::propagateDown(int srcLvl) {
-	assert(srcLvl>0);
+	assert(srcLvl > 0);
 	// set idepth of target
 
 	int nptst = numPoints[srcLvl - 1];
@@ -846,7 +846,7 @@ void CoarseInitializer::makeNN() {
 				float df = expf(-ret_dist[k] * NNDistFactor);
 				sumDF += df;
 				pts[i].neighboursDist[myidx] = df;
-				assert(ret_index[k]>=0 && ret_index[k] < npts);
+				assert(ret_index[k] >= 0 && ret_index[k] < npts);
 				myidx++;
 			}
 			for (int k = 0; k < nn; k++)
@@ -860,7 +860,7 @@ void CoarseInitializer::makeNN() {
 				pts[i].parent = ret_index[0];
 				pts[i].parentDist = expf(-ret_dist[0] * NNDistFactor);
 
-				assert(ret_index[0]>=0 && ret_index[0] < numPoints[lvl+1]);
+				assert(ret_index[0] >= 0 && ret_index[0] < numPoints[lvl + 1]);
 			} else {
 				pts[i].parent = -1;
 				pts[i].parentDist = -1;

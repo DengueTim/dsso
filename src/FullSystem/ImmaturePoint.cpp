@@ -121,7 +121,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian *frame, const Mat33f &ho
 			lastTracePixelInterval = dist;
 			return lastTraceStatus = ImmaturePointStatus::IPS_SKIPPED;
 		}
-		assert(dist>0);
+		assert(dist > 0);
 	} else {
 		dist = maxPixSearch;
 
@@ -147,7 +147,7 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian *frame, const Mat33f &ho
 			lastTracePixelInterval = 0;
 			return lastTraceStatus = ImmaturePointStatus::IPS_OOB;
 		}
-		assert(dist>0);
+		assert(dist > 0);
 	}
 
 	// set OOB if scale change too big.

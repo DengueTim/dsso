@@ -131,7 +131,7 @@ void FullSystem::flagFramesForMarginalization(FrameHessian *newFH) {
 void FullSystem::marginalizeFrame(FrameHessian *frame) {
 	// marginalize or remove all this frames points.
 
-	assert((int)frame->pointHessians.size()==0);
+	assert((int )frame->pointHessians.size() == 0);
 
 	ef->marginalizeFrame(frame->efFrame);
 

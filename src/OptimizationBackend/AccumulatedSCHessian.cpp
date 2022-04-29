@@ -62,7 +62,7 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 	accHcc[tid].update(Hcd, Hcd, p->HdiF);
 	accbc[tid].update(Hcd, p->bdSumF * p->HdiF);
 
-	assert(std::isfinite((float)(p->HdiF)));
+	assert(std::isfinite((float )(p->HdiF)));
 
 	int nf = nframes[tid];
 	for (EFResidual *r1 : p->residualsAll) {
@@ -127,7 +127,7 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 		accE[tid][j].update(r1->JpJdAdT, Hcd, p->HdiF);
 		accEB[tid][i].update(r1->JpJdAdH, p->HdiF * p->bdSumF);
 		accEB[tid][j].update(r1->JpJdAdT, p->HdiF * p->bdSumF);
-		
+
 		//accE[tid][r1ht].update(r1->JpJdF, Hcd, p->HdiF);
 		//accEB[tid][r1ht].update(r1->JpJdF, p->HdiF * p->bdSumF);
 	}
@@ -167,7 +167,7 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
 			H[tid].block<8, 8>(iIdx, jIdx) += accD[tid2][ij].A.cast<double>();
 		}
-		
+
 		// Nframes^2 Pose-pose blocks
 //		for (int k = 0; k < nf; k++) {
 //			int ijk = ij + k * nf * nf;

@@ -433,7 +433,7 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 	assert(EFAdjointsValid);
 	assert(EFIndicesValid);
 
-	assert((int)fh->points.size()==0);
+	assert((int )fh->points.size() == 0);
 	int ndim = nFrames * 8 + CPARS - 8;  // new dimension
 	int odim = nFrames * 8 + CPARS;  // old dimension
 
@@ -509,7 +509,7 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 	assert((int)frames.size()*8+CPARS == (int)HM.rows());
 	assert((int)frames.size()*8+CPARS == (int)HM.cols());
 	assert((int)frames.size()*8+CPARS == (int)bM.size());
-	assert((int)frames.size() == (int)nFrames);
+	assert((int )frames.size() == (int )nFrames);
 
 //	VecX eigenvaluesPost = HM.eigenvalues().real();
 //	std::sort(eigenvaluesPost.data(), eigenvaluesPost.data()+eigenvaluesPost.size());

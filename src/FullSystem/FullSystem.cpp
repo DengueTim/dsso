@@ -117,7 +117,7 @@ FullSystem::FullSystem(const Mat33 &leftK, const Mat33 &rightK, const SE3 &leftT
 		calibLog = 0;
 	}
 
-	assert(retstat!=293847);
+	assert(retstat != 293847);
 
 	selectionMap = new float[wG[0] * hG[0]];
 
@@ -620,7 +620,7 @@ void FullSystem::activatePointsMT() {
 			ph->host->immaturePoints[ph->idxInImmaturePoints] = 0;
 			delete ph;
 		} else {
-			assert(newpoint == 0 || newpoint == (PointHessian*)((long)(-1)));
+			assert(newpoint == 0 || newpoint == (PointHessian* )((long )(-1)));
 		}
 	}
 
@@ -1186,7 +1186,7 @@ void FullSystem::printEigenValLine() {
 	MatXX Hp = ef->lastHS.bottomRightCorner(ef->lastHS.cols() - CPARS, ef->lastHS.cols() - CPARS);
 	MatXX Ha = ef->lastHS.bottomRightCorner(ef->lastHS.cols() - CPARS, ef->lastHS.cols() - CPARS);
 	int n = Hp.cols() / 8;
-	assert(Hp.cols()%8==0);
+	assert(Hp.cols() % 8 == 0);
 
 	// sub-select
 	for (int i = 0; i < n; i++) {

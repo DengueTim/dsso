@@ -66,7 +66,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 				delete[] accEB[tid];
 			if (accD[tid] != 0)
 				delete[] accD[tid];
-			accE[tid] = new AccumulatorXX<8, CPARS> [ n];
+			accE[tid] = new AccumulatorXX<8, CPARS> [n];
 			accEB[tid] = new AccumulatorX<8> [n];
 			accD[tid] = new AccumulatorXX<8, 8> [n * n];
 		}

@@ -53,7 +53,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(ImmaturePoint *point, int minObs
 		residuals[nres].target = fh;
 		nres++;
 	}
-	assert(nres == ((int)frameHessians.size()));
+	assert(nres == ((int )frameHessians.size()));
 
 	bool print = false; //rand()%50==0;
 

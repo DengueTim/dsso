@@ -299,7 +299,7 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 	__m128 zero = _mm_set1_ps(0);
 
 	int n = buf_warped_n;
-	assert(n%4==0);
+	assert(n % 4 == 0);
 	for (int i = 0; i < n; i += 4) {
 		__m128 dx = _mm_mul_ps(_mm_load_ps(buf_warped_dx + i), fxl);
 		__m128 dy = _mm_mul_ps(_mm_load_ps(buf_warped_dy + i), fyl);
@@ -480,7 +480,7 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 }
 
 void CoarseTracker::setCoarseTrackingRef(std::vector<FrameHessian*> frameHessians) {
-	assert(frameHessians.size()>0);
+	assert(frameHessians.size() > 0);
 	lastRef = frameHessians.back();
 	makeCoarseDepthL0(frameHessians);
 

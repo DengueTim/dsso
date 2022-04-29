@@ -331,8 +331,8 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian *const fh, float *map_o
 							Vec2f dir2 = directions[randomPattern[n2] & 0xF];
 							for (int y1 = 0; y1 < my1; y1 += 1)
 								for (int x1 = 0; x1 < mx1; x1 += 1) {
-									assert(x1+x234 < w);
-									assert(y1+y234 < h);
+									assert(x1 + x234 < w);
+									assert(y1 + y234 < h);
 									int idx = x1 + x234 + w * (y1 + y234);
 									int xf = x1 + x234;
 									int yf = y1 + y234;
