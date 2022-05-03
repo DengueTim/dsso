@@ -163,7 +163,7 @@ void EnergyFunctional::setDeltaF(CalibHessian *HCalib) {
 					+ frames[t]->data->get_state_minus_stateZero().head<8>().cast<float>().transpose() * adTargetF[idx];
 		}
 
-	cDeltaF = HCalib->value_minus_value_zero.cast<float>(); // Unscaled!?
+	cDeltaF = HCalib->value_minus_value_zero.cast<float>();
 	for (EFFrame *f : frames) {
 		f->delta = f->data->get_state_minus_stateZero().head<8>();
 		f->delta_prior = (f->data->get_state() - f->data->getPriorZero()).head<8>();

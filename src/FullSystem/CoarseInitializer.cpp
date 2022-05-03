@@ -61,6 +61,7 @@ CoarseInitializer::CoarseInitializer(int ww, int hh) :
 	wM.diagonal()[6] = SCALE_A;
 	wM.diagonal()[7] = SCALE_B;
 }
+
 CoarseInitializer::~CoarseInitializer() {
 	for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
 		if (points[lvl] != 0)
@@ -405,16 +406,15 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 	acc9.finish();
 
 	// calculate alpha energy, and decide if we cap it.
-	// SURELY IT SHOULD UPDATE EAlpha AND NOT E
 	Accumulator11 EAlpha;
 	EAlpha.initialize();
 	for (int i = 0; i < npts; i++) {
 		Pnt *point = ptsl + i;
 		if (!point->isGood_new) {
-			E.updateSingle((float) (point->energy[1]));
+			EAlpha.updateSingle((float) (point->energy[1]));
 		} else {
 			point->energy_new[1] = (point->idepth_new - 1) * (point->idepth_new - 1);
-			E.updateSingle((float) (point->energy_new[1]));
+			EAlpha.updateSingle((float) (point->energy_new[1]));
 		}
 	}
 	EAlpha.finish();

@@ -54,30 +54,39 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 	 * One element per point (not pixel)
 	 */
 	p->HdiF = 1.0 / H;
+	assert(std::isfinite((float )(p->HdiF)));
+
 	p->bdSumF = p->bd_accAF + p->bd_accLF;
 	if (shiftPriorToZero)
 		p->bdSumF += p->priorF * p->deltaF;
 
 	VecCf Hcd = p->Hcd_accAF + p->Hcd_accLF;
-	accHcc[tid].update(Hcd, Hcd, p->HdiF);
-	accbc[tid].update(Hcd, p->bdSumF * p->HdiF);
 
-	assert(std::isfinite((float )(p->HdiF)));
+	Vec8f HcdIntrinsics = Hcd.head<CIPARS>();
+	accHcc[tid].update(HcdIntrinsics, HcdIntrinsics, p->HdiF);
+	accbc[tid].update(HcdIntrinsics, p->bdSumF * p->HdiF);
 
-	int nf = nframes[tid];
+	Vec8f HcdLrPose = Vec8f::Zero();
+	HcdLrPose.head<6>() = Hcd.tail<6>();
+	accD[tid][0].update(HcdLrPose, HcdLrPose, p->HdiF);
+	accE[tid][0].update(HcdLrPose, HcdIntrinsics, p->HdiF);
+	accEB[tid][0].update(HcdLrPose, p->bdSumF * p->HdiF);
+
+	int dSize = nframes[tid] + 1;
 	for (EFResidual *r1 : p->residualsAll) {
 		if (!r1->isActive())
 			continue;
 
-		int i = r1->hostIDX;
-		int j = r1->targetIDX;
-		int ii = i + nf * i;
+		int i = r1->hostIDX + 1;
+		int j = r1->targetIDX + 1;
+		int j0 = (j == i) ? 0 : j;
 
 		for (EFResidual *r2 : p->residualsAll) {
 			if (!r2->isActive())
 				continue;
 
-			int k = r2->targetIDX;
+			int k = r2->targetIDX + 1;
+			int k0 = (k == i) ? 0 : k;
 
 			/* Contribution factor of pair of depth residuals on pose-pose block Haa...
 			 * Accumulation over pairs of residuals that have a common host targets
@@ -97,39 +106,24 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 			 * The Adjoints...
 			 *
 			 * Symmetric...   Seems this computes for a pair of residuals the updates for r1,r2 and then r2,r1. which keeps the Pose-Pose block symmetric..
-			 * Could be cheaper to compute only the upper half and make it symmetric by copying/transposing blocks...
-			 *
+			 * Slightly cheaper to compute only the upper half and make it symmetric by copying/transposing blocks but code is more simple as is.
 			 */
-			if (i == j && i == k) {
-				// Both r1 and r2 are to the right image
 
-			} else if (i == j) {
-				// r1 is to right image
+			int ii = i + dSize * i;
+			int jk = j0 + dSize * k0;
+			int ji = j0 + dSize * i;
+			int ik = i + dSize * k0;
 
-			} else if (i == k) {
-				// r2 is to right image
-
-			} else {
-				int jk = j + nf * k;
-				int ji = j + nf * i;
-				int ik = i + nf * k;
-
-				accD[tid][ii].update(r1->JpJdAdH, r2->JpJdAdH, p->HdiF);
-				accD[tid][jk].update(r1->JpJdAdT, r2->JpJdAdT, p->HdiF);
-				accD[tid][ji].update(r1->JpJdAdT, r2->JpJdAdH, p->HdiF);
-				accD[tid][ik].update(r1->JpJdAdH, r2->JpJdAdT, p->HdiF);
-			}
-
-			//accD[tid][r1ht + r2->targetIDX * nf * nf].update(r1->JpJdF, r2->JpJdF, p->HdiF);
+			accD[tid][ii].update(r1->JpJdAdH, r2->JpJdAdH, p->HdiF);
+			accD[tid][jk].update(r1->JpJdAdT, r2->JpJdAdT, p->HdiF);
+			accD[tid][ji].update(r1->JpJdAdT, r2->JpJdAdH, p->HdiF);
+			accD[tid][ik].update(r1->JpJdAdH, r2->JpJdAdT, p->HdiF);
 		}
 
-		accE[tid][i].update(r1->JpJdAdH, Hcd, p->HdiF);
-		accE[tid][j].update(r1->JpJdAdT, Hcd, p->HdiF);
-		accEB[tid][i].update(r1->JpJdAdH, p->HdiF * p->bdSumF);
-		accEB[tid][j].update(r1->JpJdAdT, p->HdiF * p->bdSumF);
-
-		//accE[tid][r1ht].update(r1->JpJdF, Hcd, p->HdiF);
-		//accEB[tid][r1ht].update(r1->JpJdF, p->HdiF * p->bdSumF);
+		accE[tid][i].update(r1->JpJdAdH, HcdIntrinsics, p->HdiF);
+		accEB[tid][i].update(r1->JpJdAdH, p->bdSumF * p->HdiF);
+		accE[tid][j0].update(r1->JpJdAdT, HcdIntrinsics, p->HdiF);
+		accEB[tid][j0].update(r1->JpJdAdT, p->bdSumF * p->HdiF);
 	}
 }
 
@@ -143,79 +137,68 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 	if (min == max)
 		return;
 
-	int nf = nframes[0];
+	int dSize = nframes[0] + 1;
 
-	for (int ij = min; ij < max; ij++) {
-		int i = ij % nf;
-		int j = ij / nf;
+	for (int jk = min; jk < max; jk++) {
+		int j = jk % dSize;
+		int k = jk / dSize;
 
-		int iIdx = CPARS + i * 8;
-		int jIdx = CPARS + j * 8;
+		int jIdx = (j == 0) ? CIPARS : CPARS + (j - 1) * 8;
+		int kIdx = (k == 0) ? CIPARS : CPARS + (k - 1) * 8;
 
-		if (i == 0) {
+		if (j == 0) {
 			for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-				H[tid].block<8, CPARS>(jIdx, 0) += accE[tid2][j].A.cast<double>();
-				b[tid].segment<8>(jIdx) += accEB[tid2][j].A.cast<double>();
+				if (k == 0) {
+					H[tid].block<6, CIPARS>(kIdx, 0) += accE[tid2][k].A.topRightCorner<6, CIPARS>().cast<double>();
+					b[tid].segment<6>(kIdx) += accEB[tid2][k].A.topRightCorner<6, 1>().cast<double>();
+				} else {
+					H[tid].block<8, CIPARS>(kIdx, 0) += accE[tid2][k].A.cast<double>();
+					b[tid].segment<8>(kIdx) += accEB[tid2][k].A.cast<double>();
+				}
 			}
-
-//			H[tid].block<8, CPARS>(iIdx, 0) += EF->adHost[ij] * E;
-//			H[tid].block<8, CPARS>(jIdx, 0) += EF->adTarget[ij] * E;
-//			b[tid].segment<8>(iIdx) += EF->adHost[ij] * EB;
-//			b[tid].segment<8>(jIdx) += EF->adTarget[ij] * EB;
 		}
 
 		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-			H[tid].block<8, 8>(iIdx, jIdx) += accD[tid2][ij].A.cast<double>();
+			if (j == 0 && k == 0) {
+				// LR Pose in CPARS. Only 6x6.
+				H[tid].block<6, 6>(jIdx, kIdx) += accD[tid2][jk].A.topRightCorner<6, 6>().cast<double>();
+			} else if (j == 0) {
+				// Along top.
+				H[tid].block<6, 8>(jIdx, kIdx) += accD[tid2][jk].A.topRightCorner<6, 8>().cast<double>();
+			} else if (k == 0) {
+				// Down Left side.
+				H[tid].block<8, 6>(jIdx, kIdx) += accD[tid2][jk].A.topRightCorner<8, 6>().cast<double>();
+			} else {
+				H[tid].block<8, 8>(jIdx, kIdx) += accD[tid2][jk].A.cast<double>();
+			}
 		}
-
-		// Nframes^2 Pose-pose blocks
-//		for (int k = 0; k < nf; k++) {
-//			int ijk = ij + k * nf * nf;
-//			int ik = i + nf * k;
-//
-//			int kIdx = CPARS + k * 8;
-//
-//			Mat88 D = Mat88::Zero();
-//
-//			int num = 0;
-//			for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-//				if (accD[tid2][ijk].num > 0) {
-//					D += accD[tid2][ijk].A.cast<double>();
-//					num += accD[tid2][ijk].num;
-//				}
-//			}
-//
-//			if (num > 0) {
-//				H[tid].block<8, 8>(iIdx, iIdx) += EF->adHost[ij] * D * EF->adHost[ik].transpose();
-//				H[tid].block<8, 8>(jIdx, kIdx) += EF->adTarget[ij] * D * EF->adTarget[ik].transpose();
-//				H[tid].block<8, 8>(jIdx, iIdx) += EF->adTarget[ij] * D * EF->adHost[ik].transpose();
-//				H[tid].block<8, 8>(iIdx, kIdx) += EF->adHost[ij] * D * EF->adTarget[ik].transpose();
-//			}
-//		}
 	}
 
 	// One camera params block
 	if (min == 0) {
 		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-			H[tid].topLeftCorner<CPARS, CPARS>() += accHcc[tid2].A.cast<double>();
-			b[tid].head<CPARS>() += accbc[tid2].A.cast<double>();
+			H[tid].topLeftCorner<CIPARS, CIPARS>() += accHcc[tid2].A.cast<double>();
+			b[tid].head<CIPARS>() += accbc[tid2].A.cast<double>();
 		}
 	}
 }
 
 void AccumulatedSCHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional const *const EF) {
+	const int dSizeSquared = (nframes[0] + 1) * (nframes[0] + 1);
+
 	H = MatXX::Zero(nframes[0] * 8 + CPARS, nframes[0] * 8 + CPARS);
 	b = VecX::Zero(nframes[0] * 8 + CPARS);
 
-	stitchDoubleInternal(&H, &b, EF, 0, nframes[0] * nframes[0], 0, -1);
+	stitchDoubleInternal(&H, &b, EF, 0, dSizeSquared, 0, -1);
 	copyUpperToLowerDiagonal(&H);
 }
 
 void AccumulatedSCHessianSSE::copyUpperToLowerDiagonal(MatXX *H) {
 	// make diagonal by copying over parts.
+	H->block<CIPARS, 6>(0, CIPARS).noalias() = H->block<6, CIPARS>(CIPARS, 0).transpose();
 	for (int h = 0; h < nframes[0]; h++) {
 		int hIdx = CPARS + h * 8;
-		H->block<CPARS, 8>(0, hIdx).noalias() = H->block<8, CPARS>(hIdx, 0).transpose();
+		H->block<CIPARS, 8>(0, hIdx).noalias() = H->block<8, CIPARS>(hIdx, 0).transpose();
 	}
 }
 

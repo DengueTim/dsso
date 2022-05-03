@@ -289,6 +289,7 @@ struct CalibHessian {
 	;
 
 	VecC value_zero; // Start values from config files.
+	VecC value_zero_scaled;
 	VecC value_scaled; // The scaled value is actually the real value.
 	VecCf value_scaledf;
 	VecCf value_scaledi;
@@ -317,12 +318,12 @@ struct CalibHessian {
 		setValueScaled(initial_value);
 		// Take initial value as eval PT (zero).
 		value_zero = value;
+		value_zero_scaled = value_scaled;
 		value_minus_value_zero.setZero();
 
 		for (int i = 0; i < 256; i++)
 			Binv[i] = B[i] = i;		// set gamma function to identity
 	}
-	;
 
 	// normal mode: use the optimized parameters everywhere!
 	inline float& fxl() {
@@ -389,13 +390,12 @@ struct CalibHessian {
 		value_scaled[6] = SCALE_C * value[6];
 		value_scaled[7] = SCALE_C * value[7];
 
-		// TODO: Scale...
-		value_scaled[8] = value[8];
-		value_scaled[9] = value[9];
-		value_scaled[10] = value[10];
-		value_scaled[11] = value[11];
-		value_scaled[12] = value[12];
-		value_scaled[13] = value[13];
+		value_scaled[8] = SCALE_XI_TRANS * value[8];
+		value_scaled[9] = SCALE_XI_TRANS * value[9];
+		value_scaled[10] = SCALE_XI_TRANS * value[10];
+		value_scaled[11] = SCALE_XI_ROT * value[11];
+		value_scaled[12] = SCALE_XI_ROT * value[12];
+		value_scaled[13] = SCALE_XI_ROT * value[13];
 
 		this->value_scaledf = this->value_scaled.cast<float>();
 		this->value_scaledi[0] = 1.0f / this->value_scaledf[0];
@@ -435,8 +435,7 @@ struct CalibHessian {
 	}
 
 	SE3 getLeftToRightZero() {
-		// TODO the transform is not scaled yet.
-		return SE3::exp(value_zero.segment<6>(8));
+		return SE3::exp(value_zero_scaled.segment<6>(8));
 	}
 
 	SE3 getLeftToRight() {
@@ -458,13 +457,12 @@ private:
 		value[6] = SCALE_C_INVERSE * value_scaled[6];
 		value[7] = SCALE_C_INVERSE * value_scaled[7];
 
-		// TODO: Scale...
-		value[8] = value_scaled[8];
-		value[9] = value_scaled[9];
-		value[10] = value_scaled[10];
-		value[11] = value_scaled[11];
-		value[12] = value_scaled[12];
-		value[13] = value_scaled[13];
+		value[8] = SCALE_XI_TRANS_INVERSE * value_scaled[8];
+		value[9] = SCALE_XI_TRANS_INVERSE * value_scaled[9];
+		value[10] = SCALE_XI_TRANS_INVERSE * value_scaled[10];
+		value[11] = SCALE_XI_ROT_INVERSE * value_scaled[11];
+		value[12] = SCALE_XI_ROT_INVERSE * value_scaled[12];
+		value[13] = SCALE_XI_ROT_INVERSE * value_scaled[13];
 
 		this->value_minus_value_zero = this->value - this->value_zero;
 		this->value_scaledi[0] = 1.0f / this->value_scaledf[0];

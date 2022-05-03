@@ -36,7 +36,7 @@ class EnergyFunctional;
 
 class AccumulatedSCHessianSSE {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-	;
+
 	inline AccumulatedSCHessianSSE() {
 		for (int i = 0; i < NUM_THREADS; i++) {
 			accE[i] = 0;
@@ -45,7 +45,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 			nframes[i] = 0;
 		}
 	}
-	;
+
 	inline ~AccumulatedSCHessianSSE() {
 		for (int i = 0; i < NUM_THREADS; i++) {
 			if (accE[i] != 0)
@@ -56,9 +56,9 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 				delete[] accD[i];
 		}
 	}
-	;
 
 	inline void setZero(int n, int min = 0, int max = 1, Vec10 *stats = 0, int tid = 0) {
+		const int nplus1 = n + 1; // The CPARS Left/Right pose is accumulated as part of D not Hcc.
 		if (n != nframes[tid]) {
 			if (accE[tid] != 0)
 				delete[] accE[tid];
@@ -66,18 +66,18 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 				delete[] accEB[tid];
 			if (accD[tid] != 0)
 				delete[] accD[tid];
-			accE[tid] = new AccumulatorXX<8, CPARS> [n];
-			accEB[tid] = new AccumulatorX<8> [n];
-			accD[tid] = new AccumulatorXX<8, 8> [n * n];
+			accE[tid] = new AccumulatorXX<8, CIPARS> [nplus1];
+			accEB[tid] = new AccumulatorX<8> [nplus1];
+			accD[tid] = new AccumulatorXX<8, 8> [nplus1 * nplus1];
 		}
 		accbc[tid].initialize();
 		accHcc[tid].initialize();
 
-		for (int i = 0; i < n; i++) {
+		for (int i = 0; i < nplus1; i++) {
 			accE[tid][i].initialize();
 			accEB[tid][i].initialize();
 		}
-		for (int i = 0; i < n * n; i++) {
+		for (int i = 0; i < nplus1 * nplus1; i++) {
 			accD[tid][i].initialize();
 		}
 		nframes[tid] = n;
@@ -87,6 +87,8 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	void stitchDoubleMT(IndexThreadReduce<Vec10> *red, MatXX &H, VecX &b, EnergyFunctional const *const EF, bool MT) {
 		// sum up, splitting by bock in square.
+		const int dSizeSquared = (nframes[0] + 1) * (nframes[0] + 1);
+
 		if (MT) {
 			MatXX Hs[NUM_THREADS];
 			VecX bs[NUM_THREADS];
@@ -97,7 +99,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 			}
 
 			red->reduce(boost::bind(&AccumulatedSCHessianSSE::stitchDoubleInternal, this, Hs, bs, EF, _1, _2, _3, _4), 0,
-					nframes[0] * nframes[0], 0);
+					dSizeSquared, 0);
 
 			// sum up results
 			H = Hs[0];
@@ -110,17 +112,17 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		} else {
 			H = MatXX::Zero(nframes[0] * 8 + CPARS, nframes[0] * 8 + CPARS);
 			b = VecX::Zero(nframes[0] * 8 + CPARS);
-			stitchDoubleInternal(&H, &b, EF, 0, nframes[0] * nframes[0], 0, -1);
+			stitchDoubleInternal(&H, &b, EF, 0, dSizeSquared, 0, -1);
 		}
 
 		copyUpperToLowerDiagonal(&H);
 	}
 
-	AccumulatorXX<8, CPARS> *accE[NUM_THREADS];
+	AccumulatorXX<8, CIPARS> *accE[NUM_THREADS];
 	AccumulatorX<8> *accEB[NUM_THREADS];
 	AccumulatorXX<8, 8> *accD[NUM_THREADS];
-	AccumulatorCC accHcc[NUM_THREADS];
-	AccumulatorX<CPARS> accbc[NUM_THREADS];
+	AccumulatorXX<CIPARS, CIPARS> accHcc[NUM_THREADS];
+	AccumulatorX<CIPARS> accbc[NUM_THREADS];
 	int nframes[NUM_THREADS];
 
 	void addPointsInternal(std::vector<EFPoint*> *points, bool shiftPriorToZero, int min = 0, int max = 1, Vec10 *stats = 0,
