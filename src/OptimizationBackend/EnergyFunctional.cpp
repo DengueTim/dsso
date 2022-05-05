@@ -627,7 +627,7 @@ void EnergyFunctional::orthogonalize(VecX *b, MatXX *H) {
 	// decide to which nullspaces to orthogonalize.
 	std::vector<VecX> ns;
 	ns.insert(ns.end(), lastNullspaces_pose.begin(), lastNullspaces_pose.end());
-	ns.insert(ns.end(), lastNullspaces_scale.begin(), lastNullspaces_scale.end());
+//	ns.insert(ns.end(), lastNullspaces_scale.begin(), lastNullspaces_scale.end());
 //	if(setting_affineOptModeA <= 0)
 //		ns.insert(ns.end(), lastNullspaces_affA.begin(), lastNullspaces_affA.end());
 //	if(setting_affineOptModeB <= 0)

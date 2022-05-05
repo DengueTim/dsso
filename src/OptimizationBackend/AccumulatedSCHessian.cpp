@@ -143,34 +143,21 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 		int j = jk % dSize;
 		int k = jk / dSize;
 
-		int jIdx = (j == 0) ? CIPARS : CPARS + (j - 1) * 8;
-		int kIdx = (k == 0) ? CIPARS : CPARS + (k - 1) * 8;
+		const int jIdx = (j == 0) ? CIPARS : CPARS + (j - 1) * 8;
+		const int kIdx = (k == 0) ? CIPARS : CPARS + (k - 1) * 8;
+
+		const int js = (j==0) ? 6 : 8;
+		const int ks = (k==0) ? 6 : 8;
 
 		if (j == 0) {
 			for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-				if (k == 0) {
-					H[tid].block<6, CIPARS>(kIdx, 0) += accE[tid2][k].A.topRightCorner<6, CIPARS>().cast<double>();
-					b[tid].segment<6>(kIdx) += accEB[tid2][k].A.topRightCorner<6, 1>().cast<double>();
-				} else {
-					H[tid].block<8, CIPARS>(kIdx, 0) += accE[tid2][k].A.cast<double>();
-					b[tid].segment<8>(kIdx) += accEB[tid2][k].A.cast<double>();
-				}
+				H[tid].block(kIdx, 0, ks, CIPARS) += accE[tid2][k].A.topRightCorner(ks, CIPARS).cast<double>();
+				b[tid].segment(kIdx, ks) += accEB[tid2][k].A.topRightCorner(ks, 1).cast<double>();
 			}
 		}
 
 		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-			if (j == 0 && k == 0) {
-				// LR Pose in CPARS. Only 6x6.
-				H[tid].block<6, 6>(jIdx, kIdx) += accD[tid2][jk].A.topRightCorner<6, 6>().cast<double>();
-			} else if (j == 0) {
-				// Along top.
-				H[tid].block<6, 8>(jIdx, kIdx) += accD[tid2][jk].A.topRightCorner<6, 8>().cast<double>();
-			} else if (k == 0) {
-				// Down Left side.
-				H[tid].block<8, 6>(jIdx, kIdx) += accD[tid2][jk].A.topRightCorner<8, 6>().cast<double>();
-			} else {
-				H[tid].block<8, 8>(jIdx, kIdx) += accD[tid2][jk].A.cast<double>();
-			}
+			H[tid].block(jIdx, kIdx, js, ks) += accD[tid2][jk].A.topRightCorner(js, ks).cast<double>();
 		}
 	}
 

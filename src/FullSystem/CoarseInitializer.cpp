@@ -406,19 +406,16 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 	acc9.finish();
 
 	// calculate alpha energy, and decide if we cap it.
-	Accumulator11 EAlpha;
-	EAlpha.initialize();
 	for (int i = 0; i < npts; i++) {
 		Pnt *point = ptsl + i;
 		if (!point->isGood_new) {
-			EAlpha.updateSingle((float) (point->energy[1]));
+			E.updateSingle((float) (point->energy[1]));
 		} else {
 			point->energy_new[1] = (point->idepth_new - 1) * (point->idepth_new - 1);
-			EAlpha.updateSingle((float) (point->energy_new[1]));
+			E.updateSingle((float) (point->energy_new[1]));
 		}
 	}
-	EAlpha.finish();
-	float alphaEnergy = alphaW * (EAlpha.A + refToNew.translation().squaredNorm() * npts);
+	float alphaEnergy = alphaW * (refToNew.translation().squaredNorm() * npts);
 
 	//printf("AE = %f * %f + %f\n", alphaW, EAlpha.A, refToNew.translation().squaredNorm() * npts);
 

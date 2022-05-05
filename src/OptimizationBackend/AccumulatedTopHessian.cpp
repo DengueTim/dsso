@@ -66,8 +66,8 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 		int htIDX = r->hostIDX + r->targetIDX * nframes[tid];
 		Mat18f dp = ef->adHTdeltaF[htIDX];
 
-		const dso::Vec6f &jpdxiX = leftToRight ? rJ->Jpdc[0].segment(CIPARS, 6) : rJ->Jpdxi[0];
-		const dso::Vec6f &jpdxiY = leftToRight ? rJ->Jpdc[1].segment(CIPARS, 6) : rJ->Jpdxi[1];
+		const Vec6f &jpdxiX = leftToRight ? rJ->Jpdc[0].segment(CIPARS, 6) : rJ->Jpdxi[0];
+		const Vec6f &jpdxiY = leftToRight ? rJ->Jpdc[1].segment(CIPARS, 6) : rJ->Jpdxi[1];
 
 		VecNRf resApprox;
 		if (mode == 0)
