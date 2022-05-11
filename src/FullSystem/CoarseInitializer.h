@@ -101,8 +101,13 @@ private:
 	double cy[PYR_LEVELS];
 	double cxi[PYR_LEVELS];
 	double cyi[PYR_LEVELS];
+	double fxr[PYR_LEVELS];
+	double fyr[PYR_LEVELS];
+	double cxr[PYR_LEVELS];
+	double cyr[PYR_LEVELS];
 	int w[PYR_LEVELS];
 	int h[PYR_LEVELS];
+	SE3 leftToRight;
 	void makeK(CalibHessian *HCalib);
 
 	bool snapped;

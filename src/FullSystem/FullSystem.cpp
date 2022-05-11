@@ -731,17 +731,16 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
 
 	// =========================== make Images / derivatives etc. =========================
 	fh->ab_exposure = image->exposure_time;
-	fh->makeImages(image->imageL, image->imageR, &Hcalib);
 
-	if (!initialized) {
-		// use initializer!
-		if (coarseInitializer->frameID < 0)	// first frame set. fh is kept by coarseInitializer.
-				{
-
-			coarseInitializer->setFirst(&Hcalib, fh);
-		} else if (coarseInitializer->trackFrame(fh, outputWrapper))	// if SNAPPED
-				{
-
+	if (coarseInitializer->frameID < 0) {
+		// first frame set. fh is kept by coarseInitializer.
+		fh->makeImages<true>(image->imageL, image->imageR, &Hcalib);
+		coarseInitializer->setFirst(&Hcalib, fh);
+	} else if (!initialized) {
+		// Initializing...
+		fh->makeImages<false>(image->imageL, image->imageR, &Hcalib);
+		if (coarseInitializer->trackFrame(fh, outputWrapper)) {
+			// if SNAPPED
 			initializeFromInitializer(fh);
 			lock.unlock();
 			deliverTrackedFrame(fh, true);
@@ -751,9 +750,9 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
 			delete fh;
 			printf("Still initializing...\n");
 		}
-		return;
-	} else	// do front-end operation.
-	{
+	} else {
+		fh->makeImages<false>(image->imageL, image->imageR, &Hcalib);
+		// do front-end operation.
 		// =========================== SWAP tracking reference?. =========================
 		if (coarseTracker_forNewKF->refFrameID > coarseTracker->refFrameID) {
 			boost::unique_lock<boost::mutex> crlock(coarseTrackerSwapMutex);
@@ -793,7 +792,6 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
 
 		lock.unlock();
 		deliverTrackedFrame(fh, needToMakeKF);
-		return;
 	}
 }
 void FullSystem::deliverTrackedFrame(FrameHessian *fh, bool needKF) {

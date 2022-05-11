@@ -109,7 +109,8 @@ struct FrameHessian {
 
 	Eigen::Vector3f *dI;	// trace, fine tracking. Used for direction select (not for gradient histograms etc.)   dIp[0]
 	Eigen::Vector3f *dIr;	// dI for Right image..
-	Eigen::Vector3f *dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.  Elements: Pixel value, dx, dy
+	Eigen::Vector3f *dIp[PYR_LEVELS];	// coarse tracking / coarse initializer. NAN in [0] only.  Elements: Pixel value, dx, dy
+	Eigen::Vector3f *dIrp[PYR_LEVELS];  // optional for right image.
 	float *absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
 
 	int frameID;						// incremental ID for keyframes only!
@@ -229,17 +230,19 @@ struct FrameHessian {
 		instanceCounter--;
 		for (int i = 0; i < pyrLevelsUsed; i++) {
 			delete[] dIp[i];
+			if (dIrp[i])
+				delete[] dIrp[i];
 			delete[] absSquaredGrad[i];
 
 		}
-
-		delete[] dIr;
 
 		if (debugImage != 0)
 			delete debugImage;
 	}
 	;
 	inline FrameHessian() {
+		for (int i = 0; i < pyrLevelsUsed; i++)
+			dIrp[i] = 0;
 		instanceCounter++;
 		flaggedForMarginalization = false;
 		frameID = -1;
@@ -250,6 +253,7 @@ struct FrameHessian {
 	}
 	;
 
+	template<bool makeRightPyramid>
 	void makeImages(float *color, float *colorR, CalibHessian *HCalib);
 
 	inline Vec10 getPrior() {

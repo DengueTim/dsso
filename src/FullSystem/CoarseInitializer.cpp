@@ -405,16 +405,6 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 	E.finish();
 	acc9.finish();
 
-	// calculate alpha energy, and decide if we cap it.
-	for (int i = 0; i < npts; i++) {
-		Pnt *point = ptsl + i;
-		if (!point->isGood_new) {
-			E.updateSingle((float) (point->energy[1]));
-		} else {
-			point->energy_new[1] = (point->idepth_new - 1) * (point->idepth_new - 1);
-			E.updateSingle((float) (point->energy_new[1]));
-		}
-	}
 	float alphaEnergy = alphaW * (refToNew.translation().squaredNorm() * npts);
 
 	//printf("AE = %f * %f + %f\n", alphaW, EAlpha.A, refToNew.translation().squaredNorm() * npts);
@@ -786,6 +776,11 @@ void CoarseInitializer::makeK(CalibHessian *HCalib) {
 	cx[0] = HCalib->cxl();
 	cy[0] = HCalib->cyl();
 
+	fxr[0] = HCalib->fxlR();
+	fyr[0] = HCalib->fylR();
+	cxr[0] = HCalib->cxlR();
+	cyr[0] = HCalib->cylR();
+
 	for (int level = 1; level < pyrLevelsUsed; ++level) {
 		w[level] = w[0] >> level;
 		h[level] = h[0] >> level;
@@ -793,6 +788,11 @@ void CoarseInitializer::makeK(CalibHessian *HCalib) {
 		fy[level] = fy[level - 1] * 0.5;
 		cx[level] = (cx[0] + 0.5) / ((int) 1 << level) - 0.5;
 		cy[level] = (cy[0] + 0.5) / ((int) 1 << level) - 0.5;
+
+		fxr[level] = fxr[level - 1] * 0.5;
+		fyr[level] = fyr[level - 1] * 0.5;
+		cxr[level] = (cxr[0] + 0.5) / ((int) 1 << level) - 0.5;
+		cyr[level] = (cyr[0] + 0.5) / ((int) 1 << level) - 0.5;
 	}
 
 	for (int level = 0; level < pyrLevelsUsed; ++level) {
@@ -803,6 +803,8 @@ void CoarseInitializer::makeK(CalibHessian *HCalib) {
 		cxi[level] = Ki[level](0, 2);
 		cyi[level] = Ki[level](1, 2);
 	}
+
+	leftToRight = HCalib->getLeftToRight();
 }
 
 void CoarseInitializer::makeNN() {

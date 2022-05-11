@@ -116,15 +116,18 @@ void FrameHessian::release() {
 	immaturePoints.clear();
 }
 
+template<bool makeRightPyramid>
 void FrameHessian::makeImages(float *color, float *colorR, CalibHessian *HCalib) {
 
 	for (int i = 0; i < pyrLevelsUsed; i++) {
 		dIp[i] = new Eigen::Vector3f[wG[i] * hG[i]];
+		if (makeRightPyramid || i == 0)
+			dIrp[i] = new Eigen::Vector3f[wG[i] * hG[i]];
 		absSquaredGrad[i] = new float[wG[i] * hG[i]];
 	}
-	dI = dIp[0];
 
-	dIr = new Eigen::Vector3f[wG[0] * hG[0]];
+	dI = dIp[0];
+	dIr = dIrp[0];
 
 	// make d0
 	int w = wG[0];
@@ -137,18 +140,25 @@ void FrameHessian::makeImages(float *color, float *colorR, CalibHessian *HCalib)
 	for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
 		int wl = wG[lvl], hl = hG[lvl];
 		Eigen::Vector3f *dI_l = dIp[lvl];
+		Eigen::Vector3f *dIr_l = dIrp[lvl];
 
 		float *dabs_l = absSquaredGrad[lvl];
 		if (lvl > 0) {
 			int lvlm1 = lvl - 1;
 			int wlm1 = wG[lvlm1];
 			Eigen::Vector3f *dI_lm = dIp[lvlm1];
+			Eigen::Vector3f *dIr_lm = dIrp[lvlm1];
 
 			for (int y = 0; y < hl; y++)
 				for (int x = 0; x < wl; x++) {
 					dI_l[x + y * wl][0] = 0.25f
 							* (dI_lm[2 * x + 2 * y * wlm1][0] + dI_lm[2 * x + 1 + 2 * y * wlm1][0]
 									+ dI_lm[2 * x + 2 * y * wlm1 + wlm1][0] + dI_lm[2 * x + 1 + 2 * y * wlm1 + wlm1][0]);
+					if (makeRightPyramid) {
+						dIr_l[x + y * wl][0] = 0.25f
+								* (dIr_lm[2 * x + 2 * y * wlm1][0] + dIr_lm[2 * x + 1 + 2 * y * wlm1][0]
+										+ dIr_lm[2 * x + 2 * y * wlm1 + wlm1][0] + dIr_lm[2 * x + 1 + 2 * y * wlm1 + wlm1][0]);
+					}
 				}
 		}
 
@@ -170,25 +180,25 @@ void FrameHessian::makeImages(float *color, float *colorR, CalibHessian *HCalib)
 				float gw = HCalib->getBGradOnly((float) (dI_l[idx][0]));
 				dabs_l[idx] *= gw * gw;	// convert to gradient of original color space (before removing response).
 			}
-		}
-	}
 
-	{ // Only have image gradients for top level of right image.
-		int wl = wG[0], hl = hG[0];
-		for (int idx = wl; idx < wl * (hl - 1); idx++) {
-			float dx = 0.5f * (dIr[idx + 1][0] - dIr[idx - 1][0]);
-			float dy = 0.5f * (dIr[idx + wl][0] - dIr[idx - wl][0]);
+			if (makeRightPyramid || lvl == 0) {
+				dx = 0.5f * (dIr_l[idx + 1][0] - dIr_l[idx - 1][0]);
+				dy = 0.5f * (dIr_l[idx + wl][0] - dIr_l[idx - wl][0]);
 
-			if (!std::isfinite(dx))
-				dx = 0;
-			if (!std::isfinite(dy))
-				dy = 0;
+				if (!std::isfinite(dx))
+					dx = 0;
+				if (!std::isfinite(dy))
+					dy = 0;
 
-			dIr[idx][1] = dx;
-			dIr[idx][2] = dy;
+				dIr_l[idx][1] = dx;
+				dIr_l[idx][2] = dy;
+			}
 		}
 	}
 }
+
+template void FrameHessian::makeImages<false>(float *color, float *colorR, CalibHessian *HCalib);
+template void FrameHessian::makeImages<true>(float *color, float *colorR, CalibHessian *HCalib);
 
 void FrameFramePrecalc::set(FrameHessian *host, FrameHessian *target, CalibHessian *HCalib) {
 	this->host = host;
