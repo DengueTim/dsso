@@ -64,11 +64,11 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	float quality;
 
-	float my_type;
+	char my_type;
 
 	float idepth_min;
 	float idepth_max;
-	ImmaturePoint(int u_, int v_, FrameHessian *host_, float type, CalibHessian *HCalib);
+	ImmaturePoint(int u_, int v_, FrameHessian *host_, char type);
 	~ImmaturePoint();
 
 	ImmaturePointStatus traceOn(FrameHessian *frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt,
@@ -82,8 +82,6 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	double linearizeResidual(CalibHessian *HCalib, const float outlierTHSlack, ImmaturePointTemporaryResidual *tmpRes, float &Hdd,
 			float &bd, float idepth);
-
-	float calcResidual(CalibHessian *HCalib, const float outlierTHSlack, ImmaturePointTemporaryResidual *tmpRes, float idepth);
 
 private:
 };

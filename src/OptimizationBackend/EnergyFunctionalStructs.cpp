@@ -52,10 +52,10 @@ void EFResidual::takeDataF() {
 	JpJdAdT = adjointTarget * JpJdF;
 }
 
-void EFFrame::takeData() {
-	prior = data->getPrior().head<8>();
-	delta = data->get_state_minus_stateZero().head<8>();
-	delta_prior = (data->get_state() - data->getPriorZero()).head<8>();
+EFFrame::EFFrame(EnergyFunctional *ef_, FrameHessian *fh_) : ef(ef_), fh(fh_) {
+	prior = fh->getPrior().head<8>();
+	delta = fh->get_state_minus_stateZero().head<8>();
+	delta_prior = (fh->get_state() - fh->getPriorZero()).head<8>();
 
 //	Vec10 state_zero =  data->get_state_zero();
 //	state_zero.segment<3>(0) = SCALE_XI_TRANS * state_zero.segment<3>(0);
@@ -67,17 +67,26 @@ void EFFrame::takeData() {
 //
 //	std::cout << "state_zero: " << state_zero.transpose() << "\n";
 
-	assert(data->frameID != -1);
+	assert(fh->keyFrameID != -1);
 
-	frameID = data->frameID;
+	keyFrameID = fh->keyFrameID;
+	idxInFrames = -1;
 }
 
-void EFPoint::takeData() {
-	priorF = data->hasDepthPrior ? setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH : 0;
+EFPoint::EFPoint(PointHessian *ph_, EFFrame *host_) : ph(ph_), host(host_) {
+	priorF = ph->hasDepthPrior ? setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH : 0;
 	if (setting_solverMode & SOLVER_REMOVE_POSEPRIOR)
 		priorF = 0;
 
-	deltaF = data->idepth - data->idepth_zero;
+	deltaF = ph->idepth - ph->idepth_zero;
+	stateFlag = EFPointStatus::PS_GOOD;
+	HdiF = 0.0;
+	Hdd_accAF = 0.0;
+	Hdd_accLF = 0.0;
+	bd_accAF = 0.0;
+	bd_accLF = 0.0;
+	bdSumF = 0.0;
+	idxInPoints = -1;
 }
 
 void EFResidual::fixLinearizationF(EnergyFunctional *ef) {

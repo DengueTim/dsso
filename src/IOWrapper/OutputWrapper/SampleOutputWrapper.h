@@ -68,7 +68,7 @@ public:
 	virtual void publishKeyframes(std::vector<FrameHessian*> &frames, bool final, CalibHessian *HCalib) override
 	{
 		for (FrameHessian *f : frames) {
-			printf("OUT: KF %d (%s) (id %d, tme %f): %d active, %d marginalized, %d immature points. CameraToWorld:\n", f->frameID,
+			printf("OUT: KF %d (%s) (id %d, tme %f): %d active, %d marginalized, %d immature points. CameraToWorld:\n", f->keyFrameID,
 					final ? "final" : "non-final", f->shell->incoming_id, f->shell->timestamp, (int) f->pointHessians.size(),
 					(int) f->pointHessiansMarginalized.size(), (int) f->immaturePoints.size());
 			std::cout << f->shell->camToWorld.matrix3x4() << "\n";
@@ -107,7 +107,7 @@ public:
 
 	virtual void pushDepthImageFloat(MinimalImageF *image, FrameHessian *KF) override
 	{
-		printf("OUT: Predicted depth for KF %d (id %d, time %f, internal frame-ID %d). CameraToWorld:\n", KF->frameID,
+		printf("OUT: Predicted depth for KF %d (id %d, time %f, internal frame-ID %d). CameraToWorld:\n", KF->keyFrameID,
 				KF->shell->incoming_id, KF->shell->timestamp, KF->shell->id);
 		std::cout << KF->shell->camToWorld.matrix3x4() << "\n";
 

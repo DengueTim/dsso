@@ -54,8 +54,8 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 			if (r->efResidual->isActive()) {
 				if (r->isNew) {
 					PointHessian *p = r->point;
-					Vec3f ptp_inf = p->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u, p->v, 1); // projected point assuming infinite depth.
-					Vec3f ptp = ptp_inf + p->host->targetPrecalc[r->target->idx].PRE_KtTll * p->idepth_scaled; // projected point with real depth.
+					Vec3f ptp_inf = p->host->targetPrecalc[r->target->fhIdx].PRE_KRKiTll * Vec3f(p->u, p->v, 1); // projected point assuming infinite depth.
+					Vec3f ptp = ptp_inf + p->host->targetPrecalc[r->target->fhIdx].PRE_KtTll * p->idepth_scaled; // projected point with real depth.
 					float relBS = 0.01 * ((ptp_inf.head<2>() / ptp_inf[2]) - (ptp.head<2>() / ptp[2])).norm();	// 0.01 = one pixel.
 
 					if (relBS > p->maxRelBaseline)
@@ -84,7 +84,6 @@ void FullSystem::setNewFrameEnergyTH() {
 	for (PointFrameResidual *r : activeResiduals)
 		if (r->state_NewEnergyWithOutlier >= 0 && r->target == newFrame) {
 			allResVec.push_back(r->state_NewEnergyWithOutlier);
-
 		}
 
 	if (allResVec.size() == 0) {
@@ -521,9 +520,9 @@ std::vector<VecX> FullSystem::getNullspaces(std::vector<VecX> &nullspaces_pose, 
 		VecX nullspace_x0(n);
 		nullspace_x0.setZero();
 		for (FrameHessian *fh : frameHessians) {
-			nullspace_x0.segment<6>(CPARS + fh->idx * 8) = fh->nullspaces_pose.col(i);
-			nullspace_x0.segment<3>(CPARS + fh->idx * 8) *= SCALE_XI_TRANS_INVERSE;
-			nullspace_x0.segment<3>(CPARS + fh->idx * 8 + 3) *= SCALE_XI_ROT_INVERSE;
+			nullspace_x0.segment<6>(CPARS + fh->fhIdx * 8) = fh->nullspaces_pose.col(i);
+			nullspace_x0.segment<3>(CPARS + fh->fhIdx * 8) *= SCALE_XI_TRANS_INVERSE;
+			nullspace_x0.segment<3>(CPARS + fh->fhIdx * 8 + 3) *= SCALE_XI_ROT_INVERSE;
 		}
 		nullspaces_x0_pre.push_back(nullspace_x0);
 		nullspaces_pose.push_back(nullspace_x0);
@@ -532,9 +531,9 @@ std::vector<VecX> FullSystem::getNullspaces(std::vector<VecX> &nullspaces_pose, 
 		VecX nullspace_x0(n);
 		nullspace_x0.setZero();
 		for (FrameHessian *fh : frameHessians) {
-			nullspace_x0.segment<2>(CPARS + fh->idx * 8 + 6) = fh->nullspaces_affine.col(i).head<2>();
-			nullspace_x0[CPARS + fh->idx * 8 + 6] *= SCALE_A_INVERSE;
-			nullspace_x0[CPARS + fh->idx * 8 + 7] *= SCALE_B_INVERSE;
+			nullspace_x0.segment<2>(CPARS + fh->fhIdx * 8 + 6) = fh->nullspaces_affine.col(i).head<2>();
+			nullspace_x0[CPARS + fh->fhIdx * 8 + 6] *= SCALE_A_INVERSE;
+			nullspace_x0[CPARS + fh->fhIdx * 8 + 7] *= SCALE_B_INVERSE;
 		}
 		nullspaces_x0_pre.push_back(nullspace_x0);
 		if (i == 0)
@@ -546,9 +545,9 @@ std::vector<VecX> FullSystem::getNullspaces(std::vector<VecX> &nullspaces_pose, 
 	VecX nullspace_x0(n);
 	nullspace_x0.setZero();
 	for (FrameHessian *fh : frameHessians) {
-		nullspace_x0.segment<6>(CPARS + fh->idx * 8) = fh->nullspaces_scale;
-		nullspace_x0.segment<3>(CPARS + fh->idx * 8) *= SCALE_XI_TRANS_INVERSE;
-		nullspace_x0.segment<3>(CPARS + fh->idx * 8 + 3) *= SCALE_XI_ROT_INVERSE;
+		nullspace_x0.segment<6>(CPARS + fh->fhIdx * 8) = fh->nullspaces_scale;
+		nullspace_x0.segment<3>(CPARS + fh->fhIdx * 8) *= SCALE_XI_TRANS_INVERSE;
+		nullspace_x0.segment<3>(CPARS + fh->fhIdx * 8 + 3) *= SCALE_XI_ROT_INVERSE;
 	}
 	nullspaces_x0_pre.push_back(nullspace_x0);
 	nullspaces_scale.push_back(nullspace_x0);

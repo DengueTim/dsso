@@ -158,7 +158,7 @@ private:
 	void activatePointsMT();
 	void activatePointsOldFirst();
 	void flagPointsForRemoval();
-	void makeNewTraces(FrameHessian *newFrame, float *gtDepth);
+	void makeNewTraces(FrameHessian *newFrame);
 	void initializeFromInitializer(FrameHessian *newFrame);
 	void flagFramesForMarginalization(FrameHessian *newFH);
 
@@ -229,7 +229,7 @@ private:
 	EnergyFunctional *ef;
 	IndexThreadReduce<Vec10> treadReduce;
 
-	float *selectionMap;
+	char *selectionMap;
 	PixelSelector *pixelSelector;
 	CoarseDistanceMap *coarseDistanceMap;
 

@@ -298,7 +298,7 @@ void KeyFrameDisplay::drawCam(float lineWidth, float *color, float sizeFactor) {
 	glLineWidth(lineWidth);
 
 	drawCamFrustum(camToWorld, fxiL, fyiL, cxL, cyL, sizeFactor);
-	drawCamFrustum(camToWorld * leftToRight, fxiR, fyiR, cxR, cyR, sizeFactor);
+	drawCamFrustum(camToWorld * leftToRight.inverse(), fxiR, fyiR, cxR, cyR, sizeFactor);
 }
 
 void KeyFrameDisplay::drawCamFrustum(const SE3 &pose, const float fxi, const float fyi, const float cx, const float cy,

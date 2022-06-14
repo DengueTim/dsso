@@ -37,8 +37,8 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 	if (ngoodres == 0) {
 		p->HdiF = 0;
 		p->bdSumF = 0;
-		p->data->idepth_hessian = 0;
-		p->data->maxRelBaseline = 0;
+		p->ph->idepth_hessian = 0;
+		p->ph->maxRelBaseline = 0;
 		return;
 	}
 
@@ -46,7 +46,7 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 	if (H < 1e-10)
 		H = 1e-10;
 
-	p->data->idepth_hessian = H;
+	p->ph->idepth_hessian = H;
 
 	/* Depth part of H(H_bb) is a diagonal matrix. We need it's inverse for the Schur-Complement.
 	 * Just save the inverted diagonal element:
@@ -146,8 +146,8 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 		const int jIdx = (j == 0) ? CIPARS : CPARS + (j - 1) * 8;
 		const int kIdx = (k == 0) ? CIPARS : CPARS + (k - 1) * 8;
 
-		const int js = (j==0) ? 6 : 8;
-		const int ks = (k==0) ? 6 : 8;
+		const int js = (j == 0) ? 6 : 8;
+		const int ks = (k == 0) ? 6 : 8;
 
 		if (j == 0) {
 			for (int tid2 = 0; tid2 < toAggregate; tid2++) {

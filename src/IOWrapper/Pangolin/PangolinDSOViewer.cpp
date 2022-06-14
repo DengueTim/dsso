@@ -422,12 +422,12 @@ void PangolinDSOViewer::publishKeyframes(std::vector<FrameHessian*> &frames, boo
 
 	boost::unique_lock<boost::mutex> lk(model3DMutex);
 	for (FrameHessian *fh : frames) {
-		if (keyframesByKFID.find(fh->frameID) == keyframesByKFID.end()) {
+		if (keyframesByKFID.find(fh->keyFrameID) == keyframesByKFID.end()) {
 			KeyFrameDisplay *kfd = new KeyFrameDisplay();
-			keyframesByKFID[fh->frameID] = kfd;
+			keyframesByKFID[fh->keyFrameID] = kfd;
 			keyframes.push_back(kfd);
 		}
-		keyframesByKFID[fh->frameID]->setFromKF(fh, HCalib);
+		keyframesByKFID[fh->keyFrameID]->setFromKF(fh, HCalib);
 	}
 }
 void PangolinDSOViewer::publishCamPose(FrameShell *frame, CalibHessian *HCalib) {

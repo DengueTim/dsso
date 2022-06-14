@@ -147,14 +147,15 @@ void FrameHessian::makeImages(float *color, float *colorR, CalibHessian *HCalib)
 			int lvlm1 = lvl - 1;
 			int wlm1 = wG[lvlm1];
 			Eigen::Vector3f *dI_lm = dIp[lvlm1];
-			Eigen::Vector3f *dIr_lm = dIrp[lvlm1];
 
 			for (int y = 0; y < hl; y++)
 				for (int x = 0; x < wl; x++) {
 					dI_l[x + y * wl][0] = 0.25f
 							* (dI_lm[2 * x + 2 * y * wlm1][0] + dI_lm[2 * x + 1 + 2 * y * wlm1][0]
 									+ dI_lm[2 * x + 2 * y * wlm1 + wlm1][0] + dI_lm[2 * x + 1 + 2 * y * wlm1 + wlm1][0]);
+
 					if (makeRightPyramid) {
+						Eigen::Vector3f *dIr_lm = dIrp[lvlm1];
 						dIr_l[x + y * wl][0] = 0.25f
 								* (dIr_lm[2 * x + 2 * y * wlm1][0] + dIr_lm[2 * x + 1 + 2 * y * wlm1][0]
 										+ dIr_lm[2 * x + 2 * y * wlm1 + wlm1][0] + dIr_lm[2 * x + 1 + 2 * y * wlm1 + wlm1][0]);

@@ -26,7 +26,7 @@
 #include "FullSystem/ResidualProjections.h"
 
 namespace dso {
-ImmaturePoint::ImmaturePoint(int u_, int v_, FrameHessian *host_, float type, CalibHessian *HCalib) :
+ImmaturePoint::ImmaturePoint(int u_, int v_, FrameHessian *host_, char type) :
 		u(u_), v(v_), host(host_), my_type(type), idepth_min(0), idepth_max(NAN), lastTraceStatus(IPS_UNINITIALIZED) {
 
 	gradH.setZero();
@@ -50,6 +50,9 @@ ImmaturePoint::ImmaturePoint(int u_, int v_, FrameHessian *host_, float type, Ca
 
 	idepth_GT = 0;
 	quality = 10000;
+
+	idxInImmaturePoints = 0;
+	lastTracePixelInterval = 0.0;
 }
 
 ImmaturePoint::~ImmaturePoint() {
@@ -368,39 +371,6 @@ ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian *frame, const Mat33f &ho
 	return lastTraceStatus = ImmaturePointStatus::IPS_GOOD;
 }
 
-float ImmaturePoint::calcResidual(CalibHessian *HCalib, const float outlierTHSlack, ImmaturePointTemporaryResidual *tmpRes,
-		float idepth) {
-	FrameFramePrecalc *precalc = &(host->targetPrecalc[tmpRes->target->idx]);
-
-	float energyLeft = 0;
-	const Eigen::Vector3f *dIl = tmpRes->target->dI;
-	const Mat33f &PRE_KRKiTll = precalc->PRE_KRKiTll;
-	const Vec3f &PRE_KtTll = precalc->PRE_KtTll;
-	Vec2f affLL = precalc->PRE_aff_mode;
-
-	for (int idx = 0; idx < patternNum; idx++) {
-		float Ku, Kv;
-		if (!projectPoint(this->u + patternP[idx][0], this->v+patternP[idx][1], idepth, PRE_KRKiTll, PRE_KtTll, Ku, Kv))
-		{	return 1e10;}
-
-		Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0]));
-		if (!std::isfinite((float) hitColor[0])) {
-			return 1e10;
-		}
-		//if(benchmarkSpecialOption==5) hitColor = (getInterpolatedElement13BiCub(tmpRes->target->I, Ku, Kv, wG[0]));
-
-		float residual = hitColor[0] - (affLL[0] * color[idx] + affLL[1]);
-
-		float hw = fabsf(residual) < setting_huberTH ? 1 : setting_huberTH / fabsf(residual);
-		energyLeft += weights[idx] * weights[idx] * hw * residual * residual * (2 - hw);
-	}
-
-	if (energyLeft > energyTH * outlierTHSlack) {
-		energyLeft = energyTH * outlierTHSlack;
-	}
-	return energyLeft;
-}
-
 double ImmaturePoint::linearizeResidual(CalibHessian *HCalib, const float outlierTHSlack, ImmaturePointTemporaryResidual *tmpRes,
 		float &Hdd, float &bd, float idepth) {
 	if (tmpRes->state_state == ResState::OOB) {
@@ -410,7 +380,7 @@ double ImmaturePoint::linearizeResidual(CalibHessian *HCalib, const float outlie
 
 	const bool leftToRight = host == tmpRes->target;
 
-	FrameFramePrecalc *precalc = &(host->targetPrecalc[tmpRes->target->idx]);
+	FrameFramePrecalc *precalc = &(host->targetPrecalc[tmpRes->target->fhIdx]);
 
 	// check OOB due to scale angle change.
 

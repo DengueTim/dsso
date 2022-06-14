@@ -113,9 +113,9 @@ struct FrameHessian {
 	Eigen::Vector3f *dIrp[PYR_LEVELS];  // optional for right image.
 	float *absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
 
-	int frameID;						// incremental ID for keyframes only!
+	int keyFrameID;						// incremental ID for keyframes only!
 	static int instanceCounter;
-	int idx;
+	int fhIdx;
 
 	// Photometric Calibration Stuff
 	float frameEnergyTH;	// set dynamically depending on tracking residual
@@ -245,7 +245,7 @@ struct FrameHessian {
 			dIrp[i] = 0;
 		instanceCounter++;
 		flaggedForMarginalization = false;
-		frameID = -1;
+		keyFrameID = -1;
 		efFrame = 0;
 		frameEnergyTH = 8 * 8 * patternNum;
 
@@ -258,7 +258,7 @@ struct FrameHessian {
 
 	inline Vec10 getPrior() {
 		Vec10 p = Vec10::Zero();
-		if (frameID == 0) {
+		if (keyFrameID == 0) {
 			p.head<3>() = Vec3::Constant(setting_initialTransPrior);
 			p.segment<3>(3) = Vec3::Constant(setting_initialRotPrior);
 			if (setting_solverMode & SOLVER_REMOVE_POSEPRIOR)
@@ -505,7 +505,7 @@ struct PointHessian {
 	FrameHessian *host;
 	bool hasDepthPrior;
 
-	float my_type;
+	char my_type;
 
 	float idepth_scaled;
 	float idepth_zero_scaled;

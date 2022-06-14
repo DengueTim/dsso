@@ -46,17 +46,21 @@ EIGEN_STRONG_INLINE bool projectPoint(const float &u_pt, const float &v_pt, cons
 EIGEN_STRONG_INLINE bool projectPoint(const float u_pt, const float v_pt, const float idepth, CalibHessian *const&HCalib,
 		const Mat33f &R, const Vec3f &t, float &drescale, float &u, float &v, float &Ku, float &Kv, Vec3f &KliP, float &new_idepth,
 		bool leftToRight) {
+	// inv(K) * (Homogeneous left pixel/image point) -> Point in left camera plane.
 	KliP = Vec3f((u_pt - HCalib->cxl()) * HCalib->fxli(), (v_pt - HCalib->cyl()) * HCalib->fyli(), 1);
 
 	Vec3f ptp = R * KliP + t * idepth;
 	drescale = 1.0f / ptp[2];
-	new_idepth = idepth * drescale;
 
 	if (!(drescale > 0))
 		return false;
 
+	new_idepth = idepth * drescale;
+	// Scale x,y to camera plane. z = 1.
 	u = ptp[0] * drescale;
 	v = ptp[1] * drescale;
+
+	// Camera plane to image plane.
 	if (leftToRight) {
 		Ku = u * HCalib->fxlR() + HCalib->cxlR();
 		Kv = v * HCalib->fylR() + HCalib->cylR();
@@ -65,6 +69,7 @@ EIGEN_STRONG_INLINE bool projectPoint(const float u_pt, const float v_pt, const 
 		Kv = v * HCalib->fyl() + HCalib->cyl();
 	}
 
+	// OOB/Out of image check.
 	return Ku > 1.1f && Kv > 1.1f && Ku < wM3G && Kv < hM3G;
 }
 }

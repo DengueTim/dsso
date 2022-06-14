@@ -97,13 +97,13 @@ void FullSystem::flagFramesForMarginalization(FrameHessian *newFH) {
 		FrameHessian *latest = frameHessians.back();
 
 		for (FrameHessian *fh : frameHessians) {
-			if (fh->frameID > latest->frameID - setting_minFrameAge || fh->frameID == 0)
+			if (fh->keyFrameID > latest->keyFrameID - setting_minFrameAge || fh->keyFrameID == 0)
 				continue;
 			//if(fh==frameHessians.front() == 0) continue;
 
 			double distScore = 0;
 			for (FrameFramePrecalc &ffh : fh->targetPrecalc) {
-				if (ffh.target->frameID > latest->frameID - setting_minFrameAge + 1 || ffh.target == ffh.host)
+				if (ffh.target->keyFrameID > latest->keyFrameID - setting_minFrameAge + 1 || ffh.target == ffh.host)
 					continue;
 				distScore += 1 / (1e-5 + ffh.distanceLL);
 
@@ -150,7 +150,7 @@ void FullSystem::marginalizeFrame(FrameHessian *frame) {
 					else if (ph->lastResiduals[1].first == r)
 						ph->lastResiduals[1].first = 0;
 
-					if (r->point->host->frameID < r->target->frameID)
+					if (r->point->host->keyFrameID < r->target->keyFrameID)
 						statistics_numForceDroppedResFwd++;
 					else
 						statistics_numForceDroppedResBwd++;
@@ -175,7 +175,7 @@ void FullSystem::marginalizeFrame(FrameHessian *frame) {
 
 	deleteOutOrder<FrameHessian>(frameHessians, frame);
 	for (unsigned int i = 0; i < frameHessians.size(); i++)
-		frameHessians[i]->idx = i;
+		frameHessians[i]->fhIdx = i;
 
 	setPrecalcValues();
 	ef->setAdjointsF();

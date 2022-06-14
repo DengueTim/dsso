@@ -92,14 +92,9 @@ enum EFPointStatus {
 class EFPoint {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
-	EFPoint(PointHessian *d, EFFrame *host_) :
-			data(d), host(host_) {
-		takeData();
-		stateFlag = EFPointStatus::PS_GOOD;
-	}
-	void takeData();
+	EFPoint(PointHessian *ph_, EFFrame *host_);
 
-	PointHessian *data;
+	PointHessian *ph;
 
 	float priorF;
 	float deltaF;
@@ -133,11 +128,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 class EFFrame {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
-	EFFrame(EnergyFunctional *ef, FrameHessian *d) :
-			ef(ef), data(d) {
-		takeData();
-	}
-	void takeData();
+	EFFrame(EnergyFunctional *ef_, FrameHessian *fh_);
 
 	EnergyFunctional *ef;
 
@@ -146,10 +137,10 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	Vec8 delta;				// state - state_zero.
 
 	std::vector<EFPoint*> points;
-	FrameHessian *data;
-	int idx;	// idx in frames.
+	FrameHessian *fh;
+	int idxInFrames;
 
-	int frameID;
+	int keyFrameID;
 };
 
 }

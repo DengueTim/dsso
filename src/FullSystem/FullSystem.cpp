@@ -119,7 +119,7 @@ FullSystem::FullSystem(const Mat33 &leftK, const Mat33 &rightK, const SE3 &leftT
 
 	assert(retstat != 293847);
 
-	selectionMap = new float[wG[0] * hG[0]];
+	selectionMap = new char[wG[0] * hG[0]];
 
 	coarseDistanceMap = new CoarseDistanceMap(wG[0], hG[0]);
 	coarseTracker = new CoarseTracker(wG[0], hG[0]);
@@ -542,29 +542,29 @@ void FullSystem::activatePointsMT() {
 		Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
 
 		for (unsigned int i = 0; i < host->immaturePoints.size(); i += 1) {
-			ImmaturePoint *ph = host->immaturePoints[i];
-			ph->idxInImmaturePoints = i;
+			ImmaturePoint *ip = host->immaturePoints[i];
+			ip->idxInImmaturePoints = i;
 
 			// delete points that have never been traced successfully, or that are outlier on the last trace.
-			if (!std::isfinite(ph->idepth_max) || ph->lastTraceStatus == IPS_OUTLIER) {
+			if (!std::isfinite(ip->idepth_max) || ip->lastTraceStatus == IPS_OUTLIER) {
 //				immature_invalid_deleted++;
 				// remove point.
-				delete ph;
+				delete ip;
 				host->immaturePoints[i] = 0;
 				continue;
 			}
 
 			// can activate only if this is true.
-			bool canActivate = (ph->lastTraceStatus == IPS_GOOD || ph->lastTraceStatus == IPS_SKIPPED
-					|| ph->lastTraceStatus == IPS_BADCONDITION || ph->lastTraceStatus == IPS_OOB) && ph->lastTracePixelInterval < 8
-					&& ph->quality > setting_minTraceQuality && (ph->idepth_max + ph->idepth_min) > 0;
+			bool canActivate = (ip->lastTraceStatus == IPS_GOOD || ip->lastTraceStatus == IPS_SKIPPED
+					|| ip->lastTraceStatus == IPS_BADCONDITION || ip->lastTraceStatus == IPS_OOB) && ip->lastTracePixelInterval < 8
+					&& ip->quality > setting_minTraceQuality && (ip->idepth_max + ip->idepth_min) > 0;
 
 			// if I cannot activate the point, skip it. Maybe also delete it.
 			if (!canActivate) {
 				// if point will be out afterwards, delete it instead.
-				if (ph->host->flaggedForMarginalization || ph->lastTraceStatus == IPS_OOB) {
+				if (ip->host->flaggedForMarginalization || ip->lastTraceStatus == IPS_OOB) {
 //					immature_notReady_deleted++;
-					delete ph;
+					delete ip;
 					host->immaturePoints[i] = 0;
 				}
 //				immature_notReady_skipped++;
@@ -572,7 +572,7 @@ void FullSystem::activatePointsMT() {
 			}
 
 			// see if we need to activate point due to distance map.
-			Vec3f ptp = KRKi * Vec3f(ph->u, ph->v, 1) + Kt * (0.5f * (ph->idepth_max + ph->idepth_min));
+			Vec3f ptp = KRKi * Vec3f(ip->u, ip->v, 1) + Kt * (0.5f * (ip->idepth_max + ip->idepth_min));
 			int u = ptp[0] / ptp[2] + 0.5f;
 			int v = ptp[1] / ptp[2] + 0.5f;
 
@@ -580,12 +580,12 @@ void FullSystem::activatePointsMT() {
 
 				float dist = coarseDistanceMap->fwdWarpedIDDistFinal[u + wG[1] * v] + (ptp[0] - floorf((float) (ptp[0])));
 
-				if (dist >= currentMinActDist * ph->my_type) {
+				if (dist >= currentMinActDist * ip->my_type) {
 					coarseDistanceMap->addIntoDistFinal(u, v);
-					toOptimize.push_back(ph);
+					toOptimize.push_back(ip);
 				}
 			} else {
-				delete ph;
+				delete ip;
 				host->immaturePoints[i] = 0;
 			}
 		}
@@ -929,16 +929,15 @@ void FullSystem::makeKeyFrame(FrameHessian *fh) {
 	flagFramesForMarginalization(fh);
 
 	// =========================== add New Frame to Hessian Struct. =========================
-	fh->idx = frameHessians.size();
+	fh->fhIdx = frameHessians.size();
 	frameHessians.push_back(fh);
-	fh->frameID = allKeyFramesHistory.size();
+	fh->keyFrameID = allKeyFramesHistory.size();
 	allKeyFramesHistory.push_back(fh->shell);
 	ef->insertFrame(fh, &Hcalib);
 
 	setPrecalcValues();
 
 	// =========================== add new residuals for old points =========================
-	int numFwdResAdde = 0;
 	for (FrameHessian *fh1 : frameHessians)		// go through all active frames
 	{
 		for (PointHessian *ph : fh1->pointHessians) {
@@ -948,7 +947,6 @@ void FullSystem::makeKeyFrame(FrameHessian *fh) {
 			ef->insertResidual(r);
 			ph->lastResiduals[1] = ph->lastResiduals[0];
 			ph->lastResiduals[0] = std::pair<PointFrameResidual*, ResState>(r, ResState::IN);
-			numFwdResAdde += 1;
 		}
 	}
 
@@ -964,15 +962,15 @@ void FullSystem::makeKeyFrame(FrameHessian *fh) {
 	// =========================== Figure Out if INITIALIZATION FAILED =========================
 	if (allKeyFramesHistory.size() <= 4) {
 		if (allKeyFramesHistory.size() == 2 && rmse > 20 * benchmark_initializerSlackFactor) {
-			printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
+			printf("I THINK INITIALIZATINO FAILED! 2 Frames and RMSE: %f > 20. Resetting.\n", rmse);
 			initFailed = true;
 		}
 		if (allKeyFramesHistory.size() == 3 && rmse > 13 * benchmark_initializerSlackFactor) {
-			printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
+			printf("I THINK INITIALIZATINO FAILED! 3 Frames and RMSE: %f > 13. Resetting.\n", rmse);
 			initFailed = true;
 		}
 		if (allKeyFramesHistory.size() == 4 && rmse > 9 * benchmark_initializerSlackFactor) {
-			printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
+			printf("I THINK INITIALIZATINO FAILED! 4 Frames and RMSE: %f > 9. Resetting.\n", rmse);
 			initFailed = true;
 		}
 	}
@@ -1001,7 +999,7 @@ void FullSystem::makeKeyFrame(FrameHessian *fh) {
 	ef->marginalizePointsF();
 
 	// =========================== add new Immature points & new residuals =========================
-	makeNewTraces(fh, 0);
+	makeNewTraces(fh);
 
 	for (IOWrap::Output3DWrapper *ow : outputWrapper) {
 		ow->publishGraph(ef->connectivityMap);
@@ -1027,10 +1025,10 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame) {
 	// add firstframe.
 	FrameHessian *firstFrame = coarseInitializer->firstFrame;
 
-	firstFrame->idx = frameHessians.size();
+	firstFrame->fhIdx = frameHessians.size();
 	frameHessians.push_back(firstFrame);
 
-	firstFrame->frameID = allKeyFramesHistory.size();
+	firstFrame->keyFrameID = allKeyFramesHistory.size();
 	allKeyFramesHistory.push_back(firstFrame->shell);
 
 	ef->insertFrame(firstFrame, &Hcalib);
@@ -1054,15 +1052,15 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame) {
 	float keepPercentage = setting_desiredPointDensity / coarseInitializer->numPoints[0];
 
 	if (!setting_debugout_runquiet)
-		printf("Initialization: keep %.1f%% (need %d, have %d)!\n", 100 * keepPercentage, (int) (setting_desiredPointDensity),
-				coarseInitializer->numPoints[0]);
+		printf("Initialization: keep %.1f%% (need %d, have %d) rescaleFactor: %f\n", 100 * keepPercentage, (int) (setting_desiredPointDensity),
+				coarseInitializer->numPoints[0], rescaleFactor);
 
 	for (int i = 0; i < coarseInitializer->numPoints[0]; i++) {
 		if (rand() / (float) RAND_MAX > keepPercentage)
 			continue;
 
 		Pnt *point = coarseInitializer->points[0] + i;
-		ImmaturePoint *pt = new ImmaturePoint(point->u + 0.5f, point->v + 0.5f, firstFrame, point->my_type, &Hcalib);
+		ImmaturePoint *pt = new ImmaturePoint(point->u + 0.5f, point->v + 0.5f, firstFrame, point->my_type);
 
 		if (!std::isfinite(pt->energyTH)) {
 			delete pt;
@@ -1110,7 +1108,7 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame) {
 	printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int) firstFrame->pointHessians.size());
 }
 
-void FullSystem::makeNewTraces(FrameHessian *newFrame, float *gtDepth) {
+void FullSystem::makeNewTraces(FrameHessian *newFrame) {
 	pixelSelector->allowFast = true;
 	//int numPointsTotal = makePixelStatus(newFrame->dI, selectionMap, wG[0], hG[0], setting_desiredDensity);
 	int numPointsTotal = pixelSelector->makeMaps(newFrame, selectionMap, setting_desiredImmatureDensity);
@@ -1126,7 +1124,7 @@ void FullSystem::makeNewTraces(FrameHessian *newFrame, float *gtDepth) {
 			if (selectionMap[i] == 0)
 				continue;
 
-			ImmaturePoint *impt = new ImmaturePoint(x, y, newFrame, selectionMap[i], &Hcalib);
+			ImmaturePoint *impt = new ImmaturePoint(x, y, newFrame, selectionMap[i]);
 			if (!std::isfinite(impt->energyTH))
 				delete impt;
 			else

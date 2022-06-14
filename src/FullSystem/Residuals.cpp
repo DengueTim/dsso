@@ -86,7 +86,7 @@ double PointFrameResidual::linearizeHostTarget(CalibHessian *HCalib) {
 		return state_energy;
 	}
 
-	const FrameFramePrecalc *precalc = &(host->targetPrecalc[target->idx]);
+	const FrameFramePrecalc *precalc = &(host->targetPrecalc[target->fhIdx]);
 	float energyLeft = 0;
 	const Eigen::Vector3f *dIl = target->dI;
 	//const float* const Il = target->I;
@@ -276,7 +276,7 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 		return state_energy;
 	}
 
-	const FrameFramePrecalc *precalc = &(host->targetPrecalc[target->idx]);
+	const FrameFramePrecalc *precalc = &(host->targetPrecalc[target->fhIdx]);
 	float energyLeft = 0;
 	const Eigen::Vector3f *dIl = host->dIr;
 	const Mat33f &PRE_KRKiTll = precalc->PRE_KRKiTll;
@@ -374,7 +374,7 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 		projectedTo[idx][1] = Kv;
 
 		Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0]));
-		float residual = hitColor[0] - (float) (affLL[0] * color[idx] + affLL[1]);
+		float residual = hitColor[0] - color[idx];
 
 		float drdA = (color[idx] - b0);
 		if (!std::isfinite((float) hitColor[0])) {

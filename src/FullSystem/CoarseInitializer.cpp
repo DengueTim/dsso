@@ -104,6 +104,7 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, std::vector<IO
 	if (firstFrame->ab_exposure > 0 && newFrame->ab_exposure > 0)
 		refToNew_aff_current = AffLight(logf(newFrame->ab_exposure / firstFrame->ab_exposure), 0); // coarse approximation.
 
+	// From rough to fine..
 	for (int lvl = pyrLevelsUsed - 1; lvl >= 0; lvl--) {
 
 		if (lvl < pyrLevelsUsed - 1)
@@ -232,8 +233,13 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 
 	MinimalImageB3 iRImg(wl, hl);
 
-	for (int i = 0; i < wl * hl; i++)
-		iRImg.at(i) = Vec3b(colorRef[i][0], colorRef[i][0], colorRef[i][0]);
+	for (int i = 0; i < wl * hl; i++) {
+		float c = colorRef[i][0];
+		if (c >= 256.0) {
+			c = 255.0;
+		}
+		iRImg.at(i) = Vec3b(c, c, c);
+	}
 
 	int npts = numPoints[lvl];
 
@@ -257,9 +263,25 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 			iRImg.setPixel9(point->u + 0.5f, point->v + 0.5f, makeRainbow3B(point->iR * fac));
 	}
 
-	//IOWrap::displayImage("idepth-R", &iRImg, false);
-	for (IOWrap::Output3DWrapper *ow : wraps)
-		ow->pushDepthImage(&iRImg);
+	if (lvl == 0) {
+		for (IOWrap::Output3DWrapper *ow : wraps)
+			ow->pushDepthImage(&iRImg);
+	} else {
+		// Make scaled up image.
+		int w0 = w[0], h0 = h[0];
+		MinimalImageB3 iRImg0(w0, h0);
+
+		for (int v = 0; v < h0; v++) {
+			for (int u = 0; u < w0; u++) {
+				int i0 = v * w0 + u;
+				int il = (v >> lvl) * wl + (u >> lvl);
+				iRImg0.at(i0) = iRImg.at(il);
+			}
+		}
+
+		for (IOWrap::Output3DWrapper *ow : wraps)
+			ow->pushDepthImage(&iRImg0);
+	}
 }
 
 // calculates residual, Hessian and Hessian-block neede for re-substituting depth.
@@ -322,20 +344,15 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 			float Kv = fyl * v + cyl;
 			float new_idepth = point->idepth_new/pt[2];
 
-			if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0))
-			{
+			if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0))	{
 				isGood = false;
 				break;
 			}
 
 			Vec3f hitColor = getInterpolatedElement33(colorNew, Ku, Kv, wl);
-			//Vec3f hitColor = getInterpolatedElement33BiCub(colorNew, Ku, Kv, wl);
-
-			//float rlR = colorRef[point->u+dx + (point->v+dy) * wl][0];
 			float rlR = getInterpolatedElement31(colorRef, point->u+dx, point->v+dy, wl);
 
-			if(!std::isfinite(rlR) || !std::isfinite((float)hitColor[0]))
-			{
+			if(!std::isfinite(rlR) || !std::isfinite((float)hitColor[0])) {
 				isGood = false;
 				break;
 			}
@@ -412,6 +429,7 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 	// compute alpha opt.
 	float alphaOpt;
 	if (alphaEnergy > alphaK * npts) {
+		// Snapped condition. There is enough camera translation(energy) initialise idepth estimates.
 		alphaOpt = 0;
 		alphaEnergy = alphaK * npts;
 	} else {
@@ -426,10 +444,11 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 
 		point->lastHessian_new = JbBuffer_new[i][9];
 
-		JbBuffer_new[i][8] += alphaOpt * (point->idepth_new - 1);
-		JbBuffer_new[i][9] += alphaOpt;
-
-		if (alphaOpt == 0) {
+		if (alphaOpt != 0) {
+			JbBuffer_new[i][8] += alphaOpt * (point->idepth_new - 1);
+			JbBuffer_new[i][9] += alphaOpt;
+		} else {
+			// "snapped"
 			JbBuffer_new[i][8] += couplingWeight * (point->idepth_new - point->iR);
 			JbBuffer_new[i][9] += couplingWeight;
 		}
@@ -447,14 +466,17 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 	H_out_sc = acc9SC.H.topLeftCorner<8, 8>();	// / acc9.num;
 	b_out_sc = acc9SC.H.topRightCorner<8, 1>();	// / acc9.num;
 
-	H_out(0, 0) += alphaOpt * npts;
-	H_out(1, 1) += alphaOpt * npts;
-	H_out(2, 2) += alphaOpt * npts;
+	if (alphaOpt != 0) {
+		// Not snapped..
+		H_out(0, 0) += alphaOpt * npts;
+		H_out(1, 1) += alphaOpt * npts;
+		H_out(2, 2) += alphaOpt * npts;
 
-	Vec3f tlog = refToNew.log().head<3>().cast<float>();
-	b_out[0] += tlog[0] * alphaOpt * npts;
-	b_out[1] += tlog[1] * alphaOpt * npts;
-	b_out[2] += tlog[2] * alphaOpt * npts;
+		Vec3f tlog = refToNew.log().head<3>().cast<float>();
+		b_out[0] += tlog[0] * alphaOpt * npts;
+		b_out[1] += tlog[1] * alphaOpt * npts;
+		b_out[2] += tlog[2] * alphaOpt * npts;
+	}
 
 	return Vec3f(E.A, alphaEnergy, E.num);
 }
@@ -500,6 +522,10 @@ Vec3f CoarseInitializer::calcDepthRegularisationCouplingEnergy(int lvl) {
 	//printf("ER: %f %f %f!\n", couplingWeight*E.A1m[0], couplingWeight*E.A1m[1], (float)E.num.numIn1m);
 	return Vec3f(couplingWeight * E.A[0], couplingWeight * E.A[1], E.num);
 }
+
+/**
+ * Sets point->iR on all good points to the mid iR(idepth) of nearest neighbours..
+ */
 void CoarseInitializer::updateIdepthRegularisation(int lvl) {
 	int npts = numPoints[lvl];
 	Pnt *ptsl = points[lvl];
@@ -522,7 +548,7 @@ void CoarseInitializer::updateIdepthRegularisation(int lvl) {
 			Pnt *other = ptsl + point->neighbours[j];
 			if (!other->isGood)
 				continue;
-			idnn[nnn] = other->iR;
+			idnn[nnn] = other->iR; // !? The iRs are being updated.. idepth maybe?
 			nnn++;
 		}
 
@@ -625,7 +651,7 @@ void CoarseInitializer::setFirst(CalibHessian *HCalib, FrameHessian *newFrameHes
 
 	PixelSelector sel(w[0], h[0]);
 
-	float *statusMap = new float[w[0] * h[0]];
+	char *statusMap = new char[w[0] * h[0]];
 	bool *statusMapB = new bool[w[0] * h[0]];
 
 	float densities[] = { 0.03, 0.05, 0.15, 0.5, 1 };
@@ -691,10 +717,6 @@ void CoarseInitializer::setFirst(CalibHessian *HCalib, FrameHessian *newFrameHes
 	thisToNext = SE3();
 	snapped = false;
 	frameID = snappedAt = 0;
-
-	for (int i = 0; i < pyrLevelsUsed; i++)
-		dGrads[i].setZero();
-
 }
 
 void CoarseInitializer::resetPoints(int lvl) {
@@ -720,8 +742,8 @@ void CoarseInitializer::resetPoints(int lvl) {
 		}
 	}
 }
-void CoarseInitializer::doIdepthStepUpdate(int lvl, float lambda, Vec8f inc) {
 
+void CoarseInitializer::doIdepthStepUpdate(int lvl, float lambda, Vec8f inc) {
 	const float maxPixelStep = 0.25;
 	const float idMaxStep = 1e10;
 	Pnt *pts = points[lvl];

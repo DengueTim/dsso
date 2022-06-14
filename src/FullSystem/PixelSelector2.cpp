@@ -144,7 +144,7 @@ void PixelSelector::makeHists(const FrameHessian *const fh) {
 		}
 
 }
-int PixelSelector::makeMaps(const FrameHessian *const fh, float *map_out, float density, int recursionsLeft, bool plot,
+int PixelSelector::makeMaps(const FrameHessian *const fh, char *map_out, float density, int recursionsLeft, bool plot,
 		float thFactor) {
 	float numHave = 0;
 	float numWant = density;
@@ -280,7 +280,7 @@ int PixelSelector::makeMaps(const FrameHessian *const fh, float *map_out, float 
 	return numHaveSub;
 }
 
-Eigen::Vector3i PixelSelector::select(const FrameHessian *const fh, float *map_out, int pot, float thFactor) {
+Eigen::Vector3i PixelSelector::select(const FrameHessian *const fh, char *map_out, int pot, float thFactor) {
 
 	Eigen::Vector3f const *const map0 = fh->dI;
 
@@ -298,7 +298,7 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian *const fh, float *map_o
 			0.9808, 0.1951), Vec2f(0.9239, -0.3827), Vec2f(0.7071, -0.7071), Vec2f(0.5556, 0.8315), Vec2f(0.9808, -0.1951), Vec2f(
 			1.0000, 0.0000), Vec2f(0.1951, -0.9808) };
 
-	memset(map_out, 0, w * h * sizeof(PixelSelectorStatus));
+	memset(map_out, 0, w * h * sizeof(char));
 
 	float dw1 = setting_gradDownweightPerLevel;
 	float dw2 = dw1 * dw1;

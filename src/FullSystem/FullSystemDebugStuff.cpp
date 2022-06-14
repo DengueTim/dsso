@@ -301,7 +301,7 @@ void FullSystem::debugPlot(std::string name) {
 			}
 
 			char buf[1000];
-			snprintf(buf, 1000, "images_out/kf_%05d_%05d_%02d.png", frameHessians.back()->shell->id, frameHessians.back()->frameID,
+			snprintf(buf, 1000, "images_out/kf_%05d_%05d_%02d.png", frameHessians.back()->shell->id, frameHessians.back()->keyFrameID,
 					f);
 			IOWrap::writeImage(buf, img);
 
