@@ -75,9 +75,12 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	CoarseInitializer(int w, int h);
 	~CoarseInitializer();
 
-	void setFirst(CalibHessian *HCalib, FrameHessian *newFrameHessian);
+	void setFirst(CalibHessian *HCalib, FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	bool trackFrame(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	void calcTGrads(FrameHessian *newFrameHessian);
+	float computeRescale();
+	float rescale(float factor);
+	void debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps);
 
 	int frameID;
 	bool fixAffine;
@@ -91,8 +94,10 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	FrameHessian *firstFrame;
 	FrameHessian *newFrame;
 private:
-	Mat33 K[PYR_LEVELS];
-	Mat33 Ki[PYR_LEVELS];
+	Mat33f K[PYR_LEVELS];
+	Mat33f Kr[PYR_LEVELS];
+	Mat33f Ki[PYR_LEVELS];
+	Mat33f Kri[PYR_LEVELS];
 	double fx[PYR_LEVELS];
 	double fy[PYR_LEVELS];
 	double fxi[PYR_LEVELS];
@@ -138,7 +143,6 @@ private:
 
 	void propagateUp(int srcLvl);
 	void propagateDown(int srcLvl);
-	float rescale();
 
 	void resetPoints(int lvl);
 	void doIdepthStepUpdate(int lvl, float lambda, Vec8f inc);
@@ -146,7 +150,6 @@ private:
 
 	void makeGradients(Eigen::Vector3f **data);
 
-	void debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	void makeNN();
 };
 

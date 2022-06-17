@@ -132,6 +132,15 @@ void FrameHessian::makeImages(float *color, float *colorR, CalibHessian *HCalib)
 	// make d0
 	int w = wG[0];
 	int h = hG[0];
+
+	// Dump image data for unit test..
+//	std::ofstream os("LeftRightDump.bin", std::ios::binary);
+//	for (int i = 0; i < w * h; i++) {
+//		os.write((char*) &color[i], sizeof(float));
+//		os.write((char*) &colorR[i], sizeof(float));
+//	}
+//	os.close();
+
 	for (int i = 0; i < w * h; i++) {
 		dI[i][0] = color[i];
 		dIr[i][0] = colorR[i];

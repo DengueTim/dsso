@@ -28,12 +28,14 @@
  *      Author: engelj
  */
 
+#include <fstream>
 #include "FullSystem/CoarseInitializer.h"
 #include "FullSystem/FullSystem.h"
 #include "FullSystem/HessianBlocks.h"
 #include "FullSystem/Residuals.h"
 #include "FullSystem/PixelSelector.h"
 #include "FullSystem/PixelSelector2.h"
+#include "FullSystem/ResidualProjections.h"
 #include "util/nanoflann.h"
 
 #if !defined(__SSE3__) && !defined(__SSE2__) && !defined(__SSE1__)
@@ -228,17 +230,28 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 	if (!needCall)
 		return;
 
+	Mat33f RrKi = (leftToRight.rotationMatrix().cast<float>() * Ki[lvl]);
+	Vec3f tr = (leftToRight.translation()).cast<float>();
+
 	int wl = w[lvl], hl = h[lvl];
 	Eigen::Vector3f *colorRef = firstFrame->dIp[lvl];
+	Eigen::Vector3f *colorRight = firstFrame->dIrp[lvl];
 
-	MinimalImageB3 iRImg(wl, hl);
+	MinimalImageB3 imgLeft(wl, hl);
+	MinimalImageB3 imgRight(wl, hl);
 
 	for (int i = 0; i < wl * hl; i++) {
 		float c = colorRef[i][0];
 		if (c >= 256.0) {
 			c = 255.0;
 		}
-		iRImg.at(i) = Vec3b(c, c, c);
+		imgLeft.at(i) = Vec3b(c, c, c);
+
+		c = colorRight[i][0];
+		if (c >= 256.0) {
+			c = 255.0;
+		}
+		imgRight.at(i) = Vec3b(c, c, c);
 	}
 
 	int npts = numPoints[lvl];
@@ -256,31 +269,43 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 	for (int i = 0; i < npts; i++) {
 		Pnt *point = points[lvl] + i;
 
-		if (!point->isGood)
-			iRImg.setPixel9(point->u + 0.5f, point->v + 0.5f, Vec3b(0, 0, 0));
+		if (point->isGood) {
+			imgLeft.setPixel9(point->u + 0.5f, point->v + 0.5f, makeRainbow3B(point->iR * fac));
 
-		else
-			iRImg.setPixel9(point->u + 0.5f, point->v + 0.5f, makeRainbow3B(point->iR * fac));
+			Vec3f pt = RrKi * Vec3f(point->u, point->v, 1) + tr * point->iR;
+			float u = pt[0] / pt[2];
+			float v = pt[1] / pt[2];
+			float Ku = fxr[lvl] * u + cxr[lvl];
+			float Kv = fyr[lvl] * v + cyr[lvl];
+			float idr = point->iR / pt[2];
+			if (Ku > 1 && Kv > 1 && Ku < wl - 2 && Kv < hl - 2 && idr > 0) {
+				imgRight.setPixel9(Ku, Kv, makeRainbow3B(idr * fac));
+			}
+		} else {
+			imgLeft.setPixel9(point->u + 0.5f, point->v + 0.5f, Vec3b(0, 0, 0));
+		}
 	}
 
 	if (lvl == 0) {
 		for (IOWrap::Output3DWrapper *ow : wraps)
-			ow->pushDepthImage(&iRImg);
+			ow->pushDepthImage(&imgLeft, &imgRight);
 	} else {
 		// Make scaled up image.
 		int w0 = w[0], h0 = h[0];
-		MinimalImageB3 iRImg0(w0, h0);
+		MinimalImageB3 imgLeft0(w0, h0);
+		MinimalImageB3 imgRight0(w0, h0);
 
 		for (int v = 0; v < h0; v++) {
 			for (int u = 0; u < w0; u++) {
 				int i0 = v * w0 + u;
 				int il = (v >> lvl) * wl + (u >> lvl);
-				iRImg0.at(i0) = iRImg.at(il);
+				imgLeft0.at(i0) = imgLeft.at(il);
+				imgRight0.at(i0) = imgRight.at(il);
 			}
 		}
 
 		for (IOWrap::Output3DWrapper *ow : wraps)
-			ow->pushDepthImage(&iRImg0);
+			ow->pushDepthImage(&imgLeft0, &imgRight0);
 	}
 }
 
@@ -291,7 +316,7 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 	Eigen::Vector3f *colorRef = firstFrame->dIp[lvl];
 	Eigen::Vector3f *colorNew = newFrame->dIp[lvl];
 
-	Mat33f RKi = (refToNew.rotationMatrix() * Ki[lvl]).cast<float>();
+	Mat33f RKi = refToNew.rotationMatrix().cast<float>() * Ki[lvl];
 	Vec3f t = refToNew.translation().cast<float>();
 	Eigen::Vector2f r2new_aff = Eigen::Vector2f(exp(refToNew_aff.a), refToNew_aff.b);
 
@@ -344,7 +369,7 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 			float Kv = fyl * v + cyl;
 			float new_idepth = point->idepth_new/pt[2];
 
-			if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0))	{
+			if(!(Ku > 1 && Kv > 1 && Ku < wl-2 && Kv < hl-2 && new_idepth > 0)) {
 				isGood = false;
 				break;
 			}
@@ -377,6 +402,46 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 			dp7[idx] = - hw*1;// dPhotoAffineSomething...
 			dd[idx] = dxInterp * dxdd + dyInterp * dydd;// dRes/dInverseDepth
 			r[idx] = hw*residual;// Huber weighted residual.
+
+
+// Attempt at adding residual from Left to Right images.
+//	Mat33f RlrKi = (leftToRight.rotationMatrix() * Ki[lvl]).cast<float>();
+//	Vec3f tlr = leftToRight.translation().cast<float>();
+
+//			Vec3f ptr = RlrKi * Vec3f(point->u+dx, point->v+dy, 1) + tlr*point->idepth_new;
+//			float ur = ptr[0] / ptr[2];
+//			float vr = ptr[1] / ptr[2];
+//			float Kur = fxrl * ur + cxrl;
+//			float Kvr = fyrl * vr + cyrl;
+//			float new_idepth_r = point->idepth_new/ptr[2];
+//
+//			Vec3f hitColorRight;
+//			hitColorRight[0] = -1.0;
+//
+//			if(Kur > 1 && Kvr > 1 && Kur < wl-2 && Kvr < hl-2 && new_idepth_r > 0) {
+//				hitColorRight = getInterpolatedElement33(colorRight, Kur, Kvr, wl);
+//				if (std::isfinite((float)hitColorRight[0])) {
+//					residual += hitColorRight[0] - rlR;
+//					residual /= 2;
+//				}
+//			}
+
+//			if (hitColorRight[0] > -1.0) {
+//				float dxddr = (tlr[0]-tlr[2]*ur)/ptr[2];
+//				float dyddr = (tlr[1]-tlr[2]*vr)/ptr[2];
+//				float dxrInterp = hw*hitColorRight[1]*fxrl;
+//				float dyrInterp = hw*hitColorRight[2]*fyrl;
+//				dp0[idx] += new_idepth_r*dxrInterp;
+//				dp0[idx] /= 2;
+//				dp1[idx] += new_idepth_r*dyrInterp;
+//				dp1[idx] /= 2;
+//				dp2[idx] += new_idepth_r*(ur*dxrInterp + vr*dyrInterp);;
+//				dp2[idx] /= 2;
+//				dd[idx] += dxrInterp * dxddr + dyrInterp * dyddr;
+//				dd[idx] /= 2;
+//			}
+
+
 
 			float maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
 			if(maxstep < point->maxstep) point->maxstep = maxstep;
@@ -481,25 +546,22 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 	return Vec3f(E.A, alphaEnergy, E.num);
 }
 
-float CoarseInitializer::rescale() {
-	float factor = 20 * thisToNext.translation().norm();
-//	float factori = 1.0f/factor;
-//	float factori2 = factori*factori;
-//
-//	for(int lvl=0;lvl<pyrLevelsUsed;lvl++)
-//	{
-//		int npts = numPoints[lvl];
-//		Pnt* ptsl = points[lvl];
-//		for(int i=0;i<npts;i++)
-//		{
-//			ptsl[i].iR *= factor;
-//			ptsl[i].idepth_new *= factor;
-//			ptsl[i].lastHessian *= factori2;
-//		}
-//	}
-//	thisToNext.translation() *= factori;
+float CoarseInitializer::rescale(float factor) {
+	float factori = 1.0f / factor;
+	float factori2 = factori * factori;
 
-	return factor;
+	for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
+		int npts = numPoints[lvl];
+		Pnt *ptsl = points[lvl];
+		for (int i = 0; i < npts; i++) {
+			ptsl[i].iR *= factor;
+			ptsl[i].idepth_new *= factor;
+			ptsl[i].lastHessian *= factori2;
+		}
+	}
+	thisToNext.translation() *= factori;
+
+	return thisToNext.translation().norm();
 }
 
 Vec3f CoarseInitializer::calcDepthRegularisationCouplingEnergy(int lvl) {
@@ -644,7 +706,8 @@ void CoarseInitializer::makeGradients(Eigen::Vector3f **data) {
 		}
 	}
 }
-void CoarseInitializer::setFirst(CalibHessian *HCalib, FrameHessian *newFrameHessian) {
+void CoarseInitializer::setFirst(CalibHessian *HCalib, FrameHessian *newFrameHessian,
+		std::vector<IOWrap::Output3DWrapper*> &wraps) {
 
 	makeK(HCalib);
 	firstFrame = newFrameHessian;
@@ -717,6 +780,9 @@ void CoarseInitializer::setFirst(CalibHessian *HCalib, FrameHessian *newFrameHes
 	thisToNext = SE3();
 	snapped = false;
 	frameID = snappedAt = 0;
+
+	for (IOWrap::Output3DWrapper *ow : wraps)
+		ow->pushLiveFrame(newFrameHessian);
 }
 
 void CoarseInitializer::resetPoints(int lvl) {
@@ -819,7 +885,9 @@ void CoarseInitializer::makeK(CalibHessian *HCalib) {
 
 	for (int level = 0; level < pyrLevelsUsed; ++level) {
 		K[level] << fx[level], 0.0, cx[level], 0.0, fy[level], cy[level], 0.0, 0.0, 1.0;
+		Kr[level] << fxr[level], 0.0, cxr[level], 0.0, fyr[level], cyr[level], 0.0, 0.0, 1.0;
 		Ki[level] = K[level].inverse();
+		Kri[level] = Kr[level].inverse();
 		fxi[level] = Ki[level](0, 0);
 		fyi[level] = Ki[level](1, 1);
 		cxi[level] = Ki[level](0, 2);
@@ -894,5 +962,269 @@ void CoarseInitializer::makeNN() {
 	for (int i = 0; i < pyrLevelsUsed; i++)
 		delete indexes[i];
 }
+
+float CoarseInitializer::computeRescale() {
+	const Mat33 R = leftToRight.rotationMatrix();
+	const Vec3f t = leftToRight.translation().cast<float>();
+
+	float rescale = 1.0;
+
+	for (int lvl = 4; lvl >= 0; lvl--) {
+		const Mat33f RKi = R.cast<float>() * Ki[lvl];
+		const float fxrl = fxr[lvl];
+		const float fyrl = fyr[lvl];
+		const float cxrl = cxr[lvl];
+		const float cyrl = cyr[lvl];
+		const int wl = w[lvl];
+		const int hl = h[lvl];
+
+		Vec3f *leftImage = firstFrame->dIp[lvl];
+		Vec3f *rightImage = firstFrame->dIrp[lvl];
+
+		for (int it = 0; it < 25; it++) {
+
+			float lvlAbsRes = 0.0;
+			float lvlEnergy = 0.0;
+			float H = 1.0;
+			float b = 0.0;
+			int nGood = 0;
+
+			for (int pntIdx = 0; pntIdx < numPoints[lvl]; pntIdx++) {
+				Pnt *pnt = points[lvl] + pntIdx;
+
+//				if (pnt->iR > 1) { // only points that are further away.
+//					continue;
+//				}
+
+				float absRes = 0.0;
+				float pntEnergy = 0.0;
+				bool isGood = true;
+				VecNRf dRdS;
+				VecNRf r;
+				float Hp = 0.0;
+				float bp = 0.0;
+
+				for (int patIdx = 0; patIdx < patternNum; patIdx++) {
+					int dx = patternP[patIdx][0];
+					int dy = patternP[patIdx][1];
+
+					Vec3f pt = RKi * Vec3f(pnt->u+dx, pnt->v+dy, 1) + t * (pnt->iR * rescale);
+					float u = pt[0] / pt[2];
+					float v = pt[1] / pt[2];
+					float rightU = fxrl * u + cxrl;
+					float rightV = fyrl * v + cyrl;
+					float rightIR = (rescale * pnt->iR)/pt[2];
+
+					if(!(rightU > 1 && rightV > 1 && rightU < wl-2 && rightV < hl-2 && rightIR > 0)) {
+						isGood = false;
+						break;
+					}
+
+					Vec3f rightColor = getInterpolatedElement33(rightImage, rightU, rightV, wl);
+					if (!isfinite(rightColor[0])) {
+						isGood = false;
+						break;
+					}
+
+					float leftColor = getInterpolatedElement31(leftImage, pnt->u+dx, pnt->v+dy, wl);
+					if (!isfinite(leftColor)) {
+						isGood = false;
+						break;
+					}
+
+					float residual = leftColor - rightColor[0];
+					absRes += fabs(residual);
+					float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
+					pntEnergy += hw *residual*residual*(2-hw);
+
+					float dxdd = (t[0]-t[2]*u)/pt[2];
+					float dydd = (t[1]-t[2]*v)/pt[2];
+
+					if(hw < 1) hw = sqrtf(hw);
+					float dxInterp = rightColor[1]*fxrl;
+					float dyInterp = rightColor[2]*fyrl;
+					dRdS[patIdx] = (dxInterp * dxdd + dyInterp * dydd) * -rescale; // dRes/dRescale
+					r[patIdx] = residual;// Huber weighted residual.
+
+					Hp += dRdS[patIdx]*dRdS[patIdx];
+					bp += r[patIdx]*dRdS[patIdx];
+				}
+
+				if (!isGood || pntEnergy > pnt->outlierTH * 20) {
+					//			E.updateSingle((float) (point->energy[0]));
+					//			point->isGood_new = false;
+					//			point->energy_new = point->energy;
+					continue;
+				}
+
+				lvlAbsRes += absRes;
+				lvlEnergy += pntEnergy;
+				H += Hp;
+				b += bp;
+				nGood++;
+			}
+
+			float rescaleDelta = -b / H;
+
+			if (true) {
+				printf("lvl %i\tit %i\trescale %f\t rescaleDelta %f\tlvlAbsRes %f\tnGood %d\tlvlAbsResPP %f\n", lvl, it, rescale,
+						rescaleDelta, lvlAbsRes, nGood, lvlAbsRes / nGood);
+			}
+
+			rescale += rescaleDelta;
+		}
+	}
+
+	return rescale;
+}
+
+//void epeLine() {
+//	//	// skew-symmetric(-t)
+//	//	const Mat33 tSkew = (Mat33() << 0.0, t[2], -t[1], -t[2], 0.0, t[0], t[1], -t[0], 0.0).finished();
+//	// std::cout << "Ri:\n" << Ri << "\ntSkew:\n" << tSkew << "\n";
+//
+//
+//	// Fundamental.transpose()...
+//	const Mat33 Ft = (Ki[lvl].transpose() * tSkew * Ri * Kri[lvl]).transpose();
+//
+//	const Mat33 KrRKi = Kr[lvl] * R * Ki[lvl];
+//	const Mat22f Rplane = KrRKi.topLeftCorner(2, 2).cast<float>();
+//	Vec2f rotatetPattern[MAX_RES_PER_POINT];
+//	for (int idx = 0; idx < patternNum; idx++)
+//		rotatetPattern[idx] = Rplane * Vec2f(patternP[idx][0], patternP[idx][1]);
+//
+//	float point_buf[] = { 0, 0, 0, 0, 0, 0, 0, 0 };
+//
+//	float line_buf[w[lvl]];
+//	for (int i = 0; i < w[lvl]; i++)
+//		line_buf[i] = 0;
+//
+//	float ssdErrors[w[lvl] - 4];
+//	for (int i = 0; i < w[lvl] - 4; i++)
+//		line_buf[i] = 0;
+//
+//	float errSum = 0;
+//	int errCnt = 0;
+//	for (int pIdx = 0; pIdx < numPoints[lvl]; pIdx++) {
+//		Pnt *pntLeft = points[lvl] + pIdx;
+//		const float u_left = pntLeft->u;
+//		const float v_left = pntLeft->v;
+//
+//		const Vec3 pointLeft = Vec3(u_left, v_left, 1);
+//		const Vec3 lineRight = Ft * pointLeft;
+//
+//		// Left point at infinite depth projected to right.
+//		Vec3 pointRightFar = R * Ki[lvl] * pointLeft;
+//		assert(pointRightFar[2] > 0);
+//		pointRightFar /= pointRightFar[2];
+//		pointRightFar = Kr[lvl] * pointRightFar;
+//
+//		// Calculate bi-linear pixel values for patch around left point.
+//		for (int u = 0; u < 5; u++) {
+//			const Vec3f ival = getInterpolatedElement33(firstFrame->dIp[lvl], u_left + u - 2, v_left, w[lvl]);
+//			point_buf[u] = ival(0);
+//		}
+//
+//		// Calculate linear in v pixel values along epipolar line for integer u pixel locations.
+//		const int epFarLimitIdx = std::min((int) (pointRightFar(0) + 0.5) + 2, w[lvl]);
+//		const int epNearLimitIdx = std::max(0, epFarLimitIdx - (24 << (4 - lvl)));
+//		for (int u = epNearLimitIdx; u < epFarLimitIdx; u++) {
+//			float y = (lineRight[0] * u + lineRight[2]) / -lineRight[1] + 0.5;
+//			if (y <= 1.0 || y >= h[lvl]) {
+//				line_buf[u] = std::numeric_limits<int>::min();
+//			} else {
+//				int v = (int) y;
+//				float dv = y - v;
+//				const Eigen::Vector3f *pixel_uv = firstFrame->dIrp[lvl] + u + v * w[lvl];
+//				const Eigen::Vector3f *pixel_uv1 = pixel_uv - w[lvl];
+//				line_buf[u] = pixel_uv->coeff(0) * dv + pixel_uv1->coeff(0) * (1 - dv);
+//			}
+//		}
+//
+//		for (int idx = 0; idx < patternNum; idx++) {
+//			point_buf[idx] = getInterpolatedElement31(firstFrame->dIp[lvl], u_left + patternP[idx][0], v_left+patternP[idx][1], w[lvl]);
+//		}
+//
+//		float bestErr1 = std::numeric_limits<float>::max(), bestErr2 = std::numeric_limits<float>::max();
+//		int bestIdx1 = std::numeric_limits<int>::min(), bestIdx2 = std::numeric_limits<int>::min();
+//
+//		// Sum of Squared errors over 5 pixels.
+//		for (int u = epNearLimitIdx; u < epFarLimitIdx - 4; u++) {
+//			ssdErrors[u] = 0;
+////			for (int i = 0; i < 5; i++) {
+////				float e = point_buf[i] - line_buf[u + i];
+////				ssdErrors[u] += e * e;
+////			}
+//
+//			float v = (lineRight[0] * u + lineRight[2]) / -lineRight[1];
+//
+//			for (int idx = 0; idx < patternNum; idx++) {
+//				float hitColor = getInterpolatedElement31(firstFrame->dIrp[lvl], (float)(u + rotatetPattern[idx][0]), v + rotatetPattern[idx][1], w[lvl]);
+//
+//				if (std::isfinite(hitColor)) {
+//					float residual = hitColor - point_buf[idx];
+//					float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
+//					ssdErrors[u] += hw * residual * residual * (2 - hw);
+//				} else {
+//					ssdErrors[u] += 1e5;
+//				}
+//			}
+//
+//			if (ssdErrors[u] < bestErr1) {
+//				bestErr1 = ssdErrors[u];
+//				bestIdx1 = u; // offset from u in right image by 2
+//			}
+//		}
+//
+//		// Find second best not near best.
+//		for (int u = epNearLimitIdx; u < epFarLimitIdx - 4; u++) {
+//			// Only update 2nd best if new 1st best is not within one pixel.
+//			if ((u < (bestIdx1 - 1) || u > (bestIdx1 + 1)) && ssdErrors[u] < bestErr2) {
+//				bestErr2 = ssdErrors[u];
+//				bestIdx2 = u;
+//			}
+//		}
+//
+////		if (pIdx % 20 == 0) {
+////			std::cout << "pntLeft(x,y):" << u_left << "," << v_left << "\t";
+////			std::cout << "Best:" << bestErr1 << "@" << bestIdx1 << "," << bestErr2 << "@" << bestIdx2 << "\t";
+////			std::cout << "1st/2nd:" << bestErr1 / bestErr2 << "\n";
+////		}
+//
+//		if (bestErr1 < 500 && bestErr1 / bestErr2 < 0.8) {
+//			pntLeft->idepth = (u_left - bestIdx1) / (t.norm());
+//			pntLeft->idepth_new = pntLeft->idepth;
+//			pntLeft->iR = pntLeft->idepth;
+//			std::cout << "pntLeft(x,y):(" << u_left << "," << v_left << ") " << pntLeft->idepth << "\t";
+//			std::cout << "Best:" << bestIdx1 << "(" << bestErr1 << "), " << bestIdx2 << "(" << bestErr2 << ")\t";
+//			std::cout << "1st/2nd:" << bestErr1 / bestErr2 << "\n";
+//		} else {
+//			std::cout << "pntLeft(x,y):(" << u_left << "," << v_left << ") " << pntLeft->idepth << "\n";
+//			pntLeft->isGood = false;
+//		}
+//
+//		// Translate point from left to right camera plane. Right point not scaled to z = 1.
+//		Vec3 pointRight = R * Ki[lvl] * pointLeft + t;
+//		assert(pointRight[2] > 0);
+//		// Scale x,y to camera plane. z = 1.
+//		pointRight /= pointRight[2];
+//
+//		// Camera plane to image plane.
+//		pointRight = K[lvl] * pointRight;
+//
+//		// std::cout << "pointLeft:\n" << pointLeft << "\nlineRight:\n" << lineRight << "\npointRight:\n" << pointRight << "\n";
+//
+//		// std::cout << "pointRightFar:\n" << pointRightFar << "\n";
+//
+//		errSum += lineRight.transpose() * pointRightFar;
+//		errCnt++;
+//
+////		if (pIdx % 132 == 0) {
+////			std::cout << pntLeft->u << "," << pntLeft->v << "\n";
+////		}
+//	}
+//	std::cout << "Ft:\n" << Ft << "\nerrSum:" << errSum << "\nerrCnt:" << errCnt << "\nAvgErr:" << (errSum / errCnt) << "\n";
+//	return 1.0;
+//}
 }
 

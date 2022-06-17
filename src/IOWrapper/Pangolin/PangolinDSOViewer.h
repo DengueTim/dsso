@@ -65,7 +65,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	virtual void publishCamPose(FrameShell *frame, CalibHessian *HCalib) override;
 
 	virtual void pushLiveFrame(FrameHessian *image) override;
-	virtual void pushDepthImage(MinimalImageB3 *image) override;
+	virtual void pushDepthImage(MinimalImageB3 *imageLeft, MinimalImageB3 *imageRight) override;
 	virtual bool needPushDepthImage() override;
 
 	virtual void join() override;
@@ -83,9 +83,9 @@ private:
 
 	// images rendering
 	boost::mutex openImagesMutex;
-	MinimalImageB3 *internalVideoImgL;
-	MinimalImageB3 *internalVideoImgR;
-	MinimalImageB3 *internalKFImg;
+	MinimalImageB3 *internalVideoImg;
+	MinimalImageB3 *internalKFImgL;
+	MinimalImageB3 *internalKFImgR;
 	MinimalImageB3 *internalResImg;
 	bool videoImgChanged, kfImgChanged, resImgChanged;
 

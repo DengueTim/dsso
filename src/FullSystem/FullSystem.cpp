@@ -262,10 +262,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian *fh) {
 	AffLight aff_last_2_l = AffLight(0, 0);
 
 	std::vector<SE3, Eigen::aligned_allocator<SE3>> lastF_2_fh_tries;
-	if (allFrameHistory.size() == 2)
-		for (unsigned int i = 0; i < lastF_2_fh_tries.size(); i++)
-			lastF_2_fh_tries.push_back(SE3());
-	else {
+	if (allFrameHistory.size() > 2) {
 		FrameShell *slast = allFrameHistory[allFrameHistory.size() - 2];
 		FrameShell *sprelast = allFrameHistory[allFrameHistory.size() - 3];
 		SE3 slast_2_sprelast;
@@ -278,17 +275,20 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian *fh) {
 		}
 		SE3 fh_2_slast = slast_2_sprelast;	// assumed to be the same as fh_2_slast.
 
-		// get last delta-movement.
-		lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast);	// assume constant motion.
-		lastF_2_fh_tries.push_back(fh_2_slast.inverse() * fh_2_slast.inverse() * lastF_2_slast);// assume double motion (frame skipped)
-		lastF_2_fh_tries.push_back(SE3::exp(fh_2_slast.log() * 0.5).inverse() * lastF_2_slast); // assume half motion.
-		lastF_2_fh_tries.push_back(lastF_2_slast); // assume zero motion.
-		lastF_2_fh_tries.push_back(SE3()); // assume zero motion FROM KF.
+		if (slast->poseValid && sprelast->poseValid && lastF->shell->poseValid) {
+			// get last delta-movement.
+			lastF_2_fh_tries.push_back(fh_2_slast.inverse() * lastF_2_slast);	// assume constant motion.
+			lastF_2_fh_tries.push_back(fh_2_slast.inverse() * fh_2_slast.inverse() * lastF_2_slast);// assume double motion (frame skipped)
+			lastF_2_fh_tries.push_back(SE3::exp(fh_2_slast.log() * 0.5).inverse() * lastF_2_slast); // assume half motion.
+			lastF_2_fh_tries.push_back(lastF_2_slast); // assume zero motion.
+			lastF_2_fh_tries.push_back(SE3()); // assume zero motion FROM KF.
 
-		// just try a TON of different initializations (all rotations). In the end,
-		// if they don't work they will only be tried on the coarsest level, which is super fast anyway.
-		// also, if tracking rails here we loose, so we really, really want to avoid that.
-		for (float rotDelta = 0.02; rotDelta < 0.05; rotDelta++) {
+			// just try a TON of different initializations (all rotations). In the end,
+			// if they don't work they will only be tried on the coarsest level, which is super fast anyway.
+			// also, if tracking fails here we loose, so we really, really want to avoid that.
+			//for (float rotDelta = 0.02; rotDelta < 0.05; rotDelta++) {
+			float rotDelta = 0.02;
+
 			lastF_2_fh_tries.push_back(
 					fh_2_slast.inverse() * lastF_2_slast * SE3(Sophus::Quaterniond(1, rotDelta, 0, 0), Vec3(0, 0, 0)));	// assume constant motion.
 			lastF_2_fh_tries.push_back(
@@ -350,11 +350,10 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian *fh) {
 					fh_2_slast.inverse() * lastF_2_slast
 							* SE3(Sophus::Quaterniond(1, rotDelta, rotDelta, rotDelta), Vec3(0, 0, 0)));// assume constant motion.
 		}
-
-		if (!slast->poseValid || !sprelast->poseValid || !lastF->shell->poseValid) {
-			lastF_2_fh_tries.clear();
-			lastF_2_fh_tries.push_back(SE3());
-		}
+	}
+	
+	if (lastF_2_fh_tries.size() == 0) {
+		lastF_2_fh_tries.push_back(SE3()); // assume zero motion FROM KF.
 	}
 
 	Vec3 flowVecs = Vec3(100, 100, 100);
@@ -735,13 +734,16 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
 	if (coarseInitializer->frameID < 0) {
 		// first frame set. fh is kept by coarseInitializer.
 		fh->makeImages<true>(image->imageL, image->imageR, &Hcalib);
-		coarseInitializer->setFirst(&Hcalib, fh);
+		coarseInitializer->setFirst(&Hcalib, fh, outputWrapper);
 	} else if (!initialized) {
 		// Initializing...
 		fh->makeImages<false>(image->imageL, image->imageR, &Hcalib);
 		if (coarseInitializer->trackFrame(fh, outputWrapper)) {
 			// if SNAPPED
-			initializeFromInitializer(fh);
+			const float rescaleFactor = coarseInitializer->computeRescale();
+			coarseInitializer->rescale(rescaleFactor);
+			coarseInitializer->debugPlot(0, outputWrapper);
+			initializeFromInitializer(fh, 1);
 			lock.unlock();
 			deliverTrackedFrame(fh, true);
 		} else {
@@ -940,6 +942,8 @@ void FullSystem::makeKeyFrame(FrameHessian *fh) {
 	// =========================== add new residuals for old points =========================
 	for (FrameHessian *fh1 : frameHessians)		// go through all active frames
 	{
+		if (fh1 == fh)
+			continue;
 		for (PointHessian *ph : fh1->pointHessians) {
 			PointFrameResidual *r = new PointFrameResidual(ph, fh);
 			r->setState(ResState::IN);
@@ -1019,7 +1023,7 @@ void FullSystem::makeKeyFrame(FrameHessian *fh) {
 
 }
 
-void FullSystem::initializeFromInitializer(FrameHessian *newFrame) {
+void FullSystem::initializeFromInitializer(FrameHessian *newFrame, float rescaleFactor) {
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
 	// add firstframe.
@@ -1041,12 +1045,14 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame) {
 	firstFrame->pointHessiansMarginalized.reserve(wG[0] * hG[0] * 0.2f);
 	firstFrame->pointHessiansOut.reserve(wG[0] * hG[0] * 0.2f);
 
-	float sumID = 1e-5, numID = 1e-5;
-	for (int i = 0; i < coarseInitializer->numPoints[0]; i++) {
-		sumID += coarseInitializer->points[0][i].iR;
-		numID++;
+	if (rescaleFactor < 0.0) {
+		float sumID = 1e-5, numID = 1e-5;
+		for (int i = 0; i < coarseInitializer->numPoints[0]; i++) {
+			sumID += coarseInitializer->points[0][i].iR;
+			numID++;
+		}
+		rescaleFactor = 1 / (sumID / numID);
 	}
-	float rescaleFactor = 1 / (sumID / numID);
 
 	// randomly sub-select the points I need.
 	float keepPercentage = setting_desiredPointDensity / coarseInitializer->numPoints[0];

@@ -52,17 +52,24 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	bool debugPrint, debugPlot;
 
 	Mat33f K[PYR_LEVELS];
+	Mat33f Kr[PYR_LEVELS];
 	Mat33f Ki[PYR_LEVELS];
-	float fx[PYR_LEVELS];
-	float fy[PYR_LEVELS];
-	float fxi[PYR_LEVELS];
-	float fyi[PYR_LEVELS];
-	float cx[PYR_LEVELS];
-	float cy[PYR_LEVELS];
-	float cxi[PYR_LEVELS];
-	float cyi[PYR_LEVELS];
+	Mat33f Kri[PYR_LEVELS];
+	double fx[PYR_LEVELS];
+	double fy[PYR_LEVELS];
+	double fxi[PYR_LEVELS];
+	double fyi[PYR_LEVELS];
+	double cx[PYR_LEVELS];
+	double cy[PYR_LEVELS];
+	double cxi[PYR_LEVELS];
+	double cyi[PYR_LEVELS];
+	double fxr[PYR_LEVELS];
+	double fyr[PYR_LEVELS];
+	double cxr[PYR_LEVELS];
+	double cyr[PYR_LEVELS];
 	int w[PYR_LEVELS];
 	int h[PYR_LEVELS];
+	SE3 leftToRight;
 
 	void debugPlotIDepthMap(float *minID, float *maxID, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	void debugPlotIDepthMapFloat(std::vector<IOWrap::Output3DWrapper*> &wraps);

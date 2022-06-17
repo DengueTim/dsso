@@ -40,15 +40,15 @@ PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread) {
 
 	{
 		boost::unique_lock<boost::mutex> lk(openImagesMutex);
-		internalVideoImgL = new MinimalImageB3(w, h);
-		internalVideoImgR = new MinimalImageB3(w, h);
-		internalKFImg = new MinimalImageB3(w, h);
+		internalVideoImg = new MinimalImageB3(w, h);
+		internalKFImgL = new MinimalImageB3(w, h);
+		internalKFImgR = new MinimalImageB3(w, h);
 		internalResImg = new MinimalImageB3(w, h);
 		videoImgChanged = kfImgChanged = resImgChanged = true;
 
-		internalVideoImgL->setBlack();
-		internalVideoImgR->setBlack();
-		internalKFImg->setBlack();
+		internalVideoImg->setBlack();
+		internalKFImgL->setBlack();
+		internalKFImgR->setBlack();
 		internalResImg->setBlack();
 	}
 
@@ -67,9 +67,9 @@ PangolinDSOViewer::~PangolinDSOViewer() {
 	close();
 	runThread.join();
 	delete internalResImg;
-	delete internalKFImg;
-	delete internalVideoImgR;
-	delete internalVideoImgL;
+	delete internalKFImgR;
+	delete internalKFImgL;
+	delete internalVideoImg;
 }
 
 void PangolinDSOViewer::run() {
@@ -88,20 +88,20 @@ void PangolinDSOViewer::run() {
 			-w / (float) h).SetHandler(new pangolin::Handler3D(Visualization3D_camera));
 
 	// 4 images
-	pangolin::View &d_kfDepth = pangolin::Display("imgKFDepth").SetAspect(w / (float) h);
+	pangolin::View &d_kfDepthL = pangolin::Display("imgKFDepthL").SetAspect(w / (float) h);
+	pangolin::View &d_kfDepthR = pangolin::Display("imgKFDepthR").SetAspect(w / (float) h);
 
-	pangolin::View &d_videoL = pangolin::Display("imgLVideo").SetAspect(w / (float) h);
-	pangolin::View &d_videoR = pangolin::Display("imgRVideo").SetAspect(w / (float) h);
+	pangolin::View &d_video = pangolin::Display("imgVideoL").SetAspect(w / (float) h);
 
 	pangolin::View &d_residual = pangolin::Display("imgResidual").SetAspect(w / (float) h);
 
-	pangolin::GlTexture texKFDepth(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
-	pangolin::GlTexture texVideoL(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
-	pangolin::GlTexture texVideoR(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+	pangolin::GlTexture texKFDepthL(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+	pangolin::GlTexture texKFDepthR(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
+	pangolin::GlTexture texVideo(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
 	pangolin::GlTexture texResidual(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
 
 	pangolin::CreateDisplay().SetBounds(0.0, 0.23, pangolin::Attach::Pix(UI_WIDTH), 1.0).SetLayout(pangolin::LayoutEqual).AddDisplay(
-			d_kfDepth).AddDisplay(d_videoL).AddDisplay(d_videoR).AddDisplay(d_residual);
+			d_kfDepthL).AddDisplay(d_kfDepthR).AddDisplay(d_video).AddDisplay(d_residual);
 
 	// parameter reconfigure gui
 	pangolin::CreatePanel("ui").SetBounds(0.0, 1.0, 0.0, pangolin::Attach::Pix(UI_WIDTH));
@@ -168,11 +168,12 @@ void PangolinDSOViewer::run() {
 
 		openImagesMutex.lock();
 		if (videoImgChanged) {
-			texVideoL.Upload(internalVideoImgL->data, GL_BGR, GL_UNSIGNED_BYTE);
-			texVideoR.Upload(internalVideoImgR->data, GL_BGR, GL_UNSIGNED_BYTE);
+			texVideo.Upload(internalVideoImg->data, GL_BGR, GL_UNSIGNED_BYTE);
 		}
-		if (kfImgChanged)
-			texKFDepth.Upload(internalKFImg->data, GL_BGR, GL_UNSIGNED_BYTE);
+		if (kfImgChanged) {
+			texKFDepthL.Upload(internalKFImgL->data, GL_BGR, GL_UNSIGNED_BYTE);
+			texKFDepthR.Upload(internalKFImgR->data, GL_BGR, GL_UNSIGNED_BYTE);
+		}
 		if (resImgChanged)
 			texResidual.Upload(internalResImg->data, GL_BGR, GL_UNSIGNED_BYTE);
 		videoImgChanged = kfImgChanged = resImgChanged = false;
@@ -197,18 +198,18 @@ void PangolinDSOViewer::run() {
 		}
 
 		if (setting_render_displayVideo) {
-			d_videoL.Activate();
+			d_video.Activate();
 			glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-			texVideoL.RenderToViewportFlipY();
-			d_videoR.Activate();
-			glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-			texVideoR.RenderToViewportFlipY();
+			texVideo.RenderToViewportFlipY();
 		}
 
 		if (setting_render_displayDepth) {
-			d_kfDepth.Activate();
+			d_kfDepthL.Activate();
 			glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-			texKFDepth.RenderToViewportFlipY();
+			texKFDepthL.RenderToViewportFlipY();
+			d_kfDepthR.Activate();
+			glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+			texKFDepthR.RenderToViewportFlipY();
 		}
 
 		if (setting_render_displayResidual) {
@@ -290,9 +291,9 @@ void PangolinDSOViewer::reset_internal() {
 	model3DMutex.unlock();
 
 	openImagesMutex.lock();
-	internalVideoImgL->setBlack();
-	internalVideoImgR->setBlack();
-	internalKFImg->setBlack();
+	internalVideoImg->setBlack();
+	internalKFImgL->setBlack();
+	internalKFImgR->setBlack();
 	internalResImg->setBlack();
 	videoImgChanged = kfImgChanged = resImgChanged = true;
 	openImagesMutex.unlock();
@@ -461,10 +462,8 @@ void PangolinDSOViewer::pushLiveFrame(FrameHessian *image) {
 	boost::unique_lock<boost::mutex> lk(openImagesMutex);
 
 	for (int i = 0; i < w * h; i++) {
-		internalVideoImgL->data[i][0] = internalVideoImgL->data[i][1] = internalVideoImgL->data[i][2] =
+		internalVideoImg->data[i][0] = internalVideoImg->data[i][1] = internalVideoImg->data[i][2] =
 				image->dI[i][0] * 0.8 > 255.0f ? 255.0 : image->dI[i][0] * 0.8;
-		internalVideoImgR->data[i][0] = internalVideoImgR->data[i][1] = internalVideoImgR->data[i][2] =
-				image->dIr[i][0] * 0.8 > 255.0f ? 255.0 : image->dIr[i][0] * 0.8;
 	}
 
 	videoImgChanged = true;
@@ -473,7 +472,7 @@ void PangolinDSOViewer::pushLiveFrame(FrameHessian *image) {
 bool PangolinDSOViewer::needPushDepthImage() {
 	return setting_render_displayDepth;
 }
-void PangolinDSOViewer::pushDepthImage(MinimalImageB3 *image) {
+void PangolinDSOViewer::pushDepthImage(MinimalImageB3 *imageLeft, MinimalImageB3 *imageRight) {
 
 	if (!setting_render_displayDepth)
 		return;
@@ -489,7 +488,8 @@ void PangolinDSOViewer::pushDepthImage(MinimalImageB3 *image) {
 		lastNMappingMs.pop_front();
 	last_map = time_now;
 
-	memcpy(internalKFImg->data, image->data, w * h * 3);
+	memcpy(internalKFImgL->data, imageLeft->data, w * h * 3);
+	memcpy(internalKFImgR->data, imageRight->data, w * h * 3);
 	kfImgChanged = true;
 }
 

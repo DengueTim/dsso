@@ -351,7 +351,7 @@ int main(int argc, char **argv) {
 //	SE3 leftToRight = SE3();
 //	leftToRight.translation()[0] = 0.11; // EuRoC camera baseline is 110mm.
 
-	//std::cout << "leftToRight:" << leftToRight.log() << "\n";
+	std::cout << "leftToRight: " << leftToRight.log().transpose() << "\n";
 
 	FullSystem *fullSystem = new FullSystem(reader->undistortL->getK(), reader->undistortR->getK(), leftToRight);
 	fullSystem->setGammaFunction(reader->getPhotometricGamma());

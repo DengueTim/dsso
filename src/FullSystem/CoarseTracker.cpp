@@ -100,6 +100,11 @@ void CoarseTracker::makeK(CalibHessian *HCalib) {
 	cx[0] = HCalib->cxl();
 	cy[0] = HCalib->cyl();
 
+	fxr[0] = HCalib->fxlR();
+	fyr[0] = HCalib->fylR();
+	cxr[0] = HCalib->cxlR();
+	cyr[0] = HCalib->cylR();
+
 	for (int level = 1; level < pyrLevelsUsed; ++level) {
 		w[level] = w[0] >> level;
 		h[level] = h[0] >> level;
@@ -107,16 +112,25 @@ void CoarseTracker::makeK(CalibHessian *HCalib) {
 		fy[level] = fy[level - 1] * 0.5;
 		cx[level] = (cx[0] + 0.5) / ((int) 1 << level) - 0.5;
 		cy[level] = (cy[0] + 0.5) / ((int) 1 << level) - 0.5;
+
+		fxr[level] = fxr[level - 1] * 0.5;
+		fyr[level] = fyr[level - 1] * 0.5;
+		cxr[level] = (cxr[0] + 0.5) / ((int) 1 << level) - 0.5;
+		cyr[level] = (cyr[0] + 0.5) / ((int) 1 << level) - 0.5;
 	}
 
 	for (int level = 0; level < pyrLevelsUsed; ++level) {
 		K[level] << fx[level], 0.0, cx[level], 0.0, fy[level], cy[level], 0.0, 0.0, 1.0;
+		Kr[level] << fxr[level], 0.0, cxr[level], 0.0, fyr[level], cyr[level], 0.0, 0.0, 1.0;
 		Ki[level] = K[level].inverse();
+		Kri[level] = Kr[level].inverse();
 		fxi[level] = Ki[level](0, 0);
 		fyi[level] = Ki[level](1, 1);
 		cxi[level] = Ki[level](0, 2);
 		cyi[level] = Ki[level](1, 2);
 	}
+
+	leftToRight = HCalib->getLeftToRight();
 }
 
 void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians) {
@@ -697,16 +711,28 @@ void CoarseTracker::debugPlotIDepthMap(float *minID_pt, float *maxID_pt, std::ve
 			}
 		}
 
-		MinimalImageB3 mf(w[lvl], h[lvl]);
-		mf.setBlack();
+		MinimalImageB3 depthImageLeft(w[lvl], h[lvl]);
+		MinimalImageB3 depthImageRight(w[lvl], h[lvl]);
+		depthImageLeft.setBlack();
+		depthImageRight.setBlack();
 		for (int i = 0; i < h[lvl] * w[lvl]; i++) {
 			int c = lastRef->dIp[lvl][i][0] * 0.9f;
 			if (c > 255)
 				c = 255;
-			mf.at(i) = Vec3b(c, c, c);
+			depthImageLeft.at(i) = Vec3b(c, c, c);
+
+			c = lastRef->dIrp[lvl][i][0] * 0.9f;
+			if (c > 255)
+				c = 255;
+			depthImageRight.at(i) = Vec3b(c, c, c);
 		}
 		int wl = w[lvl];
-		for (int y = 3; y < h[lvl] - 3; y++)
+		int hl = h[lvl];
+
+		Mat33f RrKi = (leftToRight.rotationMatrix().cast<float>() * Ki[lvl]);
+		Vec3f tr = (leftToRight.translation()).cast<float>();
+
+		for (int y = 3; y < hl - 3; y++)
 			for (int x = 3; x < wl - 3; x++) {
 				int idx = x + y * wl;
 				float sid = 0, nid = 0;
@@ -735,19 +761,30 @@ void CoarseTracker::debugPlotIDepthMap(float *minID_pt, float *maxID_pt, std::ve
 
 				if (bp[0] > 0 || nid >= 3) {
 					float id = ((sid / nid) - minID) / ((maxID - minID));
-					mf.setPixelCirc(x, y, makeJet3B(id));
-					//mf.at(idx) = makeJet3B(id);
+					depthImageLeft.setPixelCirc(x, y, makeJet3B(id));
+
+					Vec3f pt = RrKi * Vec3f(x, y, 1) + tr * id;
+					float u = pt[0] / pt[2];
+					float v = pt[1] / pt[2];
+					float Ku = fxr[lvl] * u + cxr[lvl];
+					float Kv = fyr[lvl] * v + cyr[lvl];
+					float idr = id / pt[2];
+
+					if (Ku >= 3 && Kv >= 3 && Ku < wl - 3 && Kv < hl - 3 && idr > 0) {
+						depthImageRight.setPixelCirc(Ku, Kv, makeJet3B(idr));
+					}
 				}
+
 			}
 		//IOWrap::displayImage("coarseDepth LVL0", &mf, false);
 
 		for (IOWrap::Output3DWrapper *ow : wraps)
-			ow->pushDepthImage(&mf);
+			ow->pushDepthImage(&depthImageLeft, &depthImageRight);
 
 		if (debugSaveImages) {
 			char buf[1000];
 			snprintf(buf, 1000, "images_out/predicted_%05d_%05d.png", lastRef->shell->id, refFrameID);
-			IOWrap::writeImage(buf, &mf);
+			IOWrap::writeImage(buf, &depthImageLeft);
 		}
 
 	}

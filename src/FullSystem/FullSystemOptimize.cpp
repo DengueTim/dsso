@@ -81,10 +81,38 @@ void FullSystem::setNewFrameEnergyTH() {
 	allResVec.reserve(activeResiduals.size() * 2);
 	FrameHessian *newFrame = frameHessians.back();
 
-	for (PointFrameResidual *r : activeResiduals)
+//	const int slots = setting_maxFrames + 1;
+//	float resSum[slots][slots];
+//	int resCount[slots][slots];
+//	memset(resSum, 0, slots * slots * sizeof(float));
+//	memset(resCount, 0, slots * slots * sizeof(int));
+
+	for (PointFrameResidual *r : activeResiduals) {
 		if (r->state_NewEnergyWithOutlier >= 0 && r->target == newFrame) {
 			allResVec.push_back(r->state_NewEnergyWithOutlier);
 		}
+//		float rSum = 0.0;
+//		for (int i = 0 ; i < patternNum ; i++) {
+//			rSum += fabs(r->J->resF[i]);
+//		}
+
+//		int hIdx = r->point->host->efFrame->idx;
+//		int tIdx = r->target->efFrame->idx;
+//
+//		assert(hIdx >= 0 && hIdx < setting_maxFrames);
+//		assert(tIdx >= 0 && tIdx < slots);
+//
+//		resSum[hIdx][tIdx] += rSum;
+//		resCount[hIdx][tIdx] += patternNum;
+	}
+
+//	printf("Residuals avg/count for host/target EF Frame pairs:\n");
+//	for (int hIdx = 0 ; hIdx < setting_maxFrames ; hIdx++) {
+//		for (int tIdx = 0 ; tIdx < slots ; tIdx++) {
+//			printf("\t%f\t%i", resSum[hIdx][tIdx]/resCount[hIdx][tIdx], resCount[hIdx][tIdx]);
+//		}
+//		printf("\n");
+//	}
 
 	if (allResVec.size() == 0) {
 		newFrame->frameEnergyTH = 12 * 12 * patternNum;
