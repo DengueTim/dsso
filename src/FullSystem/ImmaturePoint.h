@@ -72,7 +72,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	~ImmaturePoint();
 
 	ImmaturePointStatus traceOn(FrameHessian *frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt,
-			const Vec2f &hostToFrame_affine, CalibHessian *HCalib, bool debugPrint = false);
+			const Vec2f &hostToFrame_affine, CalibHessian *HCalib);
 
 	ImmaturePointStatus lastTraceStatus;
 	Vec2f lastTraceUV;

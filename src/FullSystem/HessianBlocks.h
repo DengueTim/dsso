@@ -109,9 +109,9 @@ struct FrameHessian {
 
 	Eigen::Vector3f *dI;	// trace, fine tracking. Used for direction select (not for gradient histograms etc.)   dIp[0]
 	Eigen::Vector3f *dIr;	// dI for Right image..
-	Eigen::Vector3f *dIp[PYR_LEVELS];	// coarse tracking / coarse initializer. NAN in [0] only.  Elements: Pixel value, dx, dy
-	Eigen::Vector3f *dIrp[PYR_LEVELS];  // optional for right image.
-	float *absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
+	Eigen::Vector3f *dIp[MAX_PYR_LEVELS];	// coarse tracking / coarse initializer. NAN in [0] only.  Elements: Pixel value, dx, dy
+	Eigen::Vector3f *dIrp[MAX_PYR_LEVELS];  // optional for right image.
+	float *absSquaredGrad[MAX_PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
 
 	int keyFrameID;						// incremental ID for keyframes only!
 	static int instanceCounter;
@@ -259,10 +259,10 @@ struct FrameHessian {
 	inline Vec10 getPrior() {
 		Vec10 p = Vec10::Zero();
 		if (keyFrameID == 0) {
-			p.head<3>() = Vec3::Constant(setting_initialTransPrior);
-			p.segment<3>(3) = Vec3::Constant(setting_initialRotPrior);
-			if (setting_solverMode & SOLVER_REMOVE_POSEPRIOR)
-				p.head<6>().setZero();
+			if (!(setting_solverMode & SOLVER_REMOVE_POSEPRIOR)) {
+				p.head<3>() = Vec3::Constant(setting_initialTransPrior);
+				p.segment<3>(3) = Vec3::Constant(setting_initialRotPrior);
+			}
 
 			p[6] = setting_initialAffAPrior;
 			p[7] = setting_initialAffBPrior;
@@ -444,6 +444,20 @@ struct CalibHessian {
 
 	SE3 getLeftToRight() {
 		return SE3::exp(value_scaled.segment<6>(8));
+	}
+
+	void updateLeftToRightZero() {
+		std::cout << "LR Delta:\t" << (value_zero_scaled.segment<6>(8) - value_scaled.segment<6>(8)).transpose() << "\n";
+		std::cout << "LR Abs:\t" << getLeftToRight().log().transpose() << "\n";
+		value_zero.segment<6>(8) = value.segment<6>(8);
+		value_zero_scaled[8] = SCALE_XI_TRANS * value_zero[8];
+		value_zero_scaled[9] = SCALE_XI_TRANS * value_zero[9];
+		value_zero_scaled[10] = SCALE_XI_TRANS * value_zero[10];
+		value_zero_scaled[11] = SCALE_XI_ROT * value_zero[11];
+		value_zero_scaled[12] = SCALE_XI_ROT * value_zero[12];
+		value_zero_scaled[13] = SCALE_XI_ROT * value_zero[13];
+
+		this->value_minus_value_zero.setZero();
 	}
 
 private:

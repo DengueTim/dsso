@@ -42,8 +42,10 @@ namespace dso {
 #define SOLVER_ORTHOGONALIZE_X_LATER (int)2048
 
 // ============== PARAMETERS TO BE DECIDED ON COMPILE TIME =================
-#define PYR_LEVELS 6
-extern int pyrLevelsUsed;
+#define MAX_PYR_LEVELS 6
+extern int pyrLevelsUsed; // This can be less than MAX_PYR_LEVELS depending on image size. See setGlobalCalib().
+
+#define ADD_LR_RESIDUALS
 
 extern float setting_keyframesPerSecond;
 extern bool setting_realTimeMaxKF;

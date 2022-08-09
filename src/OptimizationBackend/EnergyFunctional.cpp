@@ -39,7 +39,7 @@ bool EFAdjointsValid = false;
 bool EFIndicesValid = false;
 bool EFDeltaValid = false;
 
-void EnergyFunctional::setAdjointsF() {
+void EnergyFunctional::setAdjointsF(CalibHessian *Hcalib) {
 
 	if (adHost != 0)
 		delete[] adHost;
@@ -53,7 +53,9 @@ void EnergyFunctional::setAdjointsF() {
 			FrameHessian *host = frames[h]->fh;
 			FrameHessian *target = frames[t]->fh;
 
-			SE3 hostToTarget = target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse();
+			SE3 hostToTarget =
+					(h != t) ? target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse() : Hcalib->getLeftToRight();
+			//SE3 hostToTarget = target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse();
 
 			Mat88 AH = Mat88::Identity();
 			Mat88 AT = Mat88::Identity();
@@ -80,7 +82,9 @@ void EnergyFunctional::setAdjointsF() {
 			adHost[h + t * nFrames] = AH;
 			adTarget[h + t * nFrames] = AT;
 		}
-	cPrior = VecC::Constant(setting_initialCalibHessian);
+	cPrior.head(8) = Vec8::Constant(setting_initialCalibHessian);
+	cPrior.segment<3>(8) = Vec3::Constant(setting_initialTransPrior);
+	cPrior.tail(3) = Vec3::Constant(setting_initialRotPrior);
 
 	if (adHostF != 0)
 		delete[] adHostF;
@@ -119,7 +123,6 @@ EnergyFunctional::EnergyFunctional() {
 	accSC_bot = new AccumulatedSCHessianSSE();
 
 	resInA = resInL = resInM = 0;
-	currentLambda = 0;
 }
 EnergyFunctional::~EnergyFunctional() {
 	for (EFFrame *f : frames) {
@@ -240,9 +243,11 @@ void EnergyFunctional::resubstituteF_MT(VecX x, CalibHessian *HCalib, bool MT) {
 		h->fh->step.head<8>() = -x.segment<8>(CPARS + 8 * h->idxInFrames);
 		h->fh->step.tail<2>().setZero();
 
-		for (EFFrame *t : frames)
-			xAd[nFrames * h->idxInFrames + t->idxInFrames] = xF.segment<8>(CPARS + 8 * h->idxInFrames).transpose() * adHostF[h->idxInFrames + nFrames * t->idxInFrames]
+		for (EFFrame *t : frames) {
+			xAd[nFrames * h->idxInFrames + t->idxInFrames] = xF.segment<8>(CPARS + 8 * h->idxInFrames).transpose()
+					* adHostF[h->idxInFrames + nFrames * t->idxInFrames]
 					+ xF.segment<8>(CPARS + 8 * t->idxInFrames).transpose() * adTargetF[h->idxInFrames + nFrames * t->idxInFrames];
+		}
 	}
 
 	if (MT)
@@ -272,6 +277,9 @@ void EnergyFunctional::resubstituteFPt(const VecCf &cstep, Mat18f *xAd, int min,
 			if (!r->isActive())
 				continue;
 			b -= xAd[r->hostIDX * nFrames + r->targetIDX] * r->JpJdF;
+			if (!std::isfinite(b)) {
+				assert(false);
+			}
 		}
 
 		p->ph->step = -b * p->HdiF;
@@ -289,6 +297,10 @@ double EnergyFunctional::calcMEnergyF() {
 	return delta.dot(2 * bM + HM * delta);
 }
 
+/**
+ * Accumulated energy of linearised points.  Basicly the sum of a function of a point's Residual(from 0), Jababian and Delta.
+ *    PATTERN: E = (2*res_toZeroF + J*delta) * J*delta.
+ */
 void EnergyFunctional::calcLEnergyPt(int min, int max, Vec10 *stats, int tid) {
 
 	Accumulator11 E;
@@ -306,10 +318,21 @@ void EnergyFunctional::calcLEnergyPt(int min, int max, Vec10 *stats, int tid) {
 			Mat18f dp = adHTdeltaF[r->hostIDX + nFrames * r->targetIDX];
 			RawResidualJacobian *rJ = r->J;
 
-			// compute Jp*delta
-			float Jp_delta_x_1 = rJ->Jpdxi[0].dot(dp.head<6>()) + rJ->Jpdc[0].dot(dc) + rJ->Jpdd[0] * dd;
+			bool leftToRight = r->hostIDX == r->targetIDX;
 
-			float Jp_delta_y_1 = rJ->Jpdxi[1].dot(dp.head<6>()) + rJ->Jpdc[1].dot(dc) + rJ->Jpdd[1] * dd;
+			float Jp_delta_x_1 = rJ->Jpdd[0] * dd;
+			float Jp_delta_y_1 = rJ->Jpdd[1] * dd;
+
+			// compute Jp*delta
+			if (leftToRight) {
+				Jp_delta_x_1 += rJ->Jpdc[0].dot(dc);
+				Jp_delta_y_1 += rJ->Jpdc[1].dot(dc);
+			} else {
+				Jp_delta_x_1 += rJ->Jpdc[0].head<4>().dot(dc.head<4>()); // Left camera intrinsics only.
+				Jp_delta_x_1 += rJ->Jpdxi[0].dot(dp.head<6>());
+				Jp_delta_y_1 += rJ->Jpdc[1].head<4>().dot(dc.head<4>());
+				Jp_delta_y_1 += rJ->Jpdxi[1].dot(dp.head<6>());
+			}
 
 			__m128 Jp_delta_x = _mm_set1_ps(Jp_delta_x_1);
 			__m128 Jp_delta_y = _mm_set1_ps(Jp_delta_y_1);
@@ -387,7 +410,7 @@ EFFrame* EnergyFunctional::insertFrame(FrameHessian *fh, CalibHessian *Hcalib) {
 	EFAdjointsValid = false;
 	EFDeltaValid = false;
 
-	setAdjointsF();
+	setAdjointsF(Hcalib);
 	makeIDX();
 
 	for (EFFrame *fh2 : frames) {
@@ -439,6 +462,16 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 	int ndim = nFrames * 8 + CPARS - 8;  // new dimension
 	int odim = nFrames * 8 + CPARS;  // old dimension
 
+	for (int i = 0; i < ndim; i++) {
+		if (HM(i, i) < 0.0) {
+			MatXX tmp = MatXX::Zero(ndim, 1);
+			tmp.col(0) = HM.diagonal().head(ndim);
+			std::cout << "      HM\n" << tmp << "\n\n";
+//				std::cout << "HM:\n" << HM << "\n\n";
+			assert(false);
+		}
+	}
+
 //	VecX eigenvaluesPre = HM.eigenvalues().real();
 //	std::sort(eigenvaluesPre.data(), eigenvaluesPre.data()+eigenvaluesPre.size());
 //
@@ -476,6 +509,17 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 //	std::cout << std::setprecision(16) << "SVec: " << SVec.transpose() << "\n\n";
 //	std::cout << std::setprecision(16) << "SVecI: " << SVecI.transpose() << "\n\n";
 
+	for (int i = 0; i < ndim; i++) {
+		if (HM(i, i) < 0.0) {
+			MatXX tmp = MatXX::Zero(ndim, 2);
+			tmp.col(0) = SVecI.head(ndim);
+			tmp.col(1) = HM.diagonal().head(ndim);
+			std::cout << "      SVecI             HM\n" << tmp << "\n\n";
+//				std::cout << "HM:\n" << HM << "\n\n";
+			assert(false);
+		}
+	}
+
 	// scale!
 	MatXX HMScaled = SVecI.asDiagonal() * HM * SVecI.asDiagonal();
 	VecX bMScaled = SVecI.asDiagonal() * bM;
@@ -488,8 +532,25 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 
 	// schur-complement!
 	MatXX bli = HMScaled.bottomLeftCorner(8, ndim).transpose() * hpi;
-	HMScaled.topLeftCorner(ndim, ndim).noalias() -= bli * HMScaled.bottomLeftCorner(8, ndim);
+	MatXX Hsc = bli * HMScaled.bottomLeftCorner(8, ndim);
+	HMScaled.topLeftCorner(ndim, ndim).noalias() -= Hsc;
 	bMScaled.head(ndim).noalias() -= bli * bMScaled.tail<8>();
+
+	for (int i = 0; i < ndim; i++) {
+		if (HMScaled(i, i) < 0.0) {
+			std::cout << "blc = [\n" << HMScaled.bottomLeftCorner(8, ndim) << "\n]\nhpi = [\n" << hpi << "\n]\n";
+			std::cout << "Hsc.diag:\t" << Hsc.diagonal().transpose() << "\n\n";
+			std::cout << "HM = [\n" << HM.topLeftCorner(14, 14) << "\n]\n";
+			std::cout << "SVecI = [" << SVecI.head(14).transpose() << "\n]\n";
+//			MatXX tmp = MatXX::Zero(ndim, 3);
+//			tmp.col(0) = SVecI.head(ndim);
+//			tmp.col(1) = Hsc.diagonal();
+//			tmp.col(2) = HMScaled.diagonal().head(ndim);
+//			std::cout << "      SVecI        Hsc	   HMScaled\n" << tmp << "\n\n";
+//				std::cout << "HM:\n" << HM << "\n\n";
+			assert(false);
+		}
+	}
 
 	//unscale!
 	HMScaled = SVec.asDiagonal() * HMScaled * SVec.asDiagonal();
@@ -498,6 +559,18 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 	// set.
 	HM = 0.5 * (HMScaled.topLeftCorner(ndim, ndim) + HMScaled.topLeftCorner(ndim, ndim).transpose());
 	bM = bMScaled.head(ndim);
+
+	for (int i = 0; i < ndim; i++) {
+		if (HM(i, i) < 0.0) {
+			MatXX tmp = MatXX::Zero(ndim, 3);
+			tmp.col(0) = SVecI.head(ndim);
+			tmp.col(1) = HMScaled.diagonal().head(ndim);
+			tmp.col(2) = HM.diagonal();
+			std::cout << "      SVecI           HMScaled   HM\n" << tmp << "\n\n";
+//				std::cout << "HM:\n" << HM << "\n\n";
+			assert(false);
+		}
+	}
 
 	// remove from vector, without changing the order!
 	for (unsigned int i = fh->idxInFrames; i + 1 < frames.size(); i++) {
@@ -629,7 +702,9 @@ void EnergyFunctional::orthogonalize(VecX *b, MatXX *H) {
 	// decide to which nullspaces to orthogonalize.
 	std::vector<VecX> ns;
 	ns.insert(ns.end(), lastNullspaces_pose.begin(), lastNullspaces_pose.end());
-//	ns.insert(ns.end(), lastNullspaces_scale.begin(), lastNullspaces_scale.end());
+#ifndef ADD_LR_RESIDUALS
+	ns.insert(ns.end(), lastNullspaces_scale.begin(), lastNullspaces_scale.end());
+#endif
 //	if(setting_affineOptModeA <= 0)
 //		ns.insert(ns.end(), lastNullspaces_affA.begin(), lastNullspaces_affA.end());
 //	if(setting_affineOptModeB <= 0)
@@ -724,11 +799,6 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *
 			HFinal_top(i, i) *= (1 + lambda);
 
 	} else {
-//		std::cout << "HL_top:\n" << HL_top << "\n\n";
-//		std::cout << "HM:\n" << HM << "\n\n";
-//		std::cout << "HA_top:\n" << HA_top << "\n\n";
-//		std::cout << "H_sc:\n" << H_sc << "\n\n";
-
 		HFinal_top = HL_top + HM + HA_top;
 		bFinal_top = bL_top + bM_top + bA_top - b_sc;
 
@@ -738,6 +808,20 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *
 		for (int i = 0; i < 8 * nFrames + CPARS; i++)
 			HFinal_top(i, i) *= (1 + lambda);
 		HFinal_top -= H_sc * (1.0f / (1 + lambda));
+
+		for (int i = 0; i < bFinal_top.size(); i++) {
+			if (HFinal_top(i, i) < 0.0) {
+				MatXX tmp = MatXX::Zero(HL_top.rows(), 5);
+				tmp.col(0) = HL_top.diagonal();
+				tmp.col(1) = HM.diagonal();
+				tmp.col(2) = HA_top.diagonal();
+				tmp.col(3) = H_sc.diagonal();
+				tmp.col(4) = HFinal_top.diagonal();
+				std::cout << "      HL_top           HM       HA_top         H_sc   HFinal_top\n" << tmp << "\n\n";
+//				std::cout << "HM:\n" << HM << "\n\n";
+				assert(false);
+			}
+		}
 	}
 
 	VecX x;
@@ -778,6 +862,15 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *
 		VecX SVecI = (HFinal_top.diagonal() + VecX::Constant(HFinal_top.cols(), 10)).cwiseSqrt().cwiseInverse();
 		MatXX HFinalScaled = SVecI.asDiagonal() * HFinal_top * SVecI.asDiagonal();
 		x = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFinal_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
+
+		for (int i = 0; i < x.size(); i++) {
+			if (!std::isfinite(x[i])) {
+				std::cout << "HFinal_top:\n" << HFinal_top << "\n\nHFinal_top diagonal:\n" << HFinal_top.diagonal().transpose()
+						<< "\n\nbFinal_top:\n" << bFinal_top << "\n";
+				assert(false);
+			}
+		}
+		//std::cout << "H_sc:\n" << H_sc << "\n\nb_sc:\n" << b_sc << "\n";
 	}
 
 	if ((setting_solverMode & SOLVER_ORTHOGONALIZE_X )
@@ -786,14 +879,21 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *
 		orthogonalize(&x, 0);
 	}
 
+	for (int i = 0; i < x.size(); i++) {
+		if (!std::isfinite(x[i])) {
+			std::cout << "HFinal_top:\n" << HFinal_top << "\n\nbFinal_top:\n" << bFinal_top << "\n";
+			assert(false);
+		}
+	}
+
+	// std::cout << "x:\n" << x << "\n";
+
 	lastX = x;
 
 	//resubstituteF(x, HCalib);
-	currentLambda = lambda;
 	resubstituteF_MT(x, HCalib, multiThreading);
-	currentLambda = 0;
-
 }
+
 void EnergyFunctional::makeIDX() {
 	for (unsigned int idx = 0; idx < frames.size(); idx++)
 		frames[idx]->idxInFrames = idx;

@@ -44,29 +44,35 @@
 
 namespace dso {
 
-PointHessian* FullSystem::optimizeImmaturePoint(ImmaturePoint *point, int minObs, ImmaturePointTemporaryResidual *residuals) {
+PointHessian* FullSystem::optimizeImmaturePoint(ImmaturePoint *ip, int minObs, ImmaturePointTemporaryResidual *residuals) {
 	int nres = 0;
 	for (FrameHessian *fh : frameHessians) {
-		if (point->host == fh)
+#ifndef ADD_LR_RESIDUALS
+		if (ip->host == fh)
 			continue;
+#endif
 		residuals[nres].state_NewEnergy = residuals[nres].state_energy = 0;
 		residuals[nres].state_NewState = ResState::OUTLIER;
 		residuals[nres].state_state = ResState::IN;
 		residuals[nres].target = fh;
 		nres++;
 	}
+
+#ifndef ADD_LR_RESIDUALS
 	assert(nres == ((int )frameHessians.size() - 1));
-//	assert(nres == ((int )frameHessians.size()));
+#else
+	assert(nres == ((int )frameHessians.size()));
+#endif
 
 	bool print = false; //rand()%50==0;
 
 	float lastEnergy = 0;
 	float lastHdd = 0;
 	float lastbd = 0;
-	float currentIdepth = (point->idepth_max + point->idepth_min) * 0.5f;
+	float currentIdepth = (ip->idepth_max + ip->idepth_min) * 0.5f;
 
 	for (int i = 0; i < nres; i++) {
-		lastEnergy += point->linearizeResidual(&Hcalib, 1000, residuals + i, lastHdd, lastbd, currentIdepth);
+		lastEnergy += ip->linearizeResidual(&Hcalib, 1000, residuals + i, lastHdd, lastbd, currentIdepth);
 		residuals[i].state_state = residuals[i].state_NewState;
 		residuals[i].state_energy = residuals[i].state_NewEnergy;
 	}
@@ -91,7 +97,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(ImmaturePoint *point, int minObs
 		float newbd = 0;
 		float newEnergy = 0;
 		for (int i = 0; i < nres; i++)
-			newEnergy += point->linearizeResidual(&Hcalib, 1, residuals + i, newHdd, newbd, newIdepth);
+			newEnergy += ip->linearizeResidual(&Hcalib, 1, residuals + i, newHdd, newbd, newIdepth);
 
 		if (!std::isfinite(lastEnergy) || newHdd < setting_minIdepthH_act) {
 			if (print)
@@ -138,7 +144,7 @@ PointHessian* FullSystem::optimizeImmaturePoint(ImmaturePoint *point, int minObs
 		return (PointHessian*) ((long) (-1));		// yeah I'm like 99% sure this is OK on 32bit systems.
 	}
 
-	PointHessian *p = new PointHessian(point);
+	PointHessian *p = new PointHessian(ip);
 	if (!std::isfinite(p->energyTH)) {
 		delete p;
 		return (PointHessian*) ((long) (-1));

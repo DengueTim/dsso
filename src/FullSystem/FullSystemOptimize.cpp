@@ -49,7 +49,7 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 		(*stats)[0] += r->linearize(&Hcalib);
 
 		if (fixLinearization) {
-			r->applyRes(true);
+			r->applyRes();
 
 			if (r->efResidual->isActive()) {
 				if (r->isNew) {
@@ -70,9 +70,9 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 	}
 }
 
-void FullSystem::applyRes_Reductor(bool copyJacobians, int min, int max, Vec10 *stats, int tid) {
+void FullSystem::applyRes_Reductor(int min, int max, Vec10 *stats, int tid) {
 	for (int k = min; k < max; k++)
-		activeResiduals[k]->applyRes(true);
+		activeResiduals[k]->applyRes();
 }
 void FullSystem::setNewFrameEnergyTH() {
 
@@ -208,9 +208,16 @@ bool FullSystem::doStepFromBackup(float stepfacC, float stepfacT, float stepfacR
 	pstepfac.segment<3>(3).setConstant(stepfacR); // Frame Rotation
 	pstepfac.segment<4>(6).setConstant(stepfacA); // Frame AB exposure
 
-	float sumA = 0, sumB = 0, sumT = 0, sumR = 0, sumID = 0, numID = 0;
+	VecC cstepfac;
+	cstepfac.head<CIPARS>().setConstant(stepfacC);
+	cstepfac.tail<6>().setConstant(0.01);
 
+	float sumA = 0, sumB = 0, sumT = 0, sumTlr = 0, sumR = 0, sumRlr = 0;
+	int numID = 0;
 	float sumNID = 0;
+
+	sumTlr = Hcalib.step.segment<3>(8).squaredNorm();
+	sumRlr = Hcalib.step.segment<3>(11).squaredNorm();
 
 	if (setting_solverMode & SOLVER_MOMENTUM) {
 		Hcalib.setValue(Hcalib.value_backup + Hcalib.step);
@@ -227,7 +234,6 @@ bool FullSystem::doStepFromBackup(float stepfacC, float stepfacT, float stepfacR
 			for (PointHessian *ph : fh->pointHessians) {
 				float step = ph->step + 0.5f * (ph->step_backup);
 				ph->setIdepth(ph->idepth_backup + step);
-				sumID += step * step;
 				sumNID += fabsf(ph->idepth_backup);
 				numID++;
 
@@ -235,7 +241,8 @@ bool FullSystem::doStepFromBackup(float stepfacC, float stepfacT, float stepfacR
 			}
 		}
 	} else {
-		Hcalib.setValue(Hcalib.value_backup + Hcalib.step * stepfacC);
+		Hcalib.setValue(Hcalib.value_backup + cstepfac.cwiseProduct(Hcalib.step));
+//		std::cout << "doStepFromBackup() leftToRight: " << Hcalib.getLeftToRight().log().transpose() << "\n";
 		for (FrameHessian *fh : frameHessians) {
 			fh->setState(fh->state_backup + pstepfac.cwiseProduct(fh->step));
 			sumA += fh->step[6] * fh->step[6];
@@ -245,7 +252,6 @@ bool FullSystem::doStepFromBackup(float stepfacC, float stepfacT, float stepfacR
 
 			for (PointHessian *ph : fh->pointHessians) {
 				ph->setIdepth(ph->idepth_backup + stepfacD * ph->step);
-				sumID += ph->step * ph->step;
 				sumNID += fabsf(ph->idepth_backup);
 				numID++;
 
@@ -258,13 +264,17 @@ bool FullSystem::doStepFromBackup(float stepfacC, float stepfacT, float stepfacR
 	sumB /= frameHessians.size();
 	sumR /= frameHessians.size();
 	sumT /= frameHessians.size();
-	sumID /= numID;
 	sumNID /= numID;
 
-	if (!setting_debugout_runquiet)
-		printf("STEPS: A %.1f; B %.1f; R %.1f; T %.1f. \t", sqrtf(sumA) / (0.0005 * setting_thOptIterations),
+	if (!setting_debugout_runquiet) {
+		std::cout << "LR step: " << Hcalib.step.segment<6>(8).transpose() << "\n";
+		std::cout << "P0 step: " << frameHessians.back()->step.head<6>().transpose() << "\n";
+		
+		printf("STEPS: A %.1f; B %.1f; R %.1f; T %.1f; Rlr %.1f; Tlr %.1f. \t", sqrtf(sumA) / (0.0005 * setting_thOptIterations),
 				sqrtf(sumB) / (0.00005 * setting_thOptIterations), sqrtf(sumR) / (0.00005 * setting_thOptIterations),
-				sqrtf(sumT) * sumNID / (0.00005 * setting_thOptIterations));
+				sqrtf(sumT) * sumNID / (0.00005 * setting_thOptIterations), sqrtf(sumRlr) / (0.00005 * setting_thOptIterations),
+				sqrtf(sumTlr) * sumNID / (0.00005 * setting_thOptIterations));
+	}
 
 	EFDeltaValid = false;
 	setPrecalcValues();
@@ -319,7 +329,6 @@ void FullSystem::loadSateBackup() {
 		fh->setState(fh->state_backup);
 		for (PointHessian *ph : fh->pointHessians) {
 			ph->setIdepth(ph->idepth_backup);
-
 			ph->setIdepthZero(ph->idepth_backup);
 		}
 
@@ -329,6 +338,8 @@ void FullSystem::loadSateBackup() {
 	setPrecalcValues();
 }
 
+/** Energy from marginalised frames/points
+ */
 double FullSystem::calcMEnergy() {
 	if (setting_forceAceptStep)
 		return 0;
@@ -336,13 +347,11 @@ double FullSystem::calcMEnergy() {
 	//ef->makeIDX();
 	//ef->setDeltaF(&Hcalib);
 	return ef->calcMEnergyF();
-
 }
 
-void FullSystem::printOptRes(const Vec3 &res, double resL, double resM, double resPrior, double LExact, float a, float b) {
+void FullSystem::printOptRes(const Vec3 &res, double resL, double resM, float a, float b) {
 	printf("A(%f)=(AV %.3f). Num: A(%'d) + M(%'d); ab %f %f!\n", res[0], sqrtf((float) (res[0] / (patternNum * ef->resInA))),
 			ef->resInA, ef->resInM, a, b);
-
 }
 
 float FullSystem::optimize(int mnumOptIts) {
@@ -359,35 +368,39 @@ float FullSystem::optimize(int mnumOptIts) {
 	activeResiduals.clear();
 	int numPoints = 0;
 	int numLinearisedPointResiduals = 0;
+	int numLeftRightResiduals = 0;
 	for (FrameHessian *fh : frameHessians)
 		for (PointHessian *ph : fh->pointHessians) {
 			for (PointFrameResidual *r : ph->residuals) {
 				if (!r->efResidual->isLinearized) {
 					activeResiduals.push_back(r);
 					r->resetOOB();
-				} else
+				} else {
 					numLinearisedPointResiduals++;
+				}
+				if (fh == r->target) {
+					numLeftRightResiduals++;
+				}
 			}
 			numPoints++;
 		}
 
 	if (!setting_debugout_runquiet)
-		printf("OPTIMIZE %d pts, %d active res, %d lin res!\n", ef->nPoints, (int) activeResiduals.size(),
-				numLinearisedPointResiduals);
+		printf("OPTIMIZE %d pts, %d active res, %d lin res, %d left/right res! %lu frames.\n", ef->nPoints,
+				(int) activeResiduals.size(), numLinearisedPointResiduals, numLeftRightResiduals, frameHessians.size());
 
 	Vec3 lastEnergy = linearizeAll(false);
 	double lastEnergyL = calcLEnergy();
 	double lastEnergyM = calcMEnergy();
 
 	if (multiThreading)
-		treadReduce.reduce(boost::bind(&FullSystem::applyRes_Reductor, this, true, _1, _2, _3, _4), 0, activeResiduals.size(), 50);
+		treadReduce.reduce(boost::bind(&FullSystem::applyRes_Reductor, this, _1, _2, _3, _4), 0, activeResiduals.size(), 50);
 	else
-		applyRes_Reductor(true, 0, activeResiduals.size(), 0, 0);
+		applyRes_Reductor(0, activeResiduals.size(), 0, 0);
 
 	if (!setting_debugout_runquiet) {
 		printf("Initial Error       \t");
-		printOptRes(lastEnergy, lastEnergyL, lastEnergyM, 0, 0, frameHessians.back()->aff_g2l().a,
-				frameHessians.back()->aff_g2l().b);
+		printOptRes(lastEnergy, lastEnergyL, lastEnergyM, frameHessians.back()->aff_g2l().a, frameHessians.back()->aff_g2l().b);
 	}
 
 	debugPlotTracking();
@@ -427,8 +440,7 @@ float FullSystem::optimize(int mnumOptIts) {
 					(newEnergy[0] + newEnergy[1] + newEnergyL + newEnergyM
 							< lastEnergy[0] + lastEnergy[1] + lastEnergyL + lastEnergyM) ? "ACCEPT" : "REJECT", iteration,
 					log10(lambda), incDirChange, stepsize);
-			printOptRes(newEnergy, newEnergyL, newEnergyM, 0, 0, frameHessians.back()->aff_g2l().a,
-					frameHessians.back()->aff_g2l().b);
+			printOptRes(newEnergy, newEnergyL, newEnergyM, frameHessians.back()->aff_g2l().a, frameHessians.back()->aff_g2l().b);
 		}
 
 		if (setting_forceAceptStep
@@ -436,10 +448,10 @@ float FullSystem::optimize(int mnumOptIts) {
 						< lastEnergy[0] + lastEnergy[1] + lastEnergyL + lastEnergyM)) {
 
 			if (multiThreading)
-				treadReduce.reduce(boost::bind(&FullSystem::applyRes_Reductor, this, true, _1, _2, _3, _4), 0,
-						activeResiduals.size(), 50);
+				treadReduce.reduce(boost::bind(&FullSystem::applyRes_Reductor, this, _1, _2, _3, _4), 0, activeResiduals.size(),
+						50);
 			else
-				applyRes_Reductor(true, 0, activeResiduals.size(), 0, 0);
+				applyRes_Reductor(0, activeResiduals.size(), 0, 0);
 
 			lastEnergy = newEnergy;
 			lastEnergyL = newEnergyL;
@@ -463,9 +475,10 @@ float FullSystem::optimize(int mnumOptIts) {
 	newStateZero.segment<2>(6) = frameHessians.back()->get_state().segment<2>(6);
 
 	frameHessians.back()->setEvalPT(frameHessians.back()->PRE_worldToCam, newStateZero);
+	Hcalib.updateLeftToRightZero();
 	EFDeltaValid = false;
 	EFAdjointsValid = false;
-	ef->setAdjointsF();
+	ef->setAdjointsF(&Hcalib);
 	setPrecalcValues();
 
 	lastEnergy = linearizeAll(true);

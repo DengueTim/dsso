@@ -179,9 +179,9 @@ private:
 			int tid);
 	void activatePointsMT_Reductor(std::vector<PointHessian*> *optimized, std::vector<ImmaturePoint*> *toOptimize, int min, int max,
 			Vec10 *stats, int tid);
-	void applyRes_Reductor(bool copyJacobians, int min, int max, Vec10 *stats, int tid);
+	void applyRes_Reductor(int min, int max, Vec10 *stats, int tid);
 
-	void printOptRes(const Vec3 &res, double resL, double resM, double resPrior, double LExact, float a, float b);
+	void printOptRes(const Vec3 &res, double resL, double resM, float a, float b);
 
 	void debugPlotTracking();
 

@@ -26,7 +26,7 @@
 #include <iostream>
 
 namespace dso {
-int wG[PYR_LEVELS], hG[PYR_LEVELS];
+int wG[MAX_PYR_LEVELS], hG[MAX_PYR_LEVELS];
 
 float wM3G;
 float hM3G;
@@ -35,7 +35,7 @@ void setGlobalCalib(int w, int h) {
 	int wlvl = w;
 	int hlvl = h;
 	pyrLevelsUsed = 1;
-	while (wlvl % 2 == 0 && hlvl % 2 == 0 && wlvl * hlvl > 5000 && pyrLevelsUsed < PYR_LEVELS) {
+	while (wlvl % 2 == 0 && hlvl % 2 == 0 && wlvl * hlvl > 5000 && pyrLevelsUsed < MAX_PYR_LEVELS) {
 		wlvl /= 2;
 		hlvl /= 2;
 		pyrLevelsUsed++;

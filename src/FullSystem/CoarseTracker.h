@@ -51,24 +51,24 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	bool debugPrint, debugPlot;
 
-	Mat33f K[PYR_LEVELS];
-	Mat33f Kr[PYR_LEVELS];
-	Mat33f Ki[PYR_LEVELS];
-	Mat33f Kri[PYR_LEVELS];
-	double fx[PYR_LEVELS];
-	double fy[PYR_LEVELS];
-	double fxi[PYR_LEVELS];
-	double fyi[PYR_LEVELS];
-	double cx[PYR_LEVELS];
-	double cy[PYR_LEVELS];
-	double cxi[PYR_LEVELS];
-	double cyi[PYR_LEVELS];
-	double fxr[PYR_LEVELS];
-	double fyr[PYR_LEVELS];
-	double cxr[PYR_LEVELS];
-	double cyr[PYR_LEVELS];
-	int w[PYR_LEVELS];
-	int h[PYR_LEVELS];
+	Mat33f K[MAX_PYR_LEVELS];
+	Mat33f Kr[MAX_PYR_LEVELS];
+	Mat33f Ki[MAX_PYR_LEVELS];
+	Mat33f Kri[MAX_PYR_LEVELS];
+	double fx[MAX_PYR_LEVELS];
+	double fy[MAX_PYR_LEVELS];
+	double fxi[MAX_PYR_LEVELS];
+	double fyi[MAX_PYR_LEVELS];
+	double cx[MAX_PYR_LEVELS];
+	double cy[MAX_PYR_LEVELS];
+	double cxi[MAX_PYR_LEVELS];
+	double cyi[MAX_PYR_LEVELS];
+	double fxr[MAX_PYR_LEVELS];
+	double fyr[MAX_PYR_LEVELS];
+	double cxr[MAX_PYR_LEVELS];
+	double cyr[MAX_PYR_LEVELS];
+	int w[MAX_PYR_LEVELS];
+	int h[MAX_PYR_LEVELS];
 	SE3 leftToRight;
 
 	void debugPlotIDepthMap(float *minID, float *maxID, std::vector<IOWrap::Output3DWrapper*> &wraps);
@@ -86,19 +86,19 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 private:
 
 	void makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians);
-	float *idepth[PYR_LEVELS];
-	float *weightSums[PYR_LEVELS];
-	float *weightSums_bak[PYR_LEVELS];
+	float *idepth[MAX_PYR_LEVELS];
+	float *weightSums[MAX_PYR_LEVELS];
+	float *weightSums_bak[MAX_PYR_LEVELS];
 
 	Vec6 calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, float cutoffTH);
 	void calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &refToNew, AffLight aff_g2l);
 
 	// pc buffers
-	float *pc_u[PYR_LEVELS];
-	float *pc_v[PYR_LEVELS];
-	float *pc_idepth[PYR_LEVELS];
-	float *pc_color[PYR_LEVELS];
-	int pc_n[PYR_LEVELS];
+	float *pc_u[MAX_PYR_LEVELS];
+	float *pc_v[MAX_PYR_LEVELS];
+	float *pc_idepth[MAX_PYR_LEVELS];
+	float *pc_color[MAX_PYR_LEVELS];
+	int pc_n[MAX_PYR_LEVELS];
 
 	// warped buffers
 	float *buf_warped_idepth;
@@ -131,18 +131,18 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	float *fwdWarpedIDDistFinal;
 
-	Mat33f K[PYR_LEVELS];
-	Mat33f Ki[PYR_LEVELS];
-	float fx[PYR_LEVELS];
-	float fy[PYR_LEVELS];
-	float fxi[PYR_LEVELS];
-	float fyi[PYR_LEVELS];
-	float cx[PYR_LEVELS];
-	float cy[PYR_LEVELS];
-	float cxi[PYR_LEVELS];
-	float cyi[PYR_LEVELS];
-	int w[PYR_LEVELS];
-	int h[PYR_LEVELS];
+	Mat33f K[MAX_PYR_LEVELS];
+	Mat33f Ki[MAX_PYR_LEVELS];
+	float fx[MAX_PYR_LEVELS];
+	float fy[MAX_PYR_LEVELS];
+	float fxi[MAX_PYR_LEVELS];
+	float fyi[MAX_PYR_LEVELS];
+	float cx[MAX_PYR_LEVELS];
+	float cy[MAX_PYR_LEVELS];
+	float cxi[MAX_PYR_LEVELS];
+	float cyi[MAX_PYR_LEVELS];
+	int w[MAX_PYR_LEVELS];
+	int h[MAX_PYR_LEVELS];
 
 	void addIntoDistFinal(int u, int v);
 

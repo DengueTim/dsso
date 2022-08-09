@@ -38,21 +38,29 @@ void EFResidual::takeDataF() {
 
 	Vec2f JI_JI_Jd = J->JIdx2 * J->Jpdd;
 
+	bool leftToRight = hostIDX == targetIDX;
+	const Vec6f &JpdxiX = leftToRight ? J->Jpdc[0].segment(CIPARS, 6) : J->Jpdxi[0];
+	const Vec6f &JpdxiY = leftToRight ? J->Jpdc[1].segment(CIPARS, 6) : J->Jpdxi[1];
+
 	for (int i = 0; i < 6; i++)
-		JpJdF[i] = J->Jpdxi[0][i] * JI_JI_Jd[0] + J->Jpdxi[1][i] * JI_JI_Jd[1];
+		JpJdF[i] = JpdxiX[i] * JI_JI_Jd[0] + JpdxiY[i] * JI_JI_Jd[1];
 
 	JpJdF.segment<2>(6) = J->JabJIdx * J->Jpdd;
 
 	EnergyFunctional *ef = host->ef;
 	int ij = hostIDX + ef->nFrames * targetIDX;
-	Mat88f adjointHost = ef->adHost[ij].cast<float>();
-	Mat88f adjointTarget = ef->adTarget[ij].cast<float>();
+#ifndef ADD_LR_RESIDUALS	
+	assert (hostIDX != targetIDX);
+#endif
+	Mat88f adjointHost = ef->adHostF[ij];
+	Mat88f adjointTarget = ef->adTargetF[ij];
 
 	JpJdAdH = adjointHost * JpJdF;
 	JpJdAdT = adjointTarget * JpJdF;
 }
 
-EFFrame::EFFrame(EnergyFunctional *ef_, FrameHessian *fh_) : ef(ef_), fh(fh_) {
+EFFrame::EFFrame(EnergyFunctional *ef_, FrameHessian *fh_) :
+		ef(ef_), fh(fh_) {
 	prior = fh->getPrior().head<8>();
 	delta = fh->get_state_minus_stateZero().head<8>();
 	delta_prior = (fh->get_state() - fh->getPriorZero()).head<8>();
@@ -73,10 +81,11 @@ EFFrame::EFFrame(EnergyFunctional *ef_, FrameHessian *fh_) : ef(ef_), fh(fh_) {
 	idxInFrames = -1;
 }
 
-EFPoint::EFPoint(PointHessian *ph_, EFFrame *host_) : ph(ph_), host(host_) {
-	priorF = ph->hasDepthPrior ? setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH : 0;
-	if (setting_solverMode & SOLVER_REMOVE_POSEPRIOR)
-		priorF = 0;
+EFPoint::EFPoint(PointHessian *ph_, EFFrame *host_) :
+		ph(ph_), host(host_) {
+	if (!(setting_solverMode & SOLVER_REMOVE_POSEPRIOR )) {
+		priorF = ph->hasDepthPrior ? setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH : 0;
+	}
 
 	deltaF = ph->idepth - ph->idepth_zero;
 	stateFlag = EFPointStatus::PS_GOOD;
@@ -90,11 +99,30 @@ EFPoint::EFPoint(PointHessian *ph_, EFFrame *host_) : ph(ph_), host(host_) {
 }
 
 void EFResidual::fixLinearizationF(EnergyFunctional *ef) {
+	bool leftToRight = hostIDX == targetIDX;
+	const Vec6f &JpdxiX = leftToRight ? J->Jpdc[0].segment(CIPARS, 6) : J->Jpdxi[0];
+	const Vec6f &JpdxiY = leftToRight ? J->Jpdc[1].segment(CIPARS, 6) : J->Jpdxi[1];
+
+	float dd = point->deltaF;
 	Vec8f dp = ef->adHTdeltaF[hostIDX + ef->nFrames * targetIDX];
+	VecCf dc = ef->cDeltaF;
+
+	float Jp_delta_x_1 = J->Jpdd[0] * dd;
+	float Jp_delta_y_1 = J->Jpdd[1] * dd;
 
 	// compute Jp*delta
-	__m128 Jp_delta_x = _mm_set1_ps(J->Jpdxi[0].dot(dp.head<6>()) + J->Jpdc[0].dot(ef->cDeltaF) + J->Jpdd[0] * point->deltaF);
-	__m128 Jp_delta_y = _mm_set1_ps(J->Jpdxi[1].dot(dp.head<6>()) + J->Jpdc[1].dot(ef->cDeltaF) + J->Jpdd[1] * point->deltaF);
+	if (leftToRight) {
+		Jp_delta_x_1 += J->Jpdc[0].dot(dc);
+		Jp_delta_y_1 += J->Jpdc[1].dot(dc);
+	} else {
+		Jp_delta_x_1 += J->Jpdc[0].head<4>().dot(dc.head<4>());
+		Jp_delta_x_1 += J->Jpdxi[0].dot(dp.head<6>());
+		Jp_delta_y_1 += J->Jpdc[1].head<4>().dot(dc.head<4>());
+		Jp_delta_y_1 += J->Jpdxi[1].dot(dp.head<6>());
+	}
+
+	__m128 Jp_delta_x = _mm_set1_ps(Jp_delta_x_1);
+	__m128 Jp_delta_y = _mm_set1_ps(Jp_delta_y_1);
 	__m128 delta_a = _mm_set1_ps((float) (dp[6]));
 	__m128 delta_b = _mm_set1_ps((float) (dp[7]));
 

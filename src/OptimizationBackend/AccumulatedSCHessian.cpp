@@ -66,12 +66,6 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 	accHcc[tid].update(HcdIntrinsics, HcdIntrinsics, p->HdiF);
 	accbc[tid].update(HcdIntrinsics, p->bdSumF * p->HdiF);
 
-	Vec8f HcdLrPose = Vec8f::Zero();
-	HcdLrPose.head<6>() = Hcd.tail<6>();
-	accD[tid][0].update(HcdLrPose, HcdLrPose, p->HdiF);
-	accE[tid][0].update(HcdLrPose, HcdIntrinsics, p->HdiF);
-	accEB[tid][0].update(HcdLrPose, p->bdSumF * p->HdiF);
-
 	int dSize = nframes[tid] + 1;
 	for (EFResidual *r1 : p->residualsAll) {
 		if (!r1->isActive())
@@ -79,51 +73,49 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 
 		int i = r1->hostIDX + 1;
 		int j = r1->targetIDX + 1;
-		int j0 = (j == i) ? 0 : j;
 
-		for (EFResidual *r2 : p->residualsAll) {
-			if (!r2->isActive())
-				continue;
+		if ( j == i ) {
+			for (EFResidual *r2 : p->residualsAll) {
+				if (!r2->isActive())
+					continue;
 
-			int k = r2->targetIDX + 1;
-			int k0 = (k == i) ? 0 : k;
+				int k = r2->targetIDX + 1;
 
-			/* Contribution factor of pair of depth residuals on pose-pose block Haa...
-			 * Accumulation over pairs of residuals that have a common host targets
-			 *
-			 * Why 4 updates?
-			 * We're computing the H_ab * H_bb' * H_ba bit of the Schur Compliment.
-			 * H_bb is a diagonal matrix with one entry for each point, the point's inverse depth.
-			 * A point's host frame poseAB info is held in a block on the diagonal of H_aa.
-			 * H_ab and H_ba have column and row entries for the influences between each point in H_bb and each frame poseAB in H_aa.
-			 * r1 and r2 go through all combinations of these H_ab & H_ba entries.
-			 * In H_aa, the host frame's poseAB entry and the poseAB entry that correspond to the selected entries in H_ab and H_ba form a square.
-			 * The four updates are to the corners of this square.
-			 * i - Indexes the host frame's poseAB on the diagonal of H_aa
-			 * j - Indexes the row of the column in H_ab
-			 * k - Indexes the column of the row in H_ba
-			 *
-			 * The Adjoints...
-			 *
-			 * Symmetric...   Seems this computes for a pair of residuals the updates for r1,r2 and then r2,r1. which keeps the Pose-Pose block symmetric..
-			 * Slightly cheaper to compute only the upper half and make it symmetric by copying/transposing blocks but code is more simple as is.
-			 */
+				if ( k != i ) {
+			//		accD[tid][i].update(r1->JpJdAdH, r2->JpJdAdT, p->HdiF);
+			//		accD[tid][k].update(r1->JpJdAdT, r2->JpJdAdT, p->HdiF);
+				}
+			}
 
-			int ii = i + dSize * i;
-			int jk = j0 + dSize * k0;
-			int ji = j0 + dSize * i;
-			int ik = i + dSize * k0;
+			accD[tid][0].update(r1->JpJdAdT, r1->JpJdAdT, p->HdiF);
 
-			accD[tid][ii].update(r1->JpJdAdH, r2->JpJdAdH, p->HdiF);
-			accD[tid][jk].update(r1->JpJdAdT, r2->JpJdAdT, p->HdiF);
-			accD[tid][ji].update(r1->JpJdAdT, r2->JpJdAdH, p->HdiF);
-			accD[tid][ik].update(r1->JpJdAdH, r2->JpJdAdT, p->HdiF);
+			accE[tid][0].update(r1->JpJdAdT, HcdIntrinsics, p->HdiF);
+			accEB[tid][0].update(r1->JpJdAdT, p->bdSumF * p->HdiF);
+		} else {
+			for (EFResidual *r2 : p->residualsAll) {
+				if (!r2->isActive())
+					continue;
+
+				int k = r2->targetIDX + 1;
+
+				if ( k != i ) {
+					int ii = i + dSize * i;
+					int jk = j + dSize * k;
+					int ji = j + dSize * i;
+					int ik = i + dSize * k;
+
+					accD[tid][ii].update(r1->JpJdAdH, r2->JpJdAdH, p->HdiF);
+					accD[tid][jk].update(r1->JpJdAdT, r2->JpJdAdT, p->HdiF);
+					accD[tid][ji].update(r1->JpJdAdT, r2->JpJdAdH, p->HdiF);
+					accD[tid][ik].update(r1->JpJdAdH, r2->JpJdAdT, p->HdiF);
+				}
+			}
+
+			accE[tid][i].update(r1->JpJdAdH, HcdIntrinsics, p->HdiF);
+			accEB[tid][i].update(r1->JpJdAdH, p->bdSumF * p->HdiF);
+			accE[tid][j].update(r1->JpJdAdT, HcdIntrinsics, p->HdiF);
+			accEB[tid][j].update(r1->JpJdAdT, p->bdSumF * p->HdiF);
 		}
-
-		accE[tid][i].update(r1->JpJdAdH, HcdIntrinsics, p->HdiF);
-		accEB[tid][i].update(r1->JpJdAdH, p->bdSumF * p->HdiF);
-		accE[tid][j0].update(r1->JpJdAdT, HcdIntrinsics, p->HdiF);
-		accEB[tid][j0].update(r1->JpJdAdT, p->bdSumF * p->HdiF);
 	}
 }
 
@@ -151,18 +143,18 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 
 		if (j == 0) {
 			for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-				H[tid].block(kIdx, 0, ks, CIPARS) += accE[tid2][k].A.topRightCorner(ks, CIPARS).cast<double>();
-				b[tid].segment(kIdx, ks) += accEB[tid2][k].A.topRightCorner(ks, 1).cast<double>();
+				H[tid].block(kIdx, 0, ks, CIPARS) += accE[tid2][k].A.topLeftCorner(ks, CIPARS).cast<double>();
+				b[tid].segment(kIdx, ks) += accEB[tid2][k].A.topLeftCorner(ks, 1).cast<double>();
 			}
 		}
 
 		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
-			H[tid].block(jIdx, kIdx, js, ks) += accD[tid2][jk].A.topRightCorner(js, ks).cast<double>();
+			H[tid].block(jIdx, kIdx, js, ks) += accD[tid2][jk].A.topLeftCorner(js, ks).cast<double>();
 		}
 	}
 
-	// One camera params block
-	if (min == 0) {
+// One camera params block
+	if (tid == 0) {
 		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
 			H[tid].topLeftCorner<CIPARS, CIPARS>() += accHcc[tid2].A.cast<double>();
 			b[tid].head<CIPARS>() += accbc[tid2].A.cast<double>();
@@ -181,11 +173,12 @@ void AccumulatedSCHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional c
 }
 
 void AccumulatedSCHessianSSE::copyUpperToLowerDiagonal(MatXX *H) {
-	// make diagonal by copying over parts.
+// make diagonal by copying over parts.
 	H->block<CIPARS, 6>(0, CIPARS).noalias() = H->block<6, CIPARS>(CIPARS, 0).transpose();
 	for (int h = 0; h < nframes[0]; h++) {
 		int hIdx = CPARS + h * 8;
 		H->block<CIPARS, 8>(0, hIdx).noalias() = H->block<8, CIPARS>(hIdx, 0).transpose();
+		H->block<6,8>(CIPARS, hIdx).noalias() = H->block<8, 6>(hIdx, CIPARS).transpose();
 	}
 }
 

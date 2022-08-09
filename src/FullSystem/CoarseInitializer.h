@@ -86,32 +86,32 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	bool fixAffine;
 	bool printDebug;
 
-	Pnt *points[PYR_LEVELS];
-	int numPoints[PYR_LEVELS];
+	Pnt *points[MAX_PYR_LEVELS];
+	int numPoints[MAX_PYR_LEVELS];
 	AffLight thisToNext_aff;
 	SE3 thisToNext;
 
 	FrameHessian *firstFrame;
 	FrameHessian *newFrame;
 private:
-	Mat33f K[PYR_LEVELS];
-	Mat33f Kr[PYR_LEVELS];
-	Mat33f Ki[PYR_LEVELS];
-	Mat33f Kri[PYR_LEVELS];
-	double fx[PYR_LEVELS];
-	double fy[PYR_LEVELS];
-	double fxi[PYR_LEVELS];
-	double fyi[PYR_LEVELS];
-	double cx[PYR_LEVELS];
-	double cy[PYR_LEVELS];
-	double cxi[PYR_LEVELS];
-	double cyi[PYR_LEVELS];
-	double fxr[PYR_LEVELS];
-	double fyr[PYR_LEVELS];
-	double cxr[PYR_LEVELS];
-	double cyr[PYR_LEVELS];
-	int w[PYR_LEVELS];
-	int h[PYR_LEVELS];
+	Mat33f K[MAX_PYR_LEVELS];
+	Mat33f Kr[MAX_PYR_LEVELS];
+	Mat33f Ki[MAX_PYR_LEVELS];
+	Mat33f Kri[MAX_PYR_LEVELS];
+	double fx[MAX_PYR_LEVELS];
+	double fy[MAX_PYR_LEVELS];
+	double fxi[MAX_PYR_LEVELS];
+	double fyi[MAX_PYR_LEVELS];
+	double cx[MAX_PYR_LEVELS];
+	double cy[MAX_PYR_LEVELS];
+	double cxi[MAX_PYR_LEVELS];
+	double cyi[MAX_PYR_LEVELS];
+	double fxr[MAX_PYR_LEVELS];
+	double fyr[MAX_PYR_LEVELS];
+	double cxr[MAX_PYR_LEVELS];
+	double cyr[MAX_PYR_LEVELS];
+	int w[MAX_PYR_LEVELS];
+	int h[MAX_PYR_LEVELS];
 	SE3 leftToRight;
 	void makeK(CalibHessian *HCalib);
 
@@ -119,8 +119,8 @@ private:
 	int snappedAt;
 
 	// pyramid images & levels on all levels
-	Eigen::Vector3f *dINew[PYR_LEVELS];
-	Eigen::Vector3f *dIFist[PYR_LEVELS];
+	Eigen::Vector3f *dINew[MAX_PYR_LEVELS];
+	Eigen::Vector3f *dIFist[MAX_PYR_LEVELS];
 
 	Eigen::DiagonalMatrix<float, 8> wM;
 

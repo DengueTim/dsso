@@ -33,21 +33,14 @@
 namespace dso {
 
 template<int mode>
-void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *const ef, int tid) // 0 = active, 1 = linearized, 2=marginalize
-		{
-
+void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *const ef, int tid) { // 0 = active, 1 = linearized, 2=marginalize
 	assert(mode == 0 || mode == 1 || mode == 2);
-
-	VecCf dc = ef->cDeltaF;
-	float dd = p->deltaF;
 
 	float bd_acc = 0;
 	float Hdd_acc = 0;
 	VecCf Hcd_acc = VecCf::Zero();
 
 	for (EFResidual *r : p->residualsAll) {
-		bool leftToRight = r->hostIDX == r->targetIDX;
-
 		if (mode == 0) {
 			if (r->isLinearized || !r->isActive())
 				continue;
@@ -64,10 +57,8 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 
 		RawResidualJacobian *rJ = r->J;
 		int htIDX = r->hostIDX + r->targetIDX * nframes[tid];
-		Mat18f dp = ef->adHTdeltaF[htIDX];
 
-		const Vec6f &jpdxiX = leftToRight ? rJ->Jpdc[0].segment(CIPARS, 6) : rJ->Jpdxi[0];
-		const Vec6f &jpdxiY = leftToRight ? rJ->Jpdc[1].segment(CIPARS, 6) : rJ->Jpdxi[1];
+		bool leftToRight = r->hostIDX == r->targetIDX;
 
 		VecNRf resApprox;
 		if (mode == 0)
@@ -75,9 +66,26 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 		if (mode == 2)
 			resApprox = r->res_toZeroF;
 		if (mode == 1) {
+			Mat18f dp = ef->adHTdeltaF[htIDX];
+			VecCf dc = ef->cDeltaF;
+			float dd = p->deltaF;
+
+			float Jp_delta_x_1 = rJ->Jpdd[0] * dd;
+			float Jp_delta_y_1 = rJ->Jpdd[1] * dd;
+
 			// compute Jp*delta
-			__m128 Jp_delta_x = _mm_set1_ps(jpdxiX.dot(dp.head<6>()) + rJ->Jpdc[0].dot(dc) + rJ->Jpdd[0] * dd);
-			__m128 Jp_delta_y = _mm_set1_ps(jpdxiY.dot(dp.head<6>()) + rJ->Jpdc[1].dot(dc) + rJ->Jpdd[1] * dd);
+			if (leftToRight) {
+				Jp_delta_x_1 += rJ->Jpdc[0].dot(dc);
+				Jp_delta_y_1 += rJ->Jpdc[1].dot(dc);
+			} else {
+				Jp_delta_x_1 += rJ->Jpdc[0].head<4>().dot(dc.head<4>()); // Left camera intrinsics only
+				Jp_delta_x_1 += rJ->Jpdxi[0].dot(dp.head<6>());
+				Jp_delta_y_1 += rJ->Jpdc[1].head<4>().dot(dc.head<4>());
+				Jp_delta_y_1 += rJ->Jpdxi[1].dot(dp.head<6>());
+			}
+
+			__m128 Jp_delta_x = _mm_set1_ps(Jp_delta_x_1);
+			__m128 Jp_delta_y = _mm_set1_ps(Jp_delta_y_1);
 			__m128 delta_a = _mm_set1_ps((float) (dp[6]));
 			__m128 delta_b = _mm_set1_ps((float) (dp[7]));
 
@@ -104,12 +112,16 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 			rr += resApprox[i] * resApprox[i];
 		}
 
-		acc[tid][htIDX].update(rJ->Jpdc[0].data(), jpdxiX.data(), rJ->Jpdc[1].data(), jpdxiY.data(), rJ->JIdx2(0, 0),
+		const Vec6f &JpdxiX = leftToRight ? rJ->Jpdc[0].segment(CIPARS, 6) : rJ->Jpdxi[0];
+		const Vec6f &JpdxiY = leftToRight ? rJ->Jpdc[1].segment(CIPARS, 6) : rJ->Jpdxi[1];
+
+		// The left-right contribution is stored in the blocks on the diagonal..
+		acc[tid][htIDX].update(rJ->Jpdc[0].data(), JpdxiX.data(), rJ->Jpdc[1].data(), JpdxiY.data(), rJ->JIdx2(0, 0),
 				rJ->JIdx2(0, 1), rJ->JIdx2(1, 1));
 
 		acc[tid][htIDX].updateBotRight(rJ->Jab2(0, 0), rJ->Jab2(0, 1), Jab_r[0], rJ->Jab2(1, 1), Jab_r[1], rr);
 
-		acc[tid][htIDX].updateTopRight(rJ->Jpdc[0].data(), jpdxiX.data(), rJ->Jpdc[1].data(), jpdxiY.data(), rJ->JabJIdx(0, 0),
+		acc[tid][htIDX].updateTopRight(rJ->Jpdc[0].data(), JpdxiX.data(), rJ->Jpdc[1].data(), JpdxiY.data(), rJ->JabJIdx(0, 0),
 				rJ->JabJIdx(0, 1), rJ->JabJIdx(1, 0), rJ->JabJIdx(1, 1), JI_r[0], JI_r[1]);
 
 		Vec2f Ji2_Jpdd = rJ->JIdx2 * rJ->Jpdd;
@@ -196,47 +208,40 @@ void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFun
 			}
 		}
 
+#ifndef ADD_LR_RESIDUALS
+		if (h == t) { assert(num == 0); }
+#endif
+
 		if (num == 0)
 			continue;
 
-//		if (accH.block<6,6>(8,8).sum() > 0 && accH.block<6,6>(14,14).sum() > 0) {
-//			std::cout << "H:T idx: " << h << ":" << t << "\t!!!\n";
-//			std::cout << accH << "\n\n";
-//			abort();
-//		}
+		// accH is symmetric.
+
+		// Intrinsics.  Top left block of H and head of b.
+		H[tid].topLeftCorner<CIPARS, CIPARS>().noalias() += accH.block<CIPARS, CIPARS>(0, 0);
+		b[tid].head<CIPARS>().noalias() += accH.block<CIPARS, 1>(0, CIPARS + 8);
 
 		if (h != t) {
-			const Eigen::Ref<Mat88> &poseAbDiagBlk = accH.block<8, 8>(CIPARS, CIPARS);
-			H[tid].block<8, 8>(hIdx, hIdx).noalias() += EF->adHost[aidx] * poseAbDiagBlk * EF->adHost[aidx].transpose();
-			H[tid].block<8, 8>(tIdx, tIdx).noalias() += EF->adTarget[aidx] * poseAbDiagBlk * EF->adTarget[aidx].transpose();
-			H[tid].block<8, 8>(hIdx, tIdx).noalias() += EF->adHost[aidx] * poseAbDiagBlk * EF->adTarget[aidx].transpose();
+			const Eigen::Ref<Mat88> &poseAbBlk = accH.block<8, 8>(CIPARS, CIPARS);
+			H[tid].block<8, 8>(hIdx, hIdx).noalias() += EF->adHost[aidx] * poseAbBlk * EF->adHost[aidx].transpose();
+			H[tid].block<8, 8>(tIdx, tIdx).noalias() += EF->adTarget[aidx] * poseAbBlk * EF->adTarget[aidx].transpose();
+			H[tid].block<8, 8>(hIdx, tIdx).noalias() += EF->adHost[aidx] * poseAbBlk * EF->adTarget[aidx].transpose();
 
 			// For left-left residuals only copy the intrisics, LR bit is zero for h != t
 			const Eigen::Ref<Mat88> &poseAbIntrinsicsLowerBlk = accH.block<8, CIPARS>(CIPARS, 0);
 			H[tid].block<8, CIPARS>(hIdx, 0).noalias() += EF->adHost[aidx] * poseAbIntrinsicsLowerBlk;
 			H[tid].block<8, CIPARS>(tIdx, 0).noalias() += EF->adTarget[aidx] * poseAbIntrinsicsLowerBlk;
 
-			// Intrisics only, again.. Top Left block
-			H[tid].topLeftCorner<CIPARS, CIPARS>().noalias() += accH.block<CIPARS, CIPARS>(0, 0);
-
 			// Accumulate residual to host and target pose & AB.
 			const Eigen::Ref<Vec8> &poseAbResidual = accH.block<8, 1>(CIPARS, CIPARS + 8);
 			b[tid].segment<8>(hIdx).noalias() += EF->adHost[aidx] * poseAbResidual;
 			b[tid].segment<8>(tIdx).noalias() += EF->adTarget[aidx] * poseAbResidual;
 
-			// Accumulate intrisics residual only, LR pose for LL res is zero.
-			b[tid].head<CIPARS>().noalias() += accH.block<CIPARS, 1>(0, CIPARS + 8);
 		} else {
-			// h == t. Accumulate just the CPARS to the top left corner of H and first elements of b
-
-			// Intrinsics
-			H[tid].topLeftCorner<CIPARS, CIPARS>().noalias() += accH.block<CIPARS, CIPARS>(0, 0);
-			b[tid].head<CIPARS>().noalias() += accH.block<CIPARS, 1>(0, CIPARS + 8);
-
+			// h == t. Accumulate just the LR pose to the top left corner of H and first elements of b
 			// LR pose with adjoint...
-			// const Eigen::Ref<Mat66> &adjoint = EF->adHost[aidx].topLeftCorner(6, 6);
-			//std::cout << adjoint << "\n\n";
-			const Mat66 adjoint = Mat66::Identity().topLeftCorner(6, 6); // TODO why does using EF->adHost not work...
+//			const Mat66 adjoint = EF->adHost[aidx].topLeftCorner(6, 6);
+			const Mat66 adjoint = EF->adTarget[aidx].topLeftCorner(6, 6); // Identity with scaling.
 			H[tid].block<6, 6>(CIPARS, CIPARS).noalias() += adjoint * accH.block<6, 6>(CIPARS, CIPARS) * adjoint.transpose();
 			H[tid].block<6, CIPARS>(CIPARS, 0).noalias() += adjoint * accH.block<6, CIPARS>(CIPARS, 0); // Is copied/flipped in copyUpperToLowerDiagonal
 			b[tid].segment<6>(CIPARS).noalias() += adjoint * accH.block<6, 1>(CIPARS, CIPARS + 8);

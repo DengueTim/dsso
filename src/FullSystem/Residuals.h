@@ -96,7 +96,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		setState(ResState::IN);
 	}
 	;
-	void applyRes(bool copyJacobians);
+	void applyRes();
 
 	void debugPlot();
 

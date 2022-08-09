@@ -763,7 +763,8 @@ void CoarseTracker::debugPlotIDepthMap(float *minID_pt, float *maxID_pt, std::ve
 					float id = ((sid / nid) - minID) / ((maxID - minID));
 					depthImageLeft.setPixelCirc(x, y, makeJet3B(id));
 
-					Vec3f pt = RrKi * Vec3f(x, y, 1) + tr * id;
+					float idepth = sid / nid;
+					Vec3f pt = RrKi * Vec3f(x, y, 1) + tr * idepth;
 					float u = pt[0] / pt[2];
 					float v = pt[1] / pt[2];
 					float Ku = fxr[lvl] * u + cxr[lvl];
@@ -820,7 +821,7 @@ CoarseDistanceMap::~CoarseDistanceMap() {
 	delete[] coarseProjectionGridNum;
 }
 
-void CoarseDistanceMap::makeDistanceMap(std::vector<FrameHessian*> frameHessians, FrameHessian *frame) {
+void CoarseDistanceMap::makeDistanceMap(std::vector<FrameHessian*> frameHessians, FrameHessian *fhNewest) {
 	int w1 = w[1];
 	int h1 = h[1];
 	int wh1 = w1 * h1;
@@ -831,10 +832,10 @@ void CoarseDistanceMap::makeDistanceMap(std::vector<FrameHessian*> frameHessians
 	int numItems = 0;
 
 	for (FrameHessian *fh : frameHessians) {
-		if (frame == fh)
+		if (fhNewest == fh)
 			continue;
 
-		SE3 fhToNew = frame->PRE_worldToCam * fh->PRE_camToWorld;
+		SE3 fhToNew = fhNewest->PRE_worldToCam * fh->PRE_camToWorld;
 		Mat33f KRKi = (K[1] * fhToNew.rotationMatrix().cast<float>() * Ki[0]);
 		Vec3f Kt = (K[1] * fhToNew.translation().cast<float>());
 

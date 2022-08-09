@@ -72,5 +72,26 @@ EIGEN_STRONG_INLINE bool projectPoint(const float u_pt, const float v_pt, const 
 	// OOB/Out of image check.
 	return Ku > 1.1f && Kv > 1.1f && Ku < wM3G && Kv < hM3G;
 }
+
+EIGEN_STRONG_INLINE bool projectPointLR(float ul, float vl, float idepthl, CalibHessian *const&HCalib, float &ur, float &vr, float &idepthr) {
+	Vec3f KliP = Vec3f((ul - HCalib->cxl()) * HCalib->fxli(), (vl - HCalib->cyl()) * HCalib->fyli(), 1);
+
+	SE3 leftToRight = HCalib->getLeftToRight();
+	Mat33f R = leftToRight.rotationMatrix().cast<float>();
+	Vec3f t = leftToRight.translation().cast<float>();
+
+	Vec3f ptp = R * KliP + t * idepthl;
+	float drescale = 1.0f / ptp[2];
+
+	if (!(drescale > 0))
+		return false;
+
+	idepthr = idepthl * drescale;
+	ur = ptp[0] * drescale * HCalib->fxlR() + HCalib->cxlR();
+	vr = ptp[1] * drescale * HCalib->fylR() + HCalib->cylR();
+
+	// OOB/Out of image check.
+	return ur > 1.1f && vr > 1.1f && ur < wM3G && vr < hM3G;
+}
 }
 

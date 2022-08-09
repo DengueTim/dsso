@@ -403,7 +403,6 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 			dd[idx] = dxInterp * dxdd + dyInterp * dydd;// dRes/dInverseDepth
 			r[idx] = hw*residual;// Huber weighted residual.
 
-
 // Attempt at adding residual from Left to Right images.
 //	Mat33f RlrKi = (leftToRight.rotationMatrix() * Ki[lvl]).cast<float>();
 //	Vec3f tlr = leftToRight.translation().cast<float>();
@@ -440,8 +439,6 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 //				dd[idx] += dxrInterp * dxddr + dyrInterp * dyddr;
 //				dd[idx] /= 2;
 //			}
-
-
 
 			float maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
 			if(maxstep < point->maxstep) point->maxstep = maxstep;
@@ -494,7 +491,7 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 	// compute alpha opt.
 	float alphaOpt;
 	if (alphaEnergy > alphaK * npts) {
-		// Snapped condition. There is enough camera translation(energy) initialise idepth estimates.
+		// Snapped condition. There is enough camera translation(energy) to initialise idepth estimates.
 		alphaOpt = 0;
 		alphaEnergy = alphaK * npts;
 	} else {
@@ -903,8 +900,8 @@ void CoarseInitializer::makeNN() {
 	typedef nanoflann::KDTreeSingleIndexAdaptor<nanoflann::L2_Simple_Adaptor<float, FLANNPointcloud>, FLANNPointcloud, 2> KDTree;
 
 	// build indices
-	FLANNPointcloud pcs[PYR_LEVELS];
-	KDTree *indexes[PYR_LEVELS];
+	FLANNPointcloud pcs[MAX_PYR_LEVELS];
+	KDTree *indexes[MAX_PYR_LEVELS];
 	for (int i = 0; i < pyrLevelsUsed; i++) {
 		pcs[i] = FLANNPointcloud(numPoints[i], points[i]);
 		indexes[i] = new KDTree(2, pcs[i], nanoflann::KDTreeSingleIndexAdaptorParams(5));
@@ -964,13 +961,13 @@ void CoarseInitializer::makeNN() {
 }
 
 float CoarseInitializer::computeRescale() {
-	const Mat33 R = leftToRight.rotationMatrix();
+	const Mat33f R = leftToRight.rotationMatrix().cast<float>();
 	const Vec3f t = leftToRight.translation().cast<float>();
 
 	float rescale = 1.0;
 
-	for (int lvl = 4; lvl >= 0; lvl--) {
-		const Mat33f RKi = R.cast<float>() * Ki[lvl];
+	for (int lvl = (pyrLevelsUsed - 1); lvl >= 0; lvl--) {
+		const Mat33f RKi = R * Ki[lvl];
 		const float fxrl = fxr[lvl];
 		const float fyrl = fyr[lvl];
 		const float cxrl = cxr[lvl];
@@ -981,8 +978,7 @@ float CoarseInitializer::computeRescale() {
 		Vec3f *leftImage = firstFrame->dIp[lvl];
 		Vec3f *rightImage = firstFrame->dIrp[lvl];
 
-		for (int it = 0; it < 25; it++) {
-
+		for (int it = 0; it < 15; it++) {
 			float lvlAbsRes = 0.0;
 			float lvlEnergy = 0.0;
 			float H = 1.0;
@@ -992,9 +988,9 @@ float CoarseInitializer::computeRescale() {
 			for (int pntIdx = 0; pntIdx < numPoints[lvl]; pntIdx++) {
 				Pnt *pnt = points[lvl] + pntIdx;
 
-//				if (pnt->iR > 1) { // only points that are further away.
-//					continue;
-//				}
+				if (pnt->iR < 0.2 || pnt->iR > 5) { // exclude points that are ....
+					continue;
+				}
 
 				float absRes = 0.0;
 				float pntEnergy = 0.0;
@@ -1008,14 +1004,16 @@ float CoarseInitializer::computeRescale() {
 					int dx = patternP[patIdx][0];
 					int dy = patternP[patIdx][1];
 
-					Vec3f pt = RKi * Vec3f(pnt->u+dx, pnt->v+dy, 1) + t * (pnt->iR * rescale);
+					float id = pnt->idepth * rescale;
+
+					Vec3f pt = RKi * Vec3f(pnt->u+dx, pnt->v+dy, 1) + t * id;
 					float u = pt[0] / pt[2];
 					float v = pt[1] / pt[2];
 					float rightU = fxrl * u + cxrl;
 					float rightV = fyrl * v + cyrl;
-					float rightIR = (rescale * pnt->iR)/pt[2];
+					float rightId = id / pt[2];
 
-					if(!(rightU > 1 && rightV > 1 && rightU < wl-2 && rightV < hl-2 && rightIR > 0)) {
+					if(!(rightU > 1 && rightV > 1 && rightU < wl-2 && rightV < hl-2 && rightId > 0)) {
 						isGood = false;
 						break;
 					}
@@ -1046,8 +1044,8 @@ float CoarseInitializer::computeRescale() {
 					dRdS[patIdx] = (dxInterp * dxdd + dyInterp * dydd) * -rescale; // dRes/dRescale
 					r[patIdx] = residual;// Huber weighted residual.
 
-					Hp += dRdS[patIdx]*dRdS[patIdx];
-					bp += r[patIdx]*dRdS[patIdx];
+					Hp += hw * dRdS[patIdx]*dRdS[patIdx];
+					bp += hw * r[patIdx]*dRdS[patIdx];
 				}
 
 				if (!isGood || pntEnergy > pnt->outlierTH * 20) {
@@ -1066,12 +1064,12 @@ float CoarseInitializer::computeRescale() {
 
 			float rescaleDelta = -b / H;
 
-			if (true) {
-				printf("lvl %i\tit %i\trescale %f\t rescaleDelta %f\tlvlAbsRes %f\tnGood %d\tlvlAbsResPP %f\n", lvl, it, rescale,
-						rescaleDelta, lvlAbsRes, nGood, lvlAbsRes / nGood);
+			if (it == 0 || it == 14) {
+				printf("lvl %i\tit %i\trescale %f\t rescaleDelta %f\tlvlAbsRes %f\tnGood %d of %d\tlvlAbsResPP %f\n", lvl, it,
+						rescale, rescaleDelta, lvlAbsRes, nGood, numPoints[lvl], lvlAbsRes / nGood);
 			}
 
-			rescale += rescaleDelta;
+			rescale += rescaleDelta; // * pow(2.0, lvl - 4.0);
 		}
 	}
 

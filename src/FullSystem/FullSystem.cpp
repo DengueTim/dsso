@@ -455,7 +455,7 @@ void FullSystem::traceNewCoarse(FrameHessian *fh) {
 		Vec2f aff = AffLight::fromToVecExposure(host->ab_exposure, fh->ab_exposure, host->aff_g2l(), fh->aff_g2l()).cast<float>();
 
 		for (ImmaturePoint *ph : host->immaturePoints) {
-			ph->traceOn(fh, KRKi, Kt, aff, &Hcalib, false);
+			ph->traceOn(fh, KRKi, Kt, aff, &Hcalib);
 
 			if (ph->lastTraceStatus == ImmaturePointStatus::IPS_GOOD)
 				trace_good++;
@@ -520,11 +520,11 @@ void FullSystem::activatePointsMT() {
 		printf("SPARSITY:  MinActDist %f (need %d points, have %d points)!\n", currentMinActDist,
 				(int) (setting_desiredPointDensity), ef->nPoints);
 
-	FrameHessian *newestHs = frameHessians.back();
+	FrameHessian *fhNewest = frameHessians.back();
 
 	// make dist map.
 	coarseDistanceMap->makeK(&Hcalib);
-	coarseDistanceMap->makeDistanceMap(frameHessians, newestHs);
+	coarseDistanceMap->makeDistanceMap(frameHessians, fhNewest);
 
 	//coarseTracker->debugPlotDistMap("distMap");
 
@@ -533,10 +533,10 @@ void FullSystem::activatePointsMT() {
 
 	for (FrameHessian *host : frameHessians)		// go through all active frames
 	{
-		if (host == newestHs)
+		if (host == fhNewest)
 			continue;
 
-		SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_camToWorld;
+		SE3 fhToNew = fhNewest->PRE_worldToCam * host->PRE_camToWorld;
 		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
 		Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
 
@@ -605,19 +605,19 @@ void FullSystem::activatePointsMT() {
 
 	for (unsigned k = 0; k < toOptimize.size(); k++) {
 		PointHessian *newpoint = optimized[k];
-		ImmaturePoint *ph = toOptimize[k];
+		ImmaturePoint *ip = toOptimize[k];
 
 		if (newpoint != 0 && newpoint != (PointHessian*) ((long) (-1))) {
-			newpoint->host->immaturePoints[ph->idxInImmaturePoints] = 0;
+			newpoint->host->immaturePoints[ip->idxInImmaturePoints] = 0;
 			newpoint->host->pointHessians.push_back(newpoint);
 			ef->insertPoint(newpoint);
 			for (PointFrameResidual *r : newpoint->residuals)
 				ef->insertResidual(r);
 			assert(newpoint->efPoint != 0);
-			delete ph;
-		} else if (newpoint == (PointHessian*) ((long) (-1)) || ph->lastTraceStatus == IPS_OOB) {
-			ph->host->immaturePoints[ph->idxInImmaturePoints] = 0;
-			delete ph;
+			delete ip;
+		} else if (newpoint == (PointHessian*) ((long) (-1)) || ip->lastTraceStatus == IPS_OOB) {
+			ip->host->immaturePoints[ip->idxInImmaturePoints] = 0;
+			delete ip;
 		} else {
 			assert(newpoint == 0 || newpoint == (PointHessian* )((long )(-1)));
 		}
@@ -675,7 +675,7 @@ void FullSystem::flagPointsForRemoval() {
 						r->resetOOB();
 						r->linearize(&Hcalib);
 						r->efResidual->isLinearized = false;
-						r->applyRes(true);
+						r->applyRes();
 						if (r->efResidual->isActive()) {
 							r->efResidual->fixLinearizationF(ef);
 							ngoodRes++;
@@ -942,8 +942,10 @@ void FullSystem::makeKeyFrame(FrameHessian *fh) {
 	// =========================== add new residuals for old points =========================
 	for (FrameHessian *fh1 : frameHessians)		// go through all active frames
 	{
+#ifndef ADD_LR_RESIDUALS
 		if (fh1 == fh)
 			continue;
+#endif
 		for (PointHessian *ph : fh1->pointHessians) {
 			PointFrameResidual *r = new PointFrameResidual(ph, fh);
 			r->setState(ResState::IN);
@@ -1088,6 +1090,16 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame, float rescale
 
 		firstFrame->pointHessians.push_back(ph);
 		ef->insertPoint(ph);
+
+#ifdef ADD_LR_RESIDUALS
+		// Add first frames Left/Right residuals.
+		PointFrameResidual *r = new PointFrameResidual(ph, firstFrame);
+		r->setState(ResState::IN);
+		ph->residuals.push_back(r);
+		ef->insertResidual(r);
+		ph->lastResiduals[1] = ph->lastResiduals[0];
+		ph->lastResiduals[0] = std::pair<PointFrameResidual*, ResState>(r, ResState::IN);
+#endif
 	}
 
 	SE3 firstToNew = coarseInitializer->thisToNext;

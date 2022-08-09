@@ -65,11 +65,11 @@ ImmaturePoint::~ImmaturePoint() {
  * * SKIP -> point has not been updated.
  */
 ImmaturePointStatus ImmaturePoint::traceOn(FrameHessian *frame, const Mat33f &hostToFrame_KRKi, const Vec3f &hostToFrame_Kt,
-		const Vec2f &hostToFrame_affine, CalibHessian *HCalib, bool debugPrint) {
+		const Vec2f &hostToFrame_affine, CalibHessian *HCalib) {
 	if (lastTraceStatus == ImmaturePointStatus::IPS_OOB)
 		return lastTraceStatus;
 
-	debugPrint = false; //rand()%100==0;
+	bool debugPrint = false; //rand()%100==0;
 	float maxPixSearch = (wG[0] + hG[0]) * setting_maxPixSearch;
 
 	if (debugPrint)

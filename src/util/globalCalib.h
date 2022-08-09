@@ -25,7 +25,7 @@
 #include "util/settings.h"
 
 namespace dso {
-extern int wG[PYR_LEVELS], hG[PYR_LEVELS];
+extern int wG[MAX_PYR_LEVELS], hG[MAX_PYR_LEVELS];
 
 extern float wM3G;
 extern float hM3G;

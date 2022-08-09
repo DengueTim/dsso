@@ -308,7 +308,7 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 		float pre_ux = HCalib->fxlR() * drescale * (PRE_RTll_0(2, 0) * u - PRE_RTll_0(0, 0)) * HCalib->fxli();
 		float pre_uy = HCalib->fxlR() * drescale * (PRE_RTll_0(2, 1) * u - PRE_RTll_0(0, 1)) * HCalib->fyli();
 
-		float pre_vx = HCalib->fyl() * drescale * (PRE_RTll_0(2, 0) * v - PRE_RTll_0(1, 0)) * HCalib->fxli();
+		float pre_vx = HCalib->fylR() * drescale * (PRE_RTll_0(2, 0) * v - PRE_RTll_0(1, 0)) * HCalib->fxli();
 		float pre_vy = HCalib->fylR() * drescale * (PRE_RTll_0(2, 1) * v - PRE_RTll_0(1, 1)) * HCalib->fyli();
 
 		d_C_u[0] = pre_ux * KliP[0] * SCALE_F;
@@ -356,13 +356,7 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 	const float *const color = point->color;
 	const float *const weights = point->weights;
 
-	Vec2f affLL = precalc->PRE_aff_mode;
-	float b0 = precalc->PRE_b0_mode;
-
 	float JIdxJIdx_00 = 0, JIdxJIdx_11 = 0, JIdxJIdx_10 = 0;
-	float JabJIdx_00 = 0, JabJIdx_01 = 0, JabJIdx_10 = 0, JabJIdx_11 = 0;
-	float JabJab_00 = 0, JabJab_01 = 0, JabJab_11 = 0;
-
 	float wJI2_sum = 0;
 
 	for (int idx = 0; idx < patternNum; idx++) {
@@ -376,7 +370,6 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 		Vec3f hitColor = (getInterpolatedElement33(dIl, Ku, Kv, wG[0]));
 		float residual = hitColor[0] - color[idx];
 
-		float drdA = (color[idx] - b0);
 		if (!std::isfinite((float) hitColor[0])) {
 			state_NewState = ResState::OOB;
 			return state_energy;
@@ -388,56 +381,39 @@ double PointFrameResidual::linearizeLeftRight(CalibHessian *HCalib) {
 		float hw = fabsf(residual) < setting_huberTH ? 1 : setting_huberTH / fabsf(residual);
 		energyLeft += w * w * hw * residual * residual * (2 - hw);
 
-		{
-			if (hw < 1)
-				hw = sqrtf(hw);
-			hw = hw * w;
+		if (hw < 1)
+			hw = sqrtf(hw);
+		hw = hw * w;
 
-			hitColor[1] *= hw;
-			hitColor[2] *= hw;
+		hitColor[1] *= hw;
+		hitColor[2] *= hw;
 
-			J->resF[idx] = residual * hw;
+		J->resF[idx] = residual * hw;
 
-			J->JIdx[0][idx] = hitColor[1]; // image gradient in x * hw
-			J->JIdx[1][idx] = hitColor[2]; // image gradient in y * hw
-			J->JabF[0][idx] = drdA * hw;
-			J->JabF[1][idx] = hw;
+		J->JIdx[0][idx] = hitColor[1]; // image gradient in x * hw
+		J->JIdx[1][idx] = hitColor[2]; // image gradient in y * hw
+		J->JabF[0][idx] = 0;
+		J->JabF[1][idx] = 0;
 
-			JIdxJIdx_00 += hitColor[1] * hitColor[1];
-			JIdxJIdx_11 += hitColor[2] * hitColor[2];
-			JIdxJIdx_10 += hitColor[1] * hitColor[2];
+		JIdxJIdx_00 += hitColor[1] * hitColor[1];
+		JIdxJIdx_11 += hitColor[2] * hitColor[2];
+		JIdxJIdx_10 += hitColor[1] * hitColor[2];
 
-			JabJIdx_00 += drdA * hw * hitColor[1];
-			JabJIdx_01 += drdA * hw * hitColor[2];
-			JabJIdx_10 += hw * hitColor[1];
-			JabJIdx_11 += hw * hitColor[2];
-
-			JabJab_00 += drdA * drdA * hw * hw;
-			JabJab_01 += drdA * hw * hw;
-			JabJab_11 += hw * hw;
-
-			wJI2_sum += hw * hw * (hitColor[1] * hitColor[1] + hitColor[2] * hitColor[2]);
-
-			if (setting_affineOptModeA < 0)
-				J->JabF[0][idx] = 0;
-			if (setting_affineOptModeB < 0)
-				J->JabF[1][idx] = 0;
-
-		}
+		wJI2_sum += hw * hw * (hitColor[1] * hitColor[1] + hitColor[2] * hitColor[2]);
 	}
 
 	J->JIdx2(0, 0) = JIdxJIdx_00;
 	J->JIdx2(0, 1) = JIdxJIdx_10;
 	J->JIdx2(1, 0) = JIdxJIdx_10;
 	J->JIdx2(1, 1) = JIdxJIdx_11;
-	J->JabJIdx(0, 0) = JabJIdx_00;
-	J->JabJIdx(0, 1) = JabJIdx_01;
-	J->JabJIdx(1, 0) = JabJIdx_10;
-	J->JabJIdx(1, 1) = JabJIdx_11;
-	J->Jab2(0, 0) = JabJab_00;
-	J->Jab2(0, 1) = JabJab_01;
-	J->Jab2(1, 0) = JabJab_01;
-	J->Jab2(1, 1) = JabJab_11;
+	J->JabJIdx(0, 0) = 0;
+	J->JabJIdx(0, 1) = 0;
+	J->JabJIdx(1, 0) = 0;
+	J->JabJIdx(1, 1) = 0;
+	J->Jab2(0, 0) = 0;
+	J->Jab2(0, 1) = 0;
+	J->Jab2(1, 0) = 0;
+	J->Jab2(1, 1) = 0;
 
 	state_NewEnergyWithOutlier = energyLeft;
 
@@ -481,19 +457,16 @@ void PointFrameResidual::debugPlot() {
 	}
 }
 
-void PointFrameResidual::applyRes(bool copyJacobians) {
-	if (copyJacobians) {
-		if (state_state == ResState::OOB) {
-			assert(!efResidual->isActiveAndIsGoodNEW);
-			return;	// can never go back from OOB
-		}
-		if (state_NewState == ResState::IN)	// && )
-				{
-			efResidual->isActiveAndIsGoodNEW = true;
-			efResidual->takeDataF();
-		} else {
-			efResidual->isActiveAndIsGoodNEW = false;
-		}
+void PointFrameResidual::applyRes() {
+	if (state_state == ResState::OOB) {
+		assert(!efResidual->isActiveAndIsGoodNEW);
+		return;	// can never go back from OOB
+	}
+	if (state_NewState == ResState::IN)	{
+		efResidual->isActiveAndIsGoodNEW = true;
+		efResidual->takeDataF();
+	} else {
+		efResidual->isActiveAndIsGoodNEW = false;
 	}
 
 	setState(state_NewState);

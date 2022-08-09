@@ -244,14 +244,14 @@ void FrameFramePrecalc::set(FrameHessian *host, FrameHessian *target, CalibHessi
 
 		// Not estimating exposure params between L/R images. Assuming they are the same.
 		PRE_aff_mode = Vec2f(1.0, 0.0);
-		PRE_b0_mode = host->aff_g2l_0().b;
+		PRE_b0_mode = 0; //host->aff_g2l_0().b;
 	} else {
 		// evalPT set when frame added and after GN optimisation.
 		// The paper says the evalPT is fixed when any residual dependent on the transform is marginalised...
 		// Guess if it's only set in the above cases it will be fixed when marginalizing points/frames??..
-		SE3 leftToLeft_0 = target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse();
-		PRE_RTll_0 = (leftToLeft_0.rotationMatrix()).cast<float>();
-		PRE_tTll_0 = (leftToLeft_0.translation()).cast<float>();
+		SE3 hostToTarget = target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse();
+		PRE_RTll_0 = (hostToTarget.rotationMatrix()).cast<float>();
+		PRE_tTll_0 = (hostToTarget.translation()).cast<float>();
 
 		// PREcalculated transform set when evalPT updated and for every GN step.
 		SE3 leftToLeft = target->PRE_worldToCam * host->PRE_camToWorld;
