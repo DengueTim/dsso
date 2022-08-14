@@ -32,7 +32,6 @@
 namespace dso {
 
 class EFPoint;
-class EnergyFunctional;
 
 class AccumulatedSCHessianSSE {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -82,10 +81,10 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		}
 		nframes[tid] = n;
 	}
-	void stitchDouble(MatXX &H_sc, VecX &b_sc, EnergyFunctional const *const EF);
+	void stitchDouble(MatXX &H_sc, VecX &b_sc);
 	void addPoint(EFPoint *p, bool shiftPriorToZero, int tid = 0);
 
-	void stitchDoubleMT(IndexThreadReduce<Vec10> *red, MatXX &H, VecX &b, EnergyFunctional const *const EF, bool MT) {
+	void stitchDoubleMT(IndexThreadReduce<Vec10> *red, MatXX &H, VecX &b, bool MT) {
 		// sum up, splitting by bock in square.
 		const int dSizeSquared = (nframes[0] + 1) * (nframes[0] + 1);
 
@@ -98,7 +97,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 				bs[i] = VecX::Zero(nframes[0] * 8 + CPARS);
 			}
 
-			red->reduce(boost::bind(&AccumulatedSCHessianSSE::stitchDoubleInternal, this, Hs, bs, EF, _1, _2, _3, _4), 0,
+			red->reduce(boost::bind(&AccumulatedSCHessianSSE::stitchDoubleInternal, this, Hs, bs, _1, _2, _3, _4), 0,
 					dSizeSquared, 0);
 
 			// sum up results
@@ -112,7 +111,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		} else {
 			H = MatXX::Zero(nframes[0] * 8 + CPARS, nframes[0] * 8 + CPARS);
 			b = VecX::Zero(nframes[0] * 8 + CPARS);
-			stitchDoubleInternal(&H, &b, EF, 0, dSizeSquared, 0, -1);
+			stitchDoubleInternal(&H, &b, 0, dSizeSquared, 0, -1);
 		}
 
 		copyUpperToLowerDiagonal(&H);
@@ -132,7 +131,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	}
 
 private:
-	void stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunctional const *const EF, int min, int max, Vec10 *stats, int tid);
+	void stitchDoubleInternal(MatXX *H, VecX *b, int min, int max, Vec10 *stats, int tid);
 	void copyUpperToLowerDiagonal(MatXX *H);
 };
 

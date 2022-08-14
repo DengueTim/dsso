@@ -33,7 +33,7 @@ namespace dso {
 class PointFrameResidual;
 class CalibHessian;
 class FrameHessian;
-class PointHessian;
+class PointHessianBase;
 
 class EFResidual;
 class EFPoint;
@@ -47,7 +47,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	inline EFResidual(PointFrameResidual *org, EFPoint *point_, EFFrame *host_, EFFrame *target_) :
 			data(org), point(point_), host(host_), target(target_) {
 		isLinearized = false;
-		isActiveAndIsGoodNEW = false;
+		isActive = false;
 		J = new RawResidualJacobian();
 		assert(((long )this) % 16 == 0);
 		assert(((long )J) % 16 == 0);
@@ -79,10 +79,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	bool isLinearized;
 
 	// if residual is not OOB & not OUTLIER & should be used during accumulations
-	bool isActiveAndIsGoodNEW;
-	inline const bool& isActive() const {
-		return isActiveAndIsGoodNEW;
-	}
+	bool isActive; // was isActiveAndIsGoodNEW.
 };
 
 enum EFPointStatus {
@@ -92,9 +89,9 @@ enum EFPointStatus {
 class EFPoint {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
-	EFPoint(PointHessian *ph_, EFFrame *host_);
+	EFPoint(PointHessianBase *ph_, EFFrame *host_);
 
-	PointHessian *ph;
+	PointHessianBase *ph;
 
 	float priorF;
 	float deltaF;

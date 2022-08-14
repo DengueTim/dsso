@@ -142,7 +142,7 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians) 
 		for (PointHessian *ph : fh->pointHessians) {
 			if (ph->lastResiduals[0].first != 0 && ph->lastResiduals[0].second == ResState::IN) {
 				PointFrameResidual *r = ph->lastResiduals[0].first;
-				assert(r->efResidual->isActive() && r->target == lastRef);
+				assert(r->efResidual->isActive && r->target == lastRef);
 				int u = r->centerProjectedTo[0] + 0.5f;
 				int v = r->centerProjectedTo[1] + 0.5f;
 				float new_idepth = r->centerProjectedTo[2];

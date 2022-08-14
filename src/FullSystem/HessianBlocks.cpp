@@ -31,10 +31,7 @@ namespace dso {
 PointHessian::PointHessian(const ImmaturePoint *const rawPoint) {
 	instanceCounter++;
 	host = rawPoint->host;
-	hasDepthPrior = false;
 
-	idepth_hessian = 0;
-	maxRelBaseline = 0;
 	numGoodResiduals = 0;
 
 	// set static values & initialization.
@@ -52,9 +49,6 @@ PointHessian::PointHessian(const ImmaturePoint *const rawPoint) {
 	memcpy(color, rawPoint->color, sizeof(float) * n);
 	memcpy(weights, rawPoint->weights, sizeof(float) * n);
 	energyTH = rawPoint->energyTH;
-
-	efPoint = 0;
-
 }
 
 void PointHessian::release() {

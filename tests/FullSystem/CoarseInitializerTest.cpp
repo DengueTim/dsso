@@ -29,7 +29,6 @@ protected:
 		const Mat33 rightK = (Mat33() << 457.584, 0, 379.493, 0, 456.13, 254.74, 0, 0, 1).finished();
 		Hcalib = new CalibHessian(leftK, rightK, leftToRight);
 
-
 		// Load image data from dump from commented code in makeImages()
 		float *leftImage = new float[imageWidth * imageHeight];
 		float *rightImage = new float[imageWidth * imageHeight];
@@ -56,9 +55,7 @@ protected:
 	}
 };
 
-TEST_F(CoarseInitializerTest, staticStereoDepth) {
+TEST_F(CoarseInitializerTest, setFirst) {
 	coarseInitializer->setFirst(Hcalib, frameHessian, outputWrapper);
-
-	EXPECT_EQ(1, 3);
 }
 

@@ -676,7 +676,7 @@ void FullSystem::flagPointsForRemoval() {
 						r->linearize(&Hcalib);
 						r->efResidual->isLinearized = false;
 						r->applyRes();
-						if (r->efResidual->isActive()) {
+						if (r->efResidual->isActive) {
 							r->efResidual->fixLinearizationF(ef);
 							ngoodRes++;
 						}

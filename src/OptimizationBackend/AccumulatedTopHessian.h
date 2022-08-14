@@ -31,8 +31,8 @@
 
 namespace dso {
 
+class EFFrame;
 class EFPoint;
-class EnergyFunctional;
 
 class AccumulatedTopHessianSSE {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -74,12 +74,11 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		nres[tid] = 0;
 
 	}
-	void stitchDouble(MatXX &H, VecX &b, EnergyFunctional const *const EF, bool usePrior, bool useDelta);
+	void stitchDouble(MatXX &H, VecX &b, Mat88 *adHost, Mat88 *adTarget, bool useDelta);
 
-	template<int mode> void addPoint(EFPoint *p, EnergyFunctional const *const ef, int tid = 0);
+	template<int mode> void addPoint(EFPoint *p, Mat18f *adHTdeltaF, VecC *cDelta, int tid = 0);
 
-	void stitchDoubleMT(IndexThreadReduce<Vec10> *red, MatXX &H, VecX &b, EnergyFunctional const *const EF, bool usePrior,
-			bool MT) {
+	void stitchDoubleMT(IndexThreadReduce<Vec10> *red, MatXX &H, VecX &b, Mat88 *adHost, Mat88 *adTarget, bool MT) {
 		// sum up, splitting by bock in square.
 		if (MT) {
 			MatXX Hs[NUM_THREADS];
@@ -90,7 +89,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 				bs[i] = VecX::Zero(nframes[0] * 8 + CPARS);
 			}
 
-			red->reduce(boost::bind(&AccumulatedTopHessianSSE::stitchDoubleInternal, this, Hs, bs, EF, usePrior, _1, _2, _3, _4), 0,
+			red->reduce(boost::bind(&AccumulatedTopHessianSSE::stitchDoubleInternal, this, Hs, bs, adHost, adTarget, _1, _2, _3, _4), 0,
 					nframes[0] * nframes[0], 0);
 
 			// sum up results
@@ -105,11 +104,13 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		} else {
 			H = MatXX::Zero(nframes[0] * 8 + CPARS, nframes[0] * 8 + CPARS);
 			b = VecX::Zero(nframes[0] * 8 + CPARS);
-			stitchDoubleInternal(&H, &b, EF, usePrior, 0, nframes[0] * nframes[0], 0, -1);
+			stitchDoubleInternal(&H, &b, adHost, adTarget, 0, nframes[0] * nframes[0], 0, -1);
 		}
 
-		copyUpperToLowerDiagonal(&H);
+		copyUpperToLowerDiagonal(H);
 	}
+
+	void addPrior(MatXX &H, VecX &b, VecC &cPrior, VecC &cDelta, std::vector<EFFrame*> &frames);
 
 	int nframes[NUM_THREADS];
 
@@ -117,18 +118,15 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 	int nres[NUM_THREADS];
 
-	template<int mode> void addPointsInternal(std::vector<EFPoint*> *points, EnergyFunctional const *const ef, int min = 0,
+	template<int mode> void addPointsInternal(std::vector<EFPoint*> *points, Mat18f *adHTdeltaF, VecC *cDelta, int min = 0,
 			int max = 1, Vec10 *stats = 0, int tid = 0) {
 		for (int i = min; i < max; i++)
-			addPoint<mode>((*points)[i], ef, tid);
+			addPoint<mode>((*points)[i], adHTdeltaF, cDelta, tid);
 	}
 
 private:
-
-	void stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunctional const *const EF, bool usePrior, int min, int max, Vec10 *stats,
-			int tid);
-
-	void copyUpperToLowerDiagonal(MatXX *H);
+	void stitchDoubleInternal(MatXX *H, VecX *b, Mat88 *adHost, Mat88 *adTarget, int min, int max, Vec10 *stats, int tid);
+	void copyUpperToLowerDiagonal(MatXX &H);
 };
 }
 

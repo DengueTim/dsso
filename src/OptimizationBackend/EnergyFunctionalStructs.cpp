@@ -81,10 +81,13 @@ EFFrame::EFFrame(EnergyFunctional *ef_, FrameHessian *fh_) :
 	idxInFrames = -1;
 }
 
-EFPoint::EFPoint(PointHessian *ph_, EFFrame *host_) :
+EFPoint::EFPoint(PointHessianBase *ph_, EFFrame *host_) :
 		ph(ph_), host(host_) {
-	if (!(setting_solverMode & SOLVER_REMOVE_POSEPRIOR )) {
-		priorF = ph->hasDepthPrior ? setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH : 0;
+
+	if (ph->hasDepthPrior && !(setting_solverMode & SOLVER_REMOVE_POSEPRIOR)) {
+		priorF = setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH;
+	} else {
+		priorF = 0;
 	}
 
 	deltaF = ph->idepth - ph->idepth_zero;
@@ -105,7 +108,7 @@ void EFResidual::fixLinearizationF(EnergyFunctional *ef) {
 
 	float dd = point->deltaF;
 	Vec8f dp = ef->adHTdeltaF[hostIDX + ef->nFrames * targetIDX];
-	VecCf dc = ef->cDeltaF;
+	VecCf dc = ef->cDelta.cast<float>();
 
 	float Jp_delta_x_1 = J->Jpdd[0] * dd;
 	float Jp_delta_y_1 = J->Jpdd[1] * dd;

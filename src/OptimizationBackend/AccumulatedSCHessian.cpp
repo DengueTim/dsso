@@ -22,7 +22,6 @@
  */
 
 #include "OptimizationBackend/AccumulatedSCHessian.h"
-#include "OptimizationBackend/EnergyFunctional.h"
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
 
 #include "FullSystem/HessianBlocks.h"
@@ -32,7 +31,7 @@ namespace dso {
 void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int tid) {
 	int ngoodres = 0;
 	for (EFResidual *r : p->residualsAll)
-		if (r->isActive())
+		if (r->isActive)
 			ngoodres++;
 	if (ngoodres == 0) {
 		p->HdiF = 0;
@@ -68,7 +67,7 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 
 	int dSize = nframes[tid] + 1;
 	for (EFResidual *r1 : p->residualsAll) {
-		if (!r1->isActive())
+		if (!r1->isActive)
 			continue;
 
 		int i = r1->hostIDX + 1;
@@ -76,7 +75,7 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 
 		if ( j == i ) {
 			for (EFResidual *r2 : p->residualsAll) {
-				if (!r2->isActive())
+				if (!r2->isActive)
 					continue;
 
 				int k = r2->targetIDX + 1;
@@ -93,7 +92,7 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 			accEB[tid][0].update(r1->JpJdAdT, p->bdSumF * p->HdiF);
 		} else {
 			for (EFResidual *r2 : p->residualsAll) {
-				if (!r2->isActive())
+				if (!r2->isActive)
 					continue;
 
 				int k = r2->targetIDX + 1;
@@ -119,8 +118,7 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 	}
 }
 
-void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunctional const *const EF, int min, int max,
-		Vec10 *stats, int tid) {
+void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, int min, int max, Vec10 *stats, int tid) {
 	int toAggregate = NUM_THREADS;
 	if (tid == -1) {
 		toAggregate = 1;
@@ -162,13 +160,13 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunc
 	}
 }
 
-void AccumulatedSCHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional const *const EF) {
+void AccumulatedSCHessianSSE::stitchDouble(MatXX &H, VecX &b) {
 	const int dSizeSquared = (nframes[0] + 1) * (nframes[0] + 1);
 
 	H = MatXX::Zero(nframes[0] * 8 + CPARS, nframes[0] * 8 + CPARS);
 	b = VecX::Zero(nframes[0] * 8 + CPARS);
 
-	stitchDoubleInternal(&H, &b, EF, 0, dSizeSquared, 0, -1);
+	stitchDoubleInternal(&H, &b, 0, dSizeSquared, 0, -1);
 	copyUpperToLowerDiagonal(&H);
 }
 

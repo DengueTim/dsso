@@ -146,6 +146,7 @@ enable_testing()
 add_executable(
   all_tests
   ${PROJECT_SOURCE_DIR}/tests/FullSystem/CoarseInitializerTest.cpp
+  ${PROJECT_SOURCE_DIR}/tests/OptimizationBackend/AccumulatedTopHessianTest.cpp
 )
 
 target_link_libraries(

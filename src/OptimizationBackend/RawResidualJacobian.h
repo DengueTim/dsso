@@ -23,6 +23,8 @@
 
 #pragma once
 
+#include <iostream>
+
 #include "util/NumType.h"
 
 namespace dso {
@@ -79,6 +81,22 @@ struct RawResidualJacobian {
 	 */
 	Mat22f Jab2;			// 2x2
 
+	void print() {
+		std::cout << "\tJ->resF" << resF.format(MatFormatInit) << "\n";
+		std::cout << "\tJ->Jpdxi[0]" << Jpdxi[0].format(MatFormatInit) << "\n";
+		std::cout << "\tJ->Jpdxi[1]" << Jpdxi[1].format(MatFormatInit) << "\n";
+		std::cout << "\tJ->Jpdc[0]" << Jpdc[0].format(MatFormatInit) << "\n";
+		std::cout << "\tJ->Jpdc[1]" << Jpdc[1].format(MatFormatInit) << "\n";
+		std::cout << "\tJ->Jpdd" << Jpdd.format(MatFormatInit) << "\n";
+		std::cout << "\tJ->JIdx[0]" << JIdx[0].format(MatFormatInit) << "\n";
+		std::cout << "\tJ->JIdx[1]" << JIdx[1].format(MatFormatInit) << "\n";
+		std::cout << "\tJ->JabF[0]" << JabF[0].format(MatFormatInit) << "\n";
+		std::cout << "\tJ->JabF[1]" << JabF[1].format(MatFormatInit) << "\n";
+		std::cout << "\tJ->JIdx2" << JIdx2.format(MatFormatInit) << "\n";
+		std::cout << "\tJ->JabJIdx" << JabJIdx.format(MatFormatInit) << "\n";
+		std::cout << "\tJ->Jab2" << Jab2.format(MatFormatInit) << "\n";
+		std::cout << "\n";
+	}
 };
 }
 

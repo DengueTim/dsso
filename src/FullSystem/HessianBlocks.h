@@ -503,11 +503,38 @@ private:
  * 		Various computed derivative components used to compute the Jacobian & Hessian partial derivatives.
  * The inverse depth is optimised using the residual error from the point's projection into the target frame.
  */
-struct PointHessian {
+
+struct PointHessianBase {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
-	static int instanceCounter;
+	// Class with bits used by optimiser.. for easier testing..
 	EFPoint *efPoint;
+
+	bool hasDepthPrior;
+
+	float idepth_zero;
+	float idepth;
+	float step;
+
+	float idepth_hessian;
+	float maxRelBaseline;
+
+	PointHessianBase() {
+		efPoint = 0;
+
+		hasDepthPrior = false;
+
+		idepth_zero = 0;
+		idepth = 0;
+		step = 0;
+
+		idepth_hessian = 0;
+		maxRelBaseline = 0;
+	}
+};
+
+struct PointHessian : public PointHessianBase {
+	static int instanceCounter;
 
 	// static values
 	float color[MAX_RES_PER_POINT];			// colors in host frame
@@ -517,21 +544,15 @@ struct PointHessian {
 	int idx;
 	float energyTH;
 	FrameHessian *host;
-	bool hasDepthPrior;
 
 	char my_type;
 
 	float idepth_scaled;
 	float idepth_zero_scaled;
-	float idepth_zero;
-	float idepth;
-	float step;
 	float step_backup;
 	float idepth_backup;
 
 	float nullspaces_scale;
-	float idepth_hessian;
-	float maxRelBaseline;
 	int numGoodResiduals;
 
 	enum PtStatus {

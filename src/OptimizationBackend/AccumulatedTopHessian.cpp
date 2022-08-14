@@ -22,7 +22,6 @@
  */
 
 #include "OptimizationBackend/AccumulatedTopHessian.h"
-#include "OptimizationBackend/EnergyFunctional.h"
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
 #include <iostream>
 
@@ -33,24 +32,25 @@
 namespace dso {
 
 template<int mode>
-void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *const ef, int tid) { // 0 = active, 1 = linearized, 2=marginalize
+void __attribute__((optimize(0))) AccumulatedTopHessianSSE::addPoint(EFPoint *p, Mat18f *adHTdeltaF, VecC *cDelta, int tid) { // 0 = active, 1 = linearized, 2=marginalize
 	assert(mode == 0 || mode == 1 || mode == 2);
 
 	float bd_acc = 0;
 	float Hdd_acc = 0;
 	VecCf Hcd_acc = VecCf::Zero();
+	VecCf dc = cDelta->cast<float>();
 
 	for (EFResidual *r : p->residualsAll) {
 		if (mode == 0) {
-			if (r->isLinearized || !r->isActive())
+			if (r->isLinearized || !r->isActive)
 				continue;
 		}
 		if (mode == 1) {
-			if (!r->isLinearized || !r->isActive())
+			if (!r->isLinearized || !r->isActive)
 				continue;
 		}
 		if (mode == 2) {
-			if (!r->isActive())
+			if (!r->isActive)
 				continue;
 			assert(r->isLinearized);
 		}
@@ -66,8 +66,7 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 		if (mode == 2)
 			resApprox = r->res_toZeroF;
 		if (mode == 1) {
-			Mat18f dp = ef->adHTdeltaF[htIDX];
-			VecCf dc = ef->cDeltaF;
+			Mat18f dp = adHTdeltaF[htIDX];
 			float dd = p->deltaF;
 
 			float Jp_delta_x_1 = rJ->Jpdd[0] * dd;
@@ -149,36 +148,35 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint *p, EnergyFunctional const *cons
 	}
 
 }
-template void AccumulatedTopHessianSSE::addPoint<0>(EFPoint *p, EnergyFunctional const *const ef, int tid);
-template void AccumulatedTopHessianSSE::addPoint<1>(EFPoint *p, EnergyFunctional const *const ef, int tid);
-template void AccumulatedTopHessianSSE::addPoint<2>(EFPoint *p, EnergyFunctional const *const ef, int tid);
+template void AccumulatedTopHessianSSE::addPoint<0>(EFPoint *p, Mat18f *adHTdeltaF, VecC *dc, int tid);
+template void AccumulatedTopHessianSSE::addPoint<1>(EFPoint *p, Mat18f *adHTdeltaF, VecC *dc, int tid);
+template void AccumulatedTopHessianSSE::addPoint<2>(EFPoint *p, Mat18f *adHTdeltaF, VecC *dc, int tid);
 
-void AccumulatedTopHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional const *const EF, bool usePrior, bool useDelta) {
+void AccumulatedTopHessianSSE::stitchDouble(MatXX &H, VecX &b, Mat88 *adHost, Mat88 *adTarget, bool useDelta) {
 	H = MatXX::Zero(nframes[0] * 8 + CPARS, nframes[0] * 8 + CPARS);
 	b = VecX::Zero(nframes[0] * 8 + CPARS);
 
-	stitchDoubleInternal(&H, &b, EF, usePrior, 0, nframes[0] * nframes[0], 0, -1);
+	stitchDoubleInternal(&H, &b, adHost, adTarget, 0, nframes[0] * nframes[0], 0, -1);
 
-	copyUpperToLowerDiagonal(&H);
+	copyUpperToLowerDiagonal(H);
 }
 
-void AccumulatedTopHessianSSE::copyUpperToLowerDiagonal(MatXX *H) {
+void AccumulatedTopHessianSSE::copyUpperToLowerDiagonal(MatXX &H) {
 	// make diagonal by copying over parts.
 	for (int h = 0; h < nframes[0]; h++) {
 		int hIdx = CPARS + h * 8;
-		H->block<CPARS, 8>(0, hIdx).noalias() = H->block<8, CPARS>(hIdx, 0).transpose();
+		H.block<CPARS, 8>(0, hIdx).noalias() = H.block<8, CPARS>(hIdx, 0).transpose();
 
 		for (int t = h + 1; t < nframes[0]; t++) {
 			int tIdx = CPARS + t * 8;
-			H->block<8, 8>(hIdx, tIdx).noalias() += H->block<8, 8>(tIdx, hIdx).transpose();
-			H->block<8, 8>(tIdx, hIdx).noalias() = H->block<8, 8>(hIdx, tIdx).transpose();
+			H.block<8, 8>(hIdx, tIdx).noalias() += H.block<8, 8>(tIdx, hIdx).transpose();
+			H.block<8, 8>(tIdx, hIdx).noalias() = H.block<8, 8>(hIdx, tIdx).transpose();
 		}
 	}
-	H->block<CIPARS, 6>(0, CIPARS).noalias() = H->block<6, CIPARS>(CIPARS, 0).transpose();
+	H.block<CIPARS, 6>(0, CIPARS).noalias() = H.block<6, CIPARS>(CIPARS, 0).transpose();
 }
 
-void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFunctional const *const EF, bool usePrior, int min,
-		int max, Vec10 *stats, int tid) {
+void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, Mat88 *adHost, Mat88 *adTarget, int min, int max, Vec10 *stats, int tid) {
 	int toAggregate = NUM_THREADS;
 	if (tid == -1) {
 		toAggregate = 1;
@@ -223,39 +221,38 @@ void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, EnergyFun
 
 		if (h != t) {
 			const Eigen::Ref<Mat88> &poseAbBlk = accH.block<8, 8>(CIPARS, CIPARS);
-			H[tid].block<8, 8>(hIdx, hIdx).noalias() += EF->adHost[aidx] * poseAbBlk * EF->adHost[aidx].transpose();
-			H[tid].block<8, 8>(tIdx, tIdx).noalias() += EF->adTarget[aidx] * poseAbBlk * EF->adTarget[aidx].transpose();
-			H[tid].block<8, 8>(hIdx, tIdx).noalias() += EF->adHost[aidx] * poseAbBlk * EF->adTarget[aidx].transpose();
+			H[tid].block<8, 8>(hIdx, hIdx).noalias() += adHost[aidx] * poseAbBlk * adHost[aidx].transpose();
+			H[tid].block<8, 8>(tIdx, tIdx).noalias() += adTarget[aidx] * poseAbBlk * adTarget[aidx].transpose();
+			H[tid].block<8, 8>(hIdx, tIdx).noalias() += adHost[aidx] * poseAbBlk * adTarget[aidx].transpose();
 
 			// For left-left residuals only copy the intrisics, LR bit is zero for h != t
 			const Eigen::Ref<Mat88> &poseAbIntrinsicsLowerBlk = accH.block<8, CIPARS>(CIPARS, 0);
-			H[tid].block<8, CIPARS>(hIdx, 0).noalias() += EF->adHost[aidx] * poseAbIntrinsicsLowerBlk;
-			H[tid].block<8, CIPARS>(tIdx, 0).noalias() += EF->adTarget[aidx] * poseAbIntrinsicsLowerBlk;
+			H[tid].block<8, CIPARS>(hIdx, 0).noalias() += adHost[aidx] * poseAbIntrinsicsLowerBlk;
+			H[tid].block<8, CIPARS>(tIdx, 0).noalias() += adTarget[aidx] * poseAbIntrinsicsLowerBlk;
 
 			// Accumulate residual to host and target pose & AB.
 			const Eigen::Ref<Vec8> &poseAbResidual = accH.block<8, 1>(CIPARS, CIPARS + 8);
-			b[tid].segment<8>(hIdx).noalias() += EF->adHost[aidx] * poseAbResidual;
-			b[tid].segment<8>(tIdx).noalias() += EF->adTarget[aidx] * poseAbResidual;
+			b[tid].segment<8>(hIdx).noalias() += adHost[aidx] * poseAbResidual;
+			b[tid].segment<8>(tIdx).noalias() += adTarget[aidx] * poseAbResidual;
 
 		} else {
 			// h == t. Accumulate just the LR pose to the top left corner of H and first elements of b
 			// LR pose with adjoint...
-//			const Mat66 adjoint = EF->adHost[aidx].topLeftCorner(6, 6);
-			const Mat66 adjoint = EF->adTarget[aidx].topLeftCorner(6, 6); // Identity with scaling.
+//			const Mat66 adjoint = adHost[aidx].topLeftCorner(6, 6);
+			const Mat66 adjoint = adTarget[aidx].topLeftCorner(6, 6); // Identity with scaling.
 			H[tid].block<6, 6>(CIPARS, CIPARS).noalias() += adjoint * accH.block<6, 6>(CIPARS, CIPARS) * adjoint.transpose();
 			H[tid].block<6, CIPARS>(CIPARS, 0).noalias() += adjoint * accH.block<6, CIPARS>(CIPARS, 0); // Is copied/flipped in copyUpperToLowerDiagonal
 			b[tid].segment<6>(CIPARS).noalias() += adjoint * accH.block<6, 1>(CIPARS, CIPARS + 8);
 		}
 	}
+}
 
-	// only do this on one thread.
-	if (min == 0 && usePrior) {
-		H[tid].diagonal().head<CPARS>() += EF->cPrior;
-		b[tid].head<CPARS>() += EF->cPrior.cwiseProduct(EF->cDeltaF.cast<double>());
-		for (int h = 0; h < nframes[tid]; h++) {
-			H[tid].diagonal().segment<8>(CPARS + h * 8) += EF->frames[h]->prior;
-			b[tid].segment<8>(CPARS + h * 8) += EF->frames[h]->prior.cwiseProduct(EF->frames[h]->delta_prior);
-		}
+void AccumulatedTopHessianSSE::addPrior(MatXX &H, VecX &b, VecC &cPrior, VecC &cDelta, std::vector<EFFrame*> &frames) {
+	H.diagonal().head<CPARS>() += cPrior;
+	b.head<CPARS>() += cPrior.cwiseProduct(cDelta);
+	for (int h = 0; h < nframes[0]; h++) {
+		H.diagonal().segment<8>(CPARS + h * 8) += frames[h]->prior;
+		b.segment<8>(CPARS + h * 8) += frames[h]->prior.cwiseProduct(frames[h]->delta_prior);
 	}
 }
 

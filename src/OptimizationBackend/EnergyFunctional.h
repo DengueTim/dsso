@@ -123,7 +123,7 @@ private:
 	Mat88f *adTargetF;
 
 	VecC cPrior;
-	VecCf cDeltaF;
+	VecC cDelta;
 
 	AccumulatedTopHessianSSE *accTop_L;  // Contribution from Linearized points.
 	AccumulatedTopHessianSSE *accTop_A;  // Contribution from Active points. Used for marginalization and GN step

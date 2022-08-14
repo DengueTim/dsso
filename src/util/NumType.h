@@ -23,7 +23,7 @@
 
 #pragma once
 
-#include "Eigen/Core"
+#include <Eigen/Core>
 #include "sophus/sim3.hpp"
 #include "sophus/se3.hpp"
 
@@ -177,6 +177,8 @@ struct AffLight {
 		return Vec2(a, b);
 	}
 };
+
+const Eigen::IOFormat MatFormatInit = Eigen::IOFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", " << ", ";");
 
 }
 
