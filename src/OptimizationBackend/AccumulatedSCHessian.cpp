@@ -78,14 +78,14 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 		int i = r1->hostIDX + 1;
 		int j = r1->targetIDX + 1;
 
-		if ( j == i ) {
+		if (j == i) {
 			for (EFResidual *r2 : p->residualsAll) {
 				if (!r2->isActive)
 					continue;
 
 				int k = r2->targetIDX + 1;
 
-				if ( k != i ) {
+				if (k != i) {
 					accD[tid][i].update(r2->JpJdAdH, r1->JpJdAdT, p->HdiF);
 					accD[tid][k].update(r2->JpJdAdT, r1->JpJdAdT, p->HdiF);
 				}
@@ -102,7 +102,7 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 
 				int k = r2->targetIDX + 1;
 
-				if ( k != i ) {
+				if (k != i) {
 					int ii = i + dSize * i;
 					int jk = j + dSize * k;
 					int ji = j + dSize * i;
@@ -181,7 +181,7 @@ void AccumulatedSCHessianSSE::copyUpperToLowerDiagonal(MatXX *H) {
 	for (int h = 0; h < nframes[0]; h++) {
 		int hIdx = CPARS + h * 8;
 		H->block<CIPARS, 8>(0, hIdx).noalias() = H->block<8, CIPARS>(hIdx, 0).transpose();
-		H->block<6,8>(CIPARS, hIdx).noalias() = H->block<8, 6>(hIdx, CIPARS).transpose();
+		H->block<6, 8>(CIPARS, hIdx).noalias() = H->block<8, 6>(hIdx, CIPARS).transpose();
 	}
 }
 

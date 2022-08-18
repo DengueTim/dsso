@@ -85,7 +85,7 @@ EFFrame::EFFrame(EnergyFunctional *ef_, FrameHessian *fh_) :
 EFPoint::EFPoint(PointHessianBase *ph_, EFFrame *host_) :
 		ph(ph_), host(host_) {
 
-	if (ph->hasDepthPrior && !(setting_solverMode & SOLVER_REMOVE_POSEPRIOR)) {
+	if (ph->hasDepthPrior && !(setting_solverMode & SOLVER_REMOVE_POSEPRIOR )) {
 		priorF = setting_idepthFixPrior * SCALE_IDEPTH * SCALE_IDEPTH;
 	} else {
 		priorF = 0;

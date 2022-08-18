@@ -351,7 +351,7 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian *fh) {
 							* SE3(Sophus::Quaterniond(1, rotDelta, rotDelta, rotDelta), Vec3(0, 0, 0)));// assume constant motion.
 		}
 	}
-	
+
 	if (lastF_2_fh_tries.size() == 0) {
 		lastF_2_fh_tries.push_back(SE3()); // assume zero motion FROM KF.
 	}
@@ -1060,8 +1060,8 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame, float rescale
 	float keepPercentage = setting_desiredPointDensity / coarseInitializer->numPoints[0];
 
 	if (!setting_debugout_runquiet)
-		printf("Initialization: keep %.1f%% (need %d, have %d) rescaleFactor: %f\n", 100 * keepPercentage, (int) (setting_desiredPointDensity),
-				coarseInitializer->numPoints[0], rescaleFactor);
+		printf("Initialization: keep %.1f%% (need %d, have %d) rescaleFactor: %f\n", 100 * keepPercentage,
+				(int) (setting_desiredPointDensity), coarseInitializer->numPoints[0], rescaleFactor);
 
 	for (int i = 0; i < coarseInitializer->numPoints[0]; i++) {
 		if (rand() / (float) RAND_MAX > keepPercentage)

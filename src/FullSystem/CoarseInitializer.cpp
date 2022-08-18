@@ -220,7 +220,7 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, std::vector<IO
 
 	debugPlot(0, wraps);
 
-	return snapped && frameID > snappedAt + 5;
+	return snapped && frameID > snappedAt + 10;
 }
 
 void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps) {
@@ -988,7 +988,7 @@ float CoarseInitializer::computeRescale() {
 			for (int pntIdx = 0; pntIdx < numPoints[lvl]; pntIdx++) {
 				Pnt *pnt = points[lvl] + pntIdx;
 
-				if (pnt->iR < 0.2 || pnt->iR > 5) { // exclude points that are ....
+				if (pnt->iR < 0.01 || pnt->iR > 1) { // exclude points that are ....
 					continue;
 				}
 

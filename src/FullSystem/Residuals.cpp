@@ -462,7 +462,7 @@ void PointFrameResidual::applyRes() {
 		assert(!efResidual->isActive);
 		return;	// can never go back from OOB
 	}
-	if (state_NewState == ResState::IN)	{
+	if (state_NewState == ResState::IN) {
 		efResidual->isActive = true;
 		efResidual->takeDataF();
 	} else {

@@ -182,8 +182,9 @@ void EnergyFunctional::setDeltaF(CalibHessian *HCalib) {
 void EnergyFunctional::accumulateAF_MT(MatXX &H, VecX &b, bool MT) {
 	if (MT) {
 		red->reduce(boost::bind(&AccumulatedTopHessianSSE::setZero, accTop_A, nFrames, _1, _2, _3, _4), 0, 0, 0);
-		red->reduce(boost::bind(&AccumulatedTopHessianSSE::addPointsInternal<0>, accTop_A, &allPoints, adHTdeltaF, &cDelta, _1, _2, _3, _4), 0,
-				allPoints.size(), 50);
+		red->reduce(
+				boost::bind(&AccumulatedTopHessianSSE::addPointsInternal<0>, accTop_A, &allPoints, adHTdeltaF, &cDelta, _1, _2, _3,
+						_4), 0, allPoints.size(), 50);
 		accTop_A->stitchDoubleMT(red, H, b, adHost, adTarget, true);
 		resInA = accTop_A->nres[0];
 	} else {
@@ -200,8 +201,9 @@ void EnergyFunctional::accumulateAF_MT(MatXX &H, VecX &b, bool MT) {
 void EnergyFunctional::accumulateLF_MT(MatXX &H, VecX &b, bool MT) {
 	if (MT) {
 		red->reduce(boost::bind(&AccumulatedTopHessianSSE::setZero, accTop_L, nFrames, _1, _2, _3, _4), 0, 0, 0);
-		red->reduce(boost::bind(&AccumulatedTopHessianSSE::addPointsInternal<1>, accTop_L, &allPoints, adHTdeltaF, &cDelta, _1, _2, _3, _4), 0,
-				allPoints.size(), 50);
+		red->reduce(
+				boost::bind(&AccumulatedTopHessianSSE::addPointsInternal<1>, accTop_L, &allPoints, adHTdeltaF, &cDelta, _1, _2, _3,
+						_4), 0, allPoints.size(), 50);
 		accTop_L->stitchDoubleMT(red, H, b, adHost, adTarget, true);
 		accTop_L->addPrior(H, b, cPrior, cDelta, frames);
 		resInL = accTop_L->nres[0];
@@ -465,16 +467,6 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 	int ndim = nFrames * 8 + CPARS - 8;  // new dimension
 	int odim = nFrames * 8 + CPARS;  // old dimension
 
-	for (int i = 0; i < ndim; i++) {
-		if (HM(i, i) < 0.0) {
-			MatXX tmp = MatXX::Zero(ndim, 1);
-			tmp.col(0) = HM.diagonal().head(ndim);
-			std::cout << "      HM\n" << tmp << "\n\n";
-//				std::cout << "HM:\n" << HM << "\n\n";
-			assert(false);
-		}
-	}
-
 //	VecX eigenvaluesPre = HM.eigenvalues().real();
 //	std::sort(eigenvaluesPre.data(), eigenvaluesPre.data()+eigenvaluesPre.size());
 //
@@ -512,17 +504,6 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 //	std::cout << std::setprecision(16) << "SVec: " << SVec.transpose() << "\n\n";
 //	std::cout << std::setprecision(16) << "SVecI: " << SVecI.transpose() << "\n\n";
 
-	for (int i = 0; i < ndim; i++) {
-		if (HM(i, i) < 0.0) {
-			MatXX tmp = MatXX::Zero(ndim, 2);
-			tmp.col(0) = SVecI.head(ndim);
-			tmp.col(1) = HM.diagonal().head(ndim);
-			std::cout << "      SVecI             HM\n" << tmp << "\n\n";
-//				std::cout << "HM:\n" << HM << "\n\n";
-			assert(false);
-		}
-	}
-
 	// scale!
 	MatXX HMScaled = SVecI.asDiagonal() * HM * SVecI.asDiagonal();
 	VecX bMScaled = SVecI.asDiagonal() * bM;
@@ -535,25 +516,8 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 
 	// schur-complement!
 	MatXX bli = HMScaled.bottomLeftCorner(8, ndim).transpose() * hpi;
-	MatXX Hsc = bli * HMScaled.bottomLeftCorner(8, ndim);
-	HMScaled.topLeftCorner(ndim, ndim).noalias() -= Hsc;
+	HMScaled.topLeftCorner(ndim, ndim).noalias() -= bli * HMScaled.bottomLeftCorner(8, ndim);
 	bMScaled.head(ndim).noalias() -= bli * bMScaled.tail<8>();
-
-	for (int i = 0; i < ndim; i++) {
-		if (HMScaled(i, i) < 0.0) {
-			std::cout << "blc = [\n" << HMScaled.bottomLeftCorner(8, ndim) << "\n]\nhpi = [\n" << hpi << "\n]\n";
-			std::cout << "Hsc.diag:\t" << Hsc.diagonal().transpose() << "\n\n";
-			std::cout << "HM = [\n" << HM.topLeftCorner(14, 14) << "\n]\n";
-			std::cout << "SVecI = [" << SVecI.head(14).transpose() << "\n]\n";
-//			MatXX tmp = MatXX::Zero(ndim, 3);
-//			tmp.col(0) = SVecI.head(ndim);
-//			tmp.col(1) = Hsc.diagonal();
-//			tmp.col(2) = HMScaled.diagonal().head(ndim);
-//			std::cout << "      SVecI        Hsc	   HMScaled\n" << tmp << "\n\n";
-//				std::cout << "HM:\n" << HM << "\n\n";
-			assert(false);
-		}
-	}
 
 	//unscale!
 	HMScaled = SVec.asDiagonal() * HMScaled * SVec.asDiagonal();
@@ -562,18 +526,6 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 	// set.
 	HM = 0.5 * (HMScaled.topLeftCorner(ndim, ndim) + HMScaled.topLeftCorner(ndim, ndim).transpose());
 	bM = bMScaled.head(ndim);
-
-	for (int i = 0; i < ndim; i++) {
-		if (HM(i, i) < 0.0) {
-			MatXX tmp = MatXX::Zero(ndim, 3);
-			tmp.col(0) = SVecI.head(ndim);
-			tmp.col(1) = HMScaled.diagonal().head(ndim);
-			tmp.col(2) = HM.diagonal();
-			std::cout << "      SVecI           HMScaled   HM\n" << tmp << "\n\n";
-//				std::cout << "HM:\n" << HM << "\n\n";
-			assert(false);
-		}
-	}
 
 	// remove from vector, without changing the order!
 	for (unsigned int i = fh->idxInFrames; i + 1 < frames.size(); i++) {
@@ -811,20 +763,6 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *
 		for (int i = 0; i < 8 * nFrames + CPARS; i++)
 			HFinal_top(i, i) *= (1 + lambda);
 		HFinal_top -= H_sc * (1.0f / (1 + lambda));
-
-		for (int i = 0; i < bFinal_top.size(); i++) {
-			if (HFinal_top(i, i) < 0.0) {
-				MatXX tmp = MatXX::Zero(HL_top.rows(), 5);
-				tmp.col(0) = HL_top.diagonal();
-				tmp.col(1) = HM.diagonal();
-				tmp.col(2) = HA_top.diagonal();
-				tmp.col(3) = H_sc.diagonal();
-				tmp.col(4) = HFinal_top.diagonal();
-				std::cout << "      HL_top           HM       HA_top         H_sc   HFinal_top\n" << tmp << "\n\n";
-//				std::cout << "HM:\n" << HM << "\n\n";
-				assert(false);
-			}
-		}
 	}
 
 	VecX x;
@@ -865,15 +803,6 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *
 		VecX SVecI = (HFinal_top.diagonal() + VecX::Constant(HFinal_top.cols(), 10)).cwiseSqrt().cwiseInverse();
 		MatXX HFinalScaled = SVecI.asDiagonal() * HFinal_top * SVecI.asDiagonal();
 		x = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFinal_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
-
-		for (int i = 0; i < x.size(); i++) {
-			if (!std::isfinite(x[i])) {
-				std::cout << "HFinal_top:\n" << HFinal_top << "\n\nHFinal_top diagonal:\n" << HFinal_top.diagonal().transpose()
-						<< "\n\nbFinal_top:\n" << bFinal_top << "\n";
-				assert(false);
-			}
-		}
-		//std::cout << "H_sc:\n" << H_sc << "\n\nb_sc:\n" << b_sc << "\n";
 	}
 
 	if ((setting_solverMode & SOLVER_ORTHOGONALIZE_X )
@@ -881,15 +810,6 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *
 		VecX xOld = x;
 		orthogonalize(&x, 0);
 	}
-
-	for (int i = 0; i < x.size(); i++) {
-		if (!std::isfinite(x[i])) {
-			std::cout << "HFinal_top:\n" << HFinal_top << "\n\nbFinal_top:\n" << bFinal_top << "\n";
-			assert(false);
-		}
-	}
-
-	// std::cout << "x:\n" << x << "\n";
 
 	lastX = x;
 

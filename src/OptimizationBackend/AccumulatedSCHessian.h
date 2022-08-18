@@ -97,8 +97,8 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 				bs[i] = VecX::Zero(nframes[0] * 8 + CPARS);
 			}
 
-			red->reduce(boost::bind(&AccumulatedSCHessianSSE::stitchDoubleInternal, this, Hs, bs, _1, _2, _3, _4), 0,
-					dSizeSquared, 0);
+			red->reduce(boost::bind(&AccumulatedSCHessianSSE::stitchDoubleInternal, this, Hs, bs, _1, _2, _3, _4), 0, dSizeSquared,
+					0);
 
 			// sum up results
 			H = Hs[0];

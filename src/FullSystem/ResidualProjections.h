@@ -73,7 +73,8 @@ EIGEN_STRONG_INLINE bool projectPoint(const float u_pt, const float v_pt, const 
 	return Ku > 1.1f && Kv > 1.1f && Ku < wM3G && Kv < hM3G;
 }
 
-EIGEN_STRONG_INLINE bool projectPointLR(float ul, float vl, float idepthl, CalibHessian *const&HCalib, float &ur, float &vr, float &idepthr) {
+EIGEN_STRONG_INLINE bool projectPointLR(float ul, float vl, float idepthl, CalibHessian *const&HCalib, float &ur, float &vr,
+		float &idepthr) {
 	Vec3f KliP = Vec3f((ul - HCalib->cxl()) * HCalib->fxli(), (vl - HCalib->cyl()) * HCalib->fyli(), 1);
 
 	SE3 leftToRight = HCalib->getLeftToRight();

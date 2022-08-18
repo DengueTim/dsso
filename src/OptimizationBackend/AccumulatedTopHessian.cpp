@@ -176,7 +176,8 @@ void AccumulatedTopHessianSSE::copyUpperToLowerDiagonal(MatXX &H) {
 	H.block<CIPARS, 6>(0, CIPARS).noalias() = H.block<6, CIPARS>(CIPARS, 0).transpose();
 }
 
-void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, Mat88 *adHost, Mat88 *adTarget, int min, int max, Vec10 *stats, int tid) {
+void AccumulatedTopHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, Mat88 *adHost, Mat88 *adTarget, int min, int max,
+		Vec10 *stats, int tid) {
 	int toAggregate = NUM_THREADS;
 	if (tid == -1) {
 		toAggregate = 1;

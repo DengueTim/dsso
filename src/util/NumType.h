@@ -178,7 +178,8 @@ struct AffLight {
 	}
 };
 
-const Eigen::IOFormat MatFormatInit = Eigen::IOFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", " << ", ";");
+const Eigen::IOFormat MatFormatInit = Eigen::IOFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", " << ",
+		";");
 
 }
 

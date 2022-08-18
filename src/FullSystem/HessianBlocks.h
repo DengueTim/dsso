@@ -259,7 +259,7 @@ struct FrameHessian {
 	inline Vec10 getPrior() {
 		Vec10 p = Vec10::Zero();
 		if (keyFrameID == 0) {
-			if (!(setting_solverMode & SOLVER_REMOVE_POSEPRIOR)) {
+			if (!(setting_solverMode & SOLVER_REMOVE_POSEPRIOR )) {
 				p.head<3>() = Vec3::Constant(setting_initialTransPrior);
 				p.segment<3>(3) = Vec3::Constant(setting_initialRotPrior);
 			}
@@ -533,7 +533,7 @@ struct PointHessianBase {
 	}
 };
 
-struct PointHessian : public PointHessianBase {
+struct PointHessian: public PointHessianBase {
 	static int instanceCounter;
 
 	// static values

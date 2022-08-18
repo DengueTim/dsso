@@ -269,7 +269,7 @@ bool FullSystem::doStepFromBackup(float stepfacC, float stepfacT, float stepfacR
 	if (!setting_debugout_runquiet) {
 		std::cout << "LR step: " << Hcalib.step.segment<6>(8).transpose() << "\n";
 		std::cout << "P0 step: " << frameHessians.back()->step.head<6>().transpose() << "\n";
-		
+
 		printf("STEPS: A %.1f; B %.1f; R %.1f; T %.1f; Rlr %.1f; Tlr %.1f. \t", sqrtf(sumA) / (0.0005 * setting_thOptIterations),
 				sqrtf(sumB) / (0.00005 * setting_thOptIterations), sqrtf(sumR) / (0.00005 * setting_thOptIterations),
 				sqrtf(sumT) * sumNID / (0.00005 * setting_thOptIterations), sqrtf(sumRlr) / (0.00005 * setting_thOptIterations),
@@ -475,7 +475,8 @@ float FullSystem::optimize(int mnumOptIts) {
 	newStateZero.segment<2>(6) = frameHessians.back()->get_state().segment<2>(6);
 
 	frameHessians.back()->setEvalPT(frameHessians.back()->PRE_worldToCam, newStateZero);
-	Hcalib.updateLeftToRightZero();
+	//	Don't update, respect the configured left-right camera transform...
+	// Hcalib.updateLeftToRightZero();
 	EFDeltaValid = false;
 	EFAdjointsValid = false;
 	ef->setAdjointsF(&Hcalib);
