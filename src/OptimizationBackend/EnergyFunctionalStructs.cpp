@@ -52,11 +52,12 @@ void EFResidual::takeDataF() {
 #ifndef ADD_LR_RESIDUALS	
 	assert (hostIDX != targetIDX);
 #endif
-	Mat88f adjointHost = ef->adHostF[ij];
-	Mat88f adjointTarget = ef->adTargetF[ij];
+	JpJdAdH = ef->adHostF[ij] * JpJdF;
+	JpJdAdT = ef->adTargetF[ij] * JpJdF;
 
-	JpJdAdH = adjointHost * JpJdF;
-	JpJdAdT = adjointTarget * JpJdF;
+	// I saw a NAN once...
+	assert(!std::isnan(JpJdAdH.sum()));
+	assert(!std::isnan(JpJdAdT.sum()));
 }
 
 EFFrame::EFFrame(EnergyFunctional *ef_, FrameHessian *fh_) :

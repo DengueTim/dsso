@@ -120,6 +120,29 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	float bd_accAF;  // Depth B(residual) value Accumulator for Active point.
 
 	EFPointStatus stateFlag;
+
+	void print() {
+		std::cout << "p.priorF = " << priorF << ";\n";
+		std::cout << "p.deltaF = " << deltaF << ";\n";
+		std::cout << "p.bdSumF = " << bdSumF << ";\n";
+		std::cout << "p.HdiF = " << HdiF << ";\n";
+		std::cout << "p.Hdd_accLF = " << Hdd_accLF << ";\n";
+		std::cout << "p.Hcd_accLF" << Hcd_accLF.format(MatFormatInit) << "\n";
+		std::cout << "p.bd_accLF = " << bd_accLF << ";\n";
+		std::cout << "p.Hdd_accAF = " << Hdd_accAF << ";\n";
+		std::cout << "p.Hcd_accAF" << Hcd_accAF.format(MatFormatInit) << "\n";
+		std::cout << "p.bd_accAF = " << bd_accAF << ";\n";
+		std::cout << "\n";
+
+		for (EFResidual *r : residualsAll) {
+			std::cout << "r.hostIDX = " << r->hostIDX << ";\n";
+			std::cout << "r.targetIDX = " << r->targetIDX << ";\n";
+			std::cout << "r.JpJdF" << r->JpJdF.format(MatFormatInit) << "\n";
+			std::cout << "r.JpJdAdH" << r->JpJdAdH.format(MatFormatInit) << "\n";
+			std::cout << "r.JpJdAdT" << r->JpJdAdT.format(MatFormatInit) << "\n";
+			r->J->print();
+		}
+	}
 };
 
 class EFFrame {

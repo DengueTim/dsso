@@ -73,6 +73,7 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
   ${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
   ${EIGEN3_INCLUDE_DIR}
+  ${PROJECT_SOURCE_DIR}/tests
 ) 
 
 
@@ -147,6 +148,7 @@ add_executable(
   all_tests
   ${PROJECT_SOURCE_DIR}/tests/FullSystem/CoarseInitializerTest.cpp
   ${PROJECT_SOURCE_DIR}/tests/OptimizationBackend/AccumulatedTopHessianTest.cpp
+  ${PROJECT_SOURCE_DIR}/tests/OptimizationBackend/AccumulatedSCHessianTest.cpp
 )
 
 target_link_libraries(

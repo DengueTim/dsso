@@ -29,6 +29,11 @@
 namespace dso {
 
 void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int tid) {
+
+//  To get data for unit tests..
+//	if (rand() % 1000 == 0)
+//		p->print();
+
 	int ngoodres = 0;
 	for (EFResidual *r : p->residualsAll)
 		if (r->isActive)
@@ -81,8 +86,8 @@ void AccumulatedSCHessianSSE::addPoint(EFPoint *p, bool shiftPriorToZero, int ti
 				int k = r2->targetIDX + 1;
 
 				if ( k != i ) {
-			//		accD[tid][i].update(r1->JpJdAdH, r2->JpJdAdT, p->HdiF);
-			//		accD[tid][k].update(r1->JpJdAdT, r2->JpJdAdT, p->HdiF);
+					accD[tid][i].update(r2->JpJdAdH, r1->JpJdAdT, p->HdiF);
+					accD[tid][k].update(r2->JpJdAdT, r1->JpJdAdT, p->HdiF);
 				}
 			}
 

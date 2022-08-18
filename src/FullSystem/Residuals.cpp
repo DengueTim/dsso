@@ -252,9 +252,6 @@ double PointFrameResidual::linearizeHostTarget(CalibHessian *HCalib) {
 	J->Jab2(1, 0) = JabJab_01;
 	J->Jab2(1, 1) = JabJab_11;
 
-//	if (rand() % 1000 == 0)
-//		J->print();
-
 	state_NewEnergyWithOutlier = energyLeft;
 
 	if (energyLeft > std::max<float>(host->frameEnergyTH, target->frameEnergyTH) || wJI2_sum < 2) {
