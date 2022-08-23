@@ -9,7 +9,7 @@ Currently this seems to work quite well as long as the CoarseInitializer gets th
 
 [The EuRoC MAV Dataset](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets)
 
-Initial runs suggest DSSO has the potential to give more accurate results.  Compare the end position on the MH_01_easy sequence:
+Initial runs suggest DSSO has the potential to give more accurate results.  Compare the end position on the MH_01_easy sequence(Jump to the last 20 seconds of each video):
 
 [![DSO on MH_01_easy](https://img.youtube.com/vi/ZpXdTiBx0do/0.jpg)](https://www.youtube.com/watch?v=ZpXdTiBx0do)
  
