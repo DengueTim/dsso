@@ -1,14 +1,20 @@
 # DSSO: Direct Sparse Stereo Odometry
 
-**WIP** 
+**An Extension of DSO to Use Left/Right Stereo Image Pairs** 
 
-An attempt at extending DSO to stereo image pairs. The intention is to remove scale abiguity by using a fixed stereo baseline and to improve initialisation and initial estimates using the image pairs.
+DSSO extends DSO to stereo static left/right image pairs. This removes the scale abiguity by using a fixed stereo baseline.  At present the right image is only used for initialisation and in the "mini bundle ajustment" optimisation.  The initialisation step needs improvement...  It's not clear if using the right image in the coarse tracker would offer better results.  For simplicity, the optimisation only considers residuals between LR pairs, not the right image of one pair with the left image of a different pair. 
 
-Ideas/approach:
- - Change FrameHessian to have left and right images with shared(but offset) pose...
- - Assuming a stereo camera uses the same exposure for both images determine if/how to share a and b illumination params.
- - Keep number of points per image or share same number of points between image pairs?
- - ...
+The implementation assumes the left/right image pairs have the same exposure parameters.  This is not the case in the EuRoC MAV dataset although the exposure parameters don't seem to differ much on the easier sequences.
+
+The CoarseInitializer currently just tried to fit a "rescaling" factor(using the right image) to the result of DSO's mono initialisation.  It is not very robust as can be seen in the videos of the EuRoC MAV V1_01_medium sequence.
+
+Ideas/improvements:
+ - __IMPROVE STEREO INITIALISATION__
+ - Add LR exposure A & B parameters to optimisation..
+ - Possibly improve the run time by having an H and b for each frame pair in the optimisation, then optimise over the sum of these.  Adding and removing frames would then be a case of computing new H's and b's for the a new frame or excluding the old ones to remove a frame.  Basically avoid the complete computation of H and b for all frames every time. 
+ - Cost/benifit of including residuals between all images?
+ - How to improve chances of recovering from a bad initialisation..
+ - What to do about moving objects in scene...
 
 For more information see
 [https://vision.in.tum.de/dso](https://vision.in.tum.de/dso)

@@ -267,10 +267,10 @@ bool FullSystem::doStepFromBackup(float stepfacC, float stepfacT, float stepfacR
 	sumNID /= numID;
 
 	if (!setting_debugout_runquiet) {
-		std::cout << "LR step: " << Hcalib.step.segment<6>(8).transpose() << "\n";
-		std::cout << "P0 step: " << frameHessians.back()->step.head<6>().transpose() << "\n";
+//		std::cout << "LR step: " << Hcalib.step.segment<6>(8).transpose() << "\n";
+//		std::cout << "P0 step: " << frameHessians.back()->step.head<6>().transpose() << "\n";
 
-		printf("STEPS: A %.1f; B %.1f; R %.1f; T %.1f; Rlr %.1f; Tlr %.1f. \t", sqrtf(sumA) / (0.0005 * setting_thOptIterations),
+		printf("STEPS: A %.2f; B %.2f; R %.2f; T %.2f; Rlr %.2f; Tlr %.2f. \t", sqrtf(sumA) / (0.0005 * setting_thOptIterations),
 				sqrtf(sumB) / (0.00005 * setting_thOptIterations), sqrtf(sumR) / (0.00005 * setting_thOptIterations),
 				sqrtf(sumT) * sumNID / (0.00005 * setting_thOptIterations), sqrtf(sumRlr) / (0.00005 * setting_thOptIterations),
 				sqrtf(sumTlr) * sumNID / (0.00005 * setting_thOptIterations));

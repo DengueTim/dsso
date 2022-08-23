@@ -3,13 +3,21 @@
 
 The changes from DSO are outlined [here](DSSO.md).
 
+Currently this seems to work quite well as long as the CoarseInitializer gets the rescaling right. Currently has a very basic implementation that needs improvment. 
 
-Doc TODO:
+##### Videos of DSO vs DSSO on The EuRoC MAV Dataset
 
- - [ ] Change instructions on running it
- - [ ] Data sets/requirements
- - [ ] About cameras...
+[The EuRoC MAV Dataset](https://projects.asl.ethz.ch/datasets/doku.php?id=kmavvisualinertialdatasets)
 
+Initial runs suggest DSSO has the potential to give more accurate results.  Compare the end position on the MH_01_easy sequence:
+
+[![DSO on MH_01_easy](https://img.youtube.com/vi/ZpXdTiBx0do/0.jpg)](https://www.youtube.com/watch?v=ZpXdTiBx0do)
+ 
+[![DSSO on MH_01_easy](https://img.youtube.com/vi/QSPC5-V1ySc/0.jpg)](https://www.youtube.com/watch?v=QSPC5-V1ySc)
+
+DSSO recoverying(watch dots in right image) from a bad initialisation on the V1_01_medium sequence:
+
+[![DSSO on V1_01_medium recovery](https://img.youtube.com/vi/xWdbjN3HshA/0.jpg)](https://www.youtube.com/watch?v=xWdbjN3HshA)
 
 ### 1. Related Papers
 * **Direct Sparse Odometry**, *J. Engel, V. Koltun, D. Cremers*, In arXiv:1607.02565, 2016
@@ -93,10 +101,12 @@ OpenCV and Pangolin need to be installed.
 Run on a dataset from [https://vision.in.tum.de/mono-dataset](https://vision.in.tum.de/mono-dataset) using
 
 		bin/dso_dataset \
-			files=XXXXX/sequence_XX/images.zip \
-			calib=XXXXX/sequence_XX/camera.txt \
-			gamma=XXXXX/sequence_XX/pcalib.txt \
-			vignette=XXXXX/sequence_XX/vignette.png \
+			leftFiles=XXXXX/EuRoC/V2_02_medium/cam0/data \
+			rightFiles=XXXXX/EuRoC/V2_02_medium/cam1/data \
+			leftCalib=XXXXX/dsso/EuRoC_MAV/cameraLeft.txt \
+			rightCalib=XXXXX/dsso/EuRoC_MAV/cameraRight.txt \
+			gamma=XXXXX/dsso/EuRoC_MAV/pcalib.txt \
+			vignette=XXXXX/dsso/EuRoC_MAV/vignette.png \
 			preset=0 \
 			mode=0
 
