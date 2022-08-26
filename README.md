@@ -3,7 +3,7 @@
 
 The changes from DSO are outlined [here](DSSO.md).
 
-Currently this seems to work quite well as long as the CoarseInitializer gets the rescaling right. Currently has a very basic implementation that needs improvment. 
+Seems to work quite well as long as the CoarseInitializer gets the rescaling right. Currently has a very basic implementation that has a lot of room for improvment. 
 
 ##### Videos of DSO vs DSSO on The EuRoC MAV Dataset
 
@@ -15,7 +15,7 @@ Initial runs suggest DSSO has the potential to give more accurate results.  Comp
  
 [![DSSO on MH_01_easy](https://img.youtube.com/vi/QSPC5-V1ySc/0.jpg)](https://www.youtube.com/watch?v=QSPC5-V1ySc)
 
-DSSO recoverying(watch dots in right image) from a bad initialisation on the V1_01_medium sequence:
+DSSO recovering(watch dots in right image) from a bad initialisation on the V1_01_medium sequence:
 
 [![DSSO on V1_01_medium recovery](https://img.youtube.com/vi/xWdbjN3HshA/0.jpg)](https://www.youtube.com/watch?v=xWdbjN3HshA)
 
