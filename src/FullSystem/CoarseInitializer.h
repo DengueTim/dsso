@@ -40,6 +40,8 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	// index in jacobian. never changes (actually, there is no reason why).
 	float u, v;
 
+	float idepthLr;		// Inverse depth from first frame Left/Right Stereo.
+
 	// idepth / isgood / energy during optimization.
 	float idepth;
 	bool isGood;
@@ -66,21 +68,20 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	float neighboursDist[10];
 
 	float my_type;
-	float outlierTH;
 };
 
 class CoarseInitializer {
 public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	;
-	CoarseInitializer(int w, int h);
+	CoarseInitializer(CalibHessian *HCalib, int w, int h);
 	~CoarseInitializer();
 
-	void setFirst(CalibHessian *HCalib, FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
+	void setFirst(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	bool trackFrame(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	void calcTGrads(FrameHessian *newFrameHessian);
 	float computeRescale();
 	float rescale(float factor);
-	void debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*> &wraps);
+	void debugPlot(std::vector<IOWrap::Output3DWrapper*> &wraps, int lvl = 0);
 
 	int frameID;
 	bool fixAffine;
@@ -115,6 +116,12 @@ private:
 	SE3 leftToRight;
 	void makeK(CalibHessian *HCalib);
 
+	Mat33f R;
+	Vec3f t;
+	Mat33f Ftl[MAX_PYR_LEVELS];
+	Mat33f KrRKil[MAX_PYR_LEVELS];
+	Vec2f rotatedPattern[MAX_PYR_LEVELS][MAX_RES_PER_POINT];
+
 	bool snapped;
 	int snappedAt;
 
@@ -126,7 +133,7 @@ private:
 
 	// temporary buffers for H and b.
 	Vec10f *JbBuffer;		// 0-7: sum(dd * dp). 8: sum(res*dd). 9: 1/(1+sum(dd*dd))=inverse hessian entry.
-	Vec10f *JbBuffer_new;
+	Vec10f *JbBuffer_new;	// 0-7: sum(dd * dp). 8: sum(res*dd). 9: 1/(1+sum(dd*dd))=inverse hessian entry.
 
 	Accumulator9 acc9;
 	Accumulator9 acc9SC;
@@ -134,7 +141,6 @@ private:
 	float alphaK;
 	float alphaW;
 	float regWeight;
-	float couplingWeight;
 
 	Vec3f calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out, Mat88f &H_out_sc, Vec8f &b_out_sc, const SE3 &refToNew,
 			AffLight refToNew_aff);
@@ -151,6 +157,8 @@ private:
 	void makeGradients(Eigen::Vector3f **data);
 
 	void makeNN();
+
+	void epeLine(int lvl, Pnt *pntLeft);
 };
 
 struct FLANNPointcloud {

@@ -30,7 +30,8 @@
 
 #include "FullSystem/FullSystem.h"
 
-#include "stdio.h"
+#include <stdio.h>
+#include <thread>
 #include "util/globalFuncs.h"
 #include <Eigen/LU>
 #include <algorithm>
@@ -124,7 +125,7 @@ FullSystem::FullSystem(const Mat33 &leftK, const Mat33 &rightK, const SE3 &leftT
 	coarseDistanceMap = new CoarseDistanceMap(wG[0], hG[0]);
 	coarseTracker = new CoarseTracker(wG[0], hG[0]);
 	coarseTracker_forNewKF = new CoarseTracker(wG[0], hG[0]);
-	coarseInitializer = new CoarseInitializer(wG[0], hG[0]);
+	coarseInitializer = new CoarseInitializer(&Hcalib, wG[0], hG[0]);
 	pixelSelector = new PixelSelector(wG[0], hG[0]);
 
 	statistics_lastNumOptIts = 0;
@@ -711,7 +712,7 @@ void FullSystem::flagPointsForRemoval() {
 	}
 }
 
-void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
+void __attribute__((optimize(0))) FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
 
 	if (isLost)
 		return;
@@ -734,15 +735,16 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
 	if (coarseInitializer->frameID < 0) {
 		// first frame set. fh is kept by coarseInitializer.
 		fh->makeImages<true>(image->imageL, image->imageR, &Hcalib);
-		coarseInitializer->setFirst(&Hcalib, fh, outputWrapper);
+		coarseInitializer->setFirst(fh, outputWrapper);
+		coarseInitializer->debugPlot(outputWrapper);
 	} else if (!initialized) {
 		// Initializing...
 		fh->makeImages<false>(image->imageL, image->imageR, &Hcalib);
 		if (coarseInitializer->trackFrame(fh, outputWrapper)) {
 			// if SNAPPED
-			const float rescaleFactor = coarseInitializer->computeRescale();
-			coarseInitializer->rescale(rescaleFactor);
-			coarseInitializer->debugPlot(0, outputWrapper);
+//			const float rescaleFactor = coarseInitializer->computeRescale();
+//			coarseInitializer->rescale(rescaleFactor);
+			coarseInitializer->debugPlot(outputWrapper);
 			initializeFromInitializer(fh, 1);
 			lock.unlock();
 			deliverTrackedFrame(fh, true);
@@ -795,6 +797,9 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
 		lock.unlock();
 		deliverTrackedFrame(fh, needToMakeKF);
 	}
+
+	// Time to update UI..
+//	std::this_thread::sleep_for (std::chrono::seconds(1));
 }
 void FullSystem::deliverTrackedFrame(FrameHessian *fh, bool needKF) {
 

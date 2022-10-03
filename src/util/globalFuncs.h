@@ -322,6 +322,20 @@ inline Vec3b makeRainbow3B(float id) {
 	return Vec3b(255, 255, 255);
 }
 
+//inline Vec3b makeRainbow3B(float id) {
+//	id *= freeDebugParam3;
+//	if (id < 0)
+//		return Vec3b(255, 255, 255);
+//
+//	if (id <= 1.0) {
+//		int i = id * 255;
+//		return Vec3b(255 - i, i, 0);
+//	}
+//
+//	int i = id >= 5 ? 255 : (id - 1) * 64;
+//	return Vec3b(0, 255 - i, i);
+//}
+
 inline Vec3b makeJet3B(float id) {
 	if (id <= 0)
 		return Vec3b(128, 0, 0);

@@ -45,7 +45,7 @@ protected:
 		delete leftImage;
 		delete rightImage;
 
-		coarseInitializer = new CoarseInitializer(imageWidth, imageHeight);
+		coarseInitializer = new CoarseInitializer(Hcalib, imageWidth, imageHeight);
 	}
 
 	void TearDown() {
@@ -56,6 +56,6 @@ protected:
 };
 
 TEST_F(CoarseInitializerTest, setFirst) {
-	coarseInitializer->setFirst(Hcalib, frameHessian, outputWrapper);
+	coarseInitializer->setFirst(frameHessian, outputWrapper);
 }
 

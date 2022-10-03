@@ -103,6 +103,32 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 		at(u - 1, v + 1) = val;
 	}
 
+	inline void setPixelSizedForLevel(const int lvl, const int &u, const int &v, T val) {
+		setPixel9(u, v, val);
+		if (lvl > 3 ) {
+			// Pad to 5x5.
+			at(u + 2, v - 2) = val;
+			at(u + 2, v - 1) = val;
+			at(u + 2, v) = val;
+			at(u + 2, v + 1) = val;
+			at(u + 2, v + 2) = val;
+
+			at(u - 1, v - 2) = val;
+			at(u, v - 2) = val;
+			at(u + 1, v - 2) = val;
+
+			at(u - 1, v + 2) = val;
+			at(u, v + 2) = val;
+			at(u + 1, v + 2) = val;
+
+			at(u - 2, v - 2) = val;
+			at(u - 2, v - 1) = val;
+			at(u - 2, v) = val;
+			at(u - 2, v + 1) = val;
+			at(u - 2, v + 2) = val;
+		}
+	}
+
 	inline void setPixelCirc(const int &u, const int &v, T val) {
 		for (int i = -3; i <= 3; i++) {
 			at(u + 3, v + i) = val;

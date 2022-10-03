@@ -75,7 +75,7 @@ PangolinDSOViewer::~PangolinDSOViewer() {
 void PangolinDSOViewer::run() {
 	printf("START PANGOLIN!\n");
 
-	pangolin::CreateWindowAndBind("Main", 2 * w, 2 * h);
+	pangolin::CreateWindowAndBind("Main", 4 * w, 3 * h);
 	const int UI_WIDTH = 180;
 
 	glEnable(GL_DEPTH_TEST);
@@ -100,7 +100,7 @@ void PangolinDSOViewer::run() {
 	pangolin::GlTexture texVideo(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
 	pangolin::GlTexture texResidual(w, h, GL_RGB, false, 0, GL_RGB, GL_UNSIGNED_BYTE);
 
-	pangolin::CreateDisplay().SetBounds(0.0, 0.23, pangolin::Attach::Pix(UI_WIDTH), 1.0).SetLayout(pangolin::LayoutEqual).AddDisplay(
+	pangolin::CreateDisplay().SetBounds(0.0, 0.33, pangolin::Attach::Pix(UI_WIDTH), 1.0).SetLayout(pangolin::LayoutEqual).AddDisplay(
 			d_kfDepthL).AddDisplay(d_kfDepthR).AddDisplay(d_video).AddDisplay(d_residual);
 
 	// parameter reconfigure gui
