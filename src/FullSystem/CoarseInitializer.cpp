@@ -65,24 +65,24 @@ CoarseInitializer::CoarseInitializer(CalibHessian *HCalib, int ww, int hh) :
 
 	makeK(HCalib);
 
-	R = leftToRight.rotationMatrix().cast<float>();
-	t = leftToRight.translation().cast<float>();
+	lrR = leftToRight.rotationMatrix().cast<float>();
+	lrt = leftToRight.translation().cast<float>();
 
 	// skew-symmetric(-t)
-	const Mat33f tSkew = (Mat33f() << 0.0, t[2], -t[1], -t[2], 0.0, t[0], t[1], -t[0], 0.0).finished();
-	std::cout << "R:\n" << R << "\ntSkew:\n" << tSkew << "\n";
+	const Mat33f tSkew = (Mat33f() << 0.0, lrt[2], -lrt[1], -lrt[2], 0.0, lrt[0], lrt[1], -lrt[0], 0.0).finished();
+	std::cout << "R:\n" << lrR << "\ntSkew:\n" << tSkew << "\n";
 
 	for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
 		// Fundamental.transpose()...
-		Ftl[lvl] = (Ki[lvl].transpose() * tSkew * R.transpose() * Kri[lvl]).transpose();
-		KrRKil[lvl] = Kr[lvl] * R * Ki[lvl];
+		Ftl[lvl] = (Ki[lvl].transpose() * tSkew * lrR.transpose() * Kri[lvl]).transpose();
+		KrRKil[lvl] = Kr[lvl] * lrR * Ki[lvl];
 
 		Mat22f Rplane = KrRKil[lvl].topLeftCorner(2, 2);
-		for (int idx = 0; idx < patternNum; idx++)
+		for (int idx = 0; idx < patternNum; idx++) {
 			rotatedPattern[lvl][idx] = Rplane * Vec2f(patternP[idx][0], patternP[idx][1]);
 		}
-
 	}
+}
 
 CoarseInitializer::~CoarseInitializer() {
 	for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
@@ -134,7 +134,6 @@ bool __attribute__((optimize(0))) CoarseInitializer::trackFrame(FrameHessian *ne
 
 	// From rough to fine..
 	for (int lvl = pyrLevelsUsed - 1; lvl >= 0; lvl--) {
-
 		if (lvl < pyrLevelsUsed - 1)
 			propagateDown(lvl + 1);
 
@@ -245,7 +244,9 @@ bool __attribute__((optimize(0))) CoarseInitializer::trackFrame(FrameHessian *ne
 
 	debugPlot(wraps);
 
-	return snapped && frameID > snappedAt + 10;
+	float lrTransNorm = leftToRight.translation().norm();
+	float ttnTransNorm = thisToNext.translation().norm();
+	return snapped && (ttnTransNorm > lrTransNorm * 0.5); // || frameID > snappedAt + 10);
 }
 
 void __attribute__((optimize(0))) CoarseInitializer::debugPlot(std::vector<IOWrap::Output3DWrapper*> &wraps, int lvl) {
@@ -558,24 +559,6 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 	return Vec3f(E.A, alphaEnergy, E.num);  // Accumulation of point residual error, translation * npoints, npoints.
 }
 
-float CoarseInitializer::rescale(float factor) {
-	float factori = 1.0f / factor;
-	float factori2 = factori * factori;
-
-	for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
-		int npts = numPoints[lvl];
-		Pnt *ptsl = points[lvl];
-		for (int i = 0; i < npts; i++) {
-			ptsl[i].iR *= factor;
-			ptsl[i].idepth_new *= factor;
-			ptsl[i].lastHessian *= factori2;
-		}
-	}
-	thisToNext.translation() *= factori;
-
-	return thisToNext.translation().norm();
-}
-
 Vec3f CoarseInitializer::calcDepthRegularisationCouplingEnergy(int lvl) {
 	if (!snapped)
 		return Vec3f(0, 0, numPoints[lvl]);
@@ -743,44 +726,55 @@ void CoarseInitializer::makeGradients(Eigen::Vector3f **data) {
 void CoarseInitializer::setFirst(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps) {
 	firstFrame = newFrameHessian;
 
+	for (IOWrap::Output3DWrapper *ow : wraps)
+		ow->pushLiveFrame(newFrameHessian);
+
 	PixelSelector sel(w[0], h[0]);
+
+	int *pointsWithIdepthLrEstimate;
+	int pointsWithIdepthLrEstimateCounter = 0;
 
 	char *statusMap = new char[w[0] * h[0]];
 	bool *statusMapB = new bool[w[0] * h[0]];
 
 	float densities[] = { 0.03, 0.05, 0.15, 0.5, 1 };
 	for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
+		int wl = w[lvl], hl = h[lvl];
+
 		sel.currentPotential = 3;
 		int npts;
-		if (lvl == 0)
-			npts = sel.makeMaps(firstFrame, statusMap, densities[lvl] * w[0] * h[0], 1, false, 2);
-		else
-			npts = makePixelStatus(firstFrame->dIp[lvl], statusMapB, w[lvl], h[lvl], densities[lvl] * w[0] * h[0]);
+		if (lvl == 0) {
+			npts = sel.makeMaps(firstFrame, statusMap, densities[lvl] * wl * hl, 1, false, 2);
+			pointsWithIdepthLrEstimate = new int[npts];
+		} else {
+			npts = makePixelStatus(firstFrame->dIp[lvl], statusMapB, wl, hl, densities[lvl] * wl * hl);
+		}
 
 		if (points[lvl] != 0)
 			delete[] points[lvl];
 		points[lvl] = new Pnt[npts];
 
 		// set idepth map to initially 1 everywhere.
-		int wl = w[lvl], hl = h[lvl];
 		Pnt *pl = points[lvl];
 		int nl = 0;
 		for (int y = patternPadding + 1; y < hl - patternPadding - 2; y++) {
 			for (int x = patternPadding + 1; x < wl - patternPadding - 2; x++) {
 				//if(x==2) printf("y=%d!\n",y);
 				if ((lvl != 0 && statusMapB[x + y * wl]) || (lvl == 0 && statusMap[x + y * wl] != 0)) {
-					//assert(patternNum==9);
 					pl[nl].u = x + 0.1;
 					pl[nl].v = y + 0.1;
-//					pl[nl].idepth = 1;
-//					pl[nl].iR = 1;
-//					pl[nl].isGood = true;
+					pl[nl].idepthLr = -1;
+					pl[nl].idepth = 1;
+					pl[nl].iR = 1;
+					pl[nl].isGood = false;
 					pl[nl].energy.setZero();
 					pl[nl].lastHessian = 0;
 					pl[nl].lastHessian_new = 0;
 					pl[nl].my_type = (lvl != 0) ? 1 : statusMap[x + y * wl];
 
-					epeLine(lvl, &pl[nl]);
+					if (lvl == 0 && idepthLrEstimate(lvl, &pl[nl])) {
+						pointsWithIdepthLrEstimate[pointsWithIdepthLrEstimateCounter++] = nl;
+					}
 
 					nl++;
 					assert(nl <= npts);
@@ -795,12 +789,86 @@ void CoarseInitializer::setFirst(FrameHessian *newFrameHessian, std::vector<IOWr
 
 	makeNN();
 
+	// Only use idepthLr estimates that are similar to their neighbours.
+	const float fBound = 0.90f;
+	for (int estimateI = 0; estimateI < pointsWithIdepthLrEstimateCounter; estimateI++) {
+		int pi = pointsWithIdepthLrEstimate[estimateI];
+		Pnt *p = &points[0][pi];
+		assert(p->idepthLr >= 0);
+
+		int nnWithIDepth = 0;
+		int nnWithSimilarIDepth = 0;
+
+		// First neighbour is self.
+		for (int i = 1; i < 10; i++) {
+			if (p->neighbours[i] == -1)
+				continue;
+
+			Pnt *n = &points[0][p->neighbours[i]];
+			if (n->idepthLr < 0)
+				continue;
+
+			nnWithIDepth++;
+
+			float f = p->idepthLr / n->idepthLr;
+			if (fBound < f && f < 1 / fBound) {
+				nnWithSimilarIDepth++;
+			}
+		}
+
+		if (nnWithIDepth >= 3 && nnWithSimilarIDepth / nnWithIDepth >= 0.6) {
+			// LR depth estimate agrees with neighbours.
+			p->isGood = true;
+		}
+	}
+
+	for (int lvl = 0; lvl < pyrLevelsUsed; lvl++) {
+		float idepthLrSum = 0;
+		float idepthLrSqSum = 0;
+		int idepthLrCounter = 0;
+		int goodIdepthLr = 0;
+		float bestParentDist[numPoints[lvl + 1]];
+
+		for (int i = 0; i < numPoints[lvl]; i++) {
+			Pnt *p = &points[lvl][i];
+			if (p->idepthLr < 0)
+				continue;
+
+			idepthLrCounter++;
+			if (p->isGood) {
+				p->idepth = p->idepthLr;
+				p->iR = p->idepthLr;
+
+				if (p->parent >= 0) {
+					int parenti = p->parent;
+					Pnt *parent = &points[lvl + 1][parenti];
+					if (parent->idepthLr < 0 || bestParentDist[parenti] < p->parentDist) {
+						bestParentDist[parenti] = p->parentDist;
+						parent->idepthLr = p->idepthLr;
+						parent->isGood = true;
+					}
+				}
+
+				idepthLrSum += p->idepthLr;
+				idepthLrSqSum += p->idepthLr * p->idepthLr;
+				goodIdepthLr++;
+			}
+		}
+
+		if (printDebug) {
+			float idMu = idepthLrSum / idepthLrCounter;
+			float idSigma = idepthLrSqSum / idepthLrCounter - idMu * idMu;
+
+			printf("Points at lvl %d idMu:%f\tidSigma:%f\t(All/With IDepthLr/With good IDepthLr) %d/%d/%d\n", lvl, idMu, idSigma,
+					numPoints[lvl], idepthLrCounter, goodIdepthLr);
+		}
+	}
+
 	thisToNext = SE3();
 	snapped = false;
 	frameID = snappedAt = 0;
 
-	for (IOWrap::Output3DWrapper *ow : wraps)
-		ow->pushLiveFrame(newFrameHessian);
+	debugPlot(wraps);
 }
 
 void CoarseInitializer::resetPoints(int lvl) {
@@ -839,7 +907,7 @@ void __attribute__((optimize(0))) CoarseInitializer::doIdepthStepUpdate(int lvl,
 		float b = JbBuffer[i][8] + JbBuffer[i].head<8>().dot(inc);
 		float step = -b * JbBuffer[i][9] / (1 + lambda);
 
-		float stepFactor = pts[i].idepthLr >= 0 ? 0.0 : 1.0;
+		float stepFactor = pts[i].idepthLr >= 0 ? 0.01 : 1.0;
 		float maxstep = maxPixelStep * pts[i].maxstep * stepFactor;
 		if (maxstep > idMaxStep)
 			maxstep = idMaxStep;
@@ -942,6 +1010,14 @@ void CoarseInitializer::makeNN() {
 		nanoflann::KNNResultSet<float, int, int> resultSet(nn);
 		nanoflann::KNNResultSet<float, int, int> resultSet1(1);
 
+//		int npts1 = (lvl + 1) < pyrLevelsUsed ? numPoints[lvl + 1] : 0;
+//		float parentsSumDf[npts1];
+//		int parentsSumDfCounter[npts1];
+//		for (int i = 0 ; i < npts1 ; i++) {
+//			parentsSumDf[i] = 0;
+//			parentsSumDfCounter[i] = 0;
+//		}
+
 		for (int i = 0; i < npts; i++) {
 			//resultSet.init(pts[i].neighbours, pts[i].neighboursDist );
 			resultSet.init(ret_index, ret_dist);
@@ -967,6 +1043,8 @@ void CoarseInitializer::makeNN() {
 
 				pts[i].parent = ret_index[0];
 				pts[i].parentDist = expf(-ret_dist[0] * NNDistFactor);
+//				parentsSumDf[ret_index[0]] += pts[i].parentDist;
+//				parentsSumDfCounter[ret_index[0]]++;
 
 				assert(ret_index[0] >= 0 && ret_index[0] < numPoints[lvl + 1]);
 			} else {
@@ -974,6 +1052,13 @@ void CoarseInitializer::makeNN() {
 				pts[i].parentDist = -1;
 			}
 		}
+
+//		for (int i = 0 ; i < npts ; i++) {
+//			int parentIdx = pts[i].parent;
+//			if (parentIdx >= 0) {
+//				pts[i].parentDist /= parentsSumDf[parentIdx];
+//			}
+//		}
 	}
 
 	// done.
@@ -982,123 +1067,7 @@ void CoarseInitializer::makeNN() {
 		delete indexes[i];
 }
 
-float CoarseInitializer::computeRescale() {
-	const Mat33f R = leftToRight.rotationMatrix().cast<float>();
-	const Vec3f t = leftToRight.translation().cast<float>();
-
-	float rescale = 1.0;
-
-	for (int lvl = (pyrLevelsUsed - 1); lvl >= 0; lvl--) {
-		const Mat33f RKi = R * Ki[lvl];
-		const float fxrl = fxr[lvl];
-		const float fyrl = fyr[lvl];
-		const float cxrl = cxr[lvl];
-		const float cyrl = cyr[lvl];
-		const int wl = w[lvl];
-		const int hl = h[lvl];
-
-		Vec3f *leftImage = firstFrame->dIp[lvl];
-		Vec3f *rightImage = firstFrame->dIrp[lvl];
-
-		for (int it = 0; it < 15; it++) {
-			float lvlAbsRes = 0.0;
-			float lvlEnergy = 0.0;
-			float H = 1.0;
-			float b = 0.0;
-			int nGood = 0;
-
-			for (int pntIdx = 0; pntIdx < numPoints[lvl]; pntIdx++) {
-				Pnt *pnt = points[lvl] + pntIdx;
-
-				if (pnt->iR < 0.01 || pnt->iR > 1) { // exclude points that are ....
-					continue;
-				}
-
-				float absRes = 0.0;
-				float pntEnergy = 0.0;
-				bool isGood = true;
-				VecNRf dRdS;
-				VecNRf r;
-				float Hp = 0.0;
-				float bp = 0.0;
-
-				for (int patIdx = 0; patIdx < patternNum; patIdx++) {
-					int dx = patternP[patIdx][0];
-					int dy = patternP[patIdx][1];
-
-					float id = pnt->idepth * rescale;
-
-					Vec3f pt = RKi * Vec3f(pnt->u+dx, pnt->v+dy, 1) + t * id;
-					float u = pt[0] / pt[2];
-					float v = pt[1] / pt[2];
-					float rightU = fxrl * u + cxrl;
-					float rightV = fyrl * v + cyrl;
-					float rightId = id / pt[2];
-
-					if(!(rightU > 1 && rightV > 1 && rightU < wl-2 && rightV < hl-2 && rightId > 0)) {
-						isGood = false;
-						break;
-					}
-
-					Vec3f rightColor = getInterpolatedElement33(rightImage, rightU, rightV, wl);
-					if (!isfinite(rightColor[0])) {
-						isGood = false;
-						break;
-					}
-
-					float leftColor = getInterpolatedElement31(leftImage, pnt->u+dx, pnt->v+dy, wl);
-					if (!isfinite(leftColor)) {
-						isGood = false;
-						break;
-					}
-
-					float residual = leftColor - rightColor[0];
-					absRes += fabs(residual);
-					float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
-					pntEnergy += hw *residual*residual*(2-hw);
-
-					float dxdd = (t[0]-t[2]*u)/pt[2];
-					float dydd = (t[1]-t[2]*v)/pt[2];
-
-					if(hw < 1) hw = sqrtf(hw);
-					float dxInterp = rightColor[1]*fxrl;
-					float dyInterp = rightColor[2]*fyrl;
-					dRdS[patIdx] = (dxInterp * dxdd + dyInterp * dydd) * -rescale; // dRes/dRescale
-					r[patIdx] = residual;// Huber weighted residual.
-
-					Hp += hw * dRdS[patIdx]*dRdS[patIdx];
-					bp += hw * r[patIdx]*dRdS[patIdx];
-				}
-
-				if (!isGood || (patternNum * setting_outlierTH) * 20) {
-					//			E.updateSingle((float) (point->energy[0]));
-					//			point->isGood_new = false;
-					//			point->energy_new = point->energy;
-					continue;
-				}
-
-				lvlAbsRes += absRes;
-				lvlEnergy += pntEnergy;
-				H += Hp;
-				b += bp;
-				nGood++;
-			}
-
-			float rescaleDelta = -b / H;
-
-			if (it == 0 || it == 14) {
-				printf("lvl %i\tit %i\trescale %f\t rescaleDelta %f\tlvlAbsRes %f\tnGood %d of %d\tlvlAbsResPP %f\n", lvl, it,
-						rescale, rescaleDelta, lvlAbsRes, nGood, numPoints[lvl], lvlAbsRes / nGood);
-			}
-
-			rescale += rescaleDelta; // * pow(2.0, lvl - 4.0);
-		}
-	}
-
-	return rescale;
-}
-
-void __attribute__((optimize(0))) CoarseInitializer::epeLine(int lvl, Pnt *pntLeft) {
+bool CoarseInitializer::idepthLrEstimate(int lvl, Pnt *pntLeft) {
 	const float uLeft = pntLeft->u;
 	const float vLeft = pntLeft->v;
 
@@ -1106,7 +1075,7 @@ void __attribute__((optimize(0))) CoarseInitializer::epeLine(int lvl, Pnt *pntLe
 	const Vec3f lineRight = Ftl[lvl] * pointLeft;
 
 	// Left point at infinite depth projected to right.
-	Vec3f pointRightFar = R * Ki[lvl] * pointLeft;
+	Vec3f pointRightFar = lrR * Ki[lvl] * pointLeft;
 	assert(pointRightFar[2] > 0);
 	pointRightFar /= pointRightFar[2];
 	pointRightFar = Kr[lvl] * pointRightFar;
@@ -1116,11 +1085,7 @@ void __attribute__((optimize(0))) CoarseInitializer::epeLine(int lvl, Pnt *pntLe
 
 	if (uRight < 2.1f || vRight < 2.1f || uRight > (w[lvl] - 3.1) || vRight > (h[lvl] - 3.1)) {
 		// Point projected at infinita depth is out of bounds in right image.
-		pntLeft->idepthLr = -1;
-		pntLeft->idepth = 1;
-		pntLeft->iR = 1;
-		pntLeft->isGood = false;
-		return;
+		return false;
 	}
 
 	// Calculate bi-linear pixel values for patch around left point.
@@ -1130,20 +1095,18 @@ void __attribute__((optimize(0))) CoarseInitializer::epeLine(int lvl, Pnt *pntLe
 	}
 
 	// Left point at inverse depth of 4 projected to right;
-	Vec3f pointRightNear = R * Ki[lvl] * pointLeft + t * 4;
+	Vec3f pointRightNear = lrR * Ki[lvl] * pointLeft + lrt * 3;
 	assert(pointRightNear[2] > 0);
 	pointRightNear /= pointRightNear[2];
 	pointRightNear = Kr[lvl] * pointRightNear;
 
-	const int numberOfSamples = 1 << (9 - lvl);  // 2 ^ (9-level) so lvl 0 -> 512, lvl 1 -> 256
-	float ssdErrors[numberOfSamples];
+	const int numberOfSamples = 1 << (8 - (lvl / 2));
 
 	float uInc = (pointRightFar(0) - pointRightNear(0)) / (numberOfSamples - 1);
 	float vInc = (pointRightFar(1) - pointRightNear(1)) / (numberOfSamples - 1);
 
 	int sample = 0;
-	float bestErr1 = std::numeric_limits<float>::max(), bestErr2 = std::numeric_limits<float>::max();
-	int bestIdx1 = std::numeric_limits<int>::min(), bestIdx2 = std::numeric_limits<int>::min();
+	float ssdErrors[numberOfSamples];
 	do {
 		ssdErrors[sample] = 0;
 
@@ -1159,74 +1122,51 @@ void __attribute__((optimize(0))) CoarseInitializer::epeLine(int lvl, Pnt *pntLe
 			}
 		}
 
-		if (ssdErrors[sample] < bestErr1) {
-			bestErr1 = ssdErrors[sample];
-			bestIdx1 = sample;
-		}
-
 		sample++;
 		uRight -= uInc;
 		vRight -= vInc;
 	} while (sample < numberOfSamples && uRight > 2.1f && (vRight > 2.1f && vRight < (h[lvl] - 3.1)));
 
+	float smoothSsdErrors[sample];
+
+	smoothSsdErrors[0] = (ssdErrors[0] + ssdErrors[0] + ssdErrors[1]) / 3;
+	float sum3 = ssdErrors[0] + ssdErrors[1];
+	for (int idx = 1; idx < (sample - 1); idx++) {
+		sum3 += ssdErrors[idx + 1];
+		smoothSsdErrors[idx] = sum3 / 3;
+		sum3 -= ssdErrors[idx - 1];
+	}
+	smoothSsdErrors[sample - 1] = (sum3 + ssdErrors[sample - 1]) / 3;
+
+	float bestErr1 = std::numeric_limits<float>::max(), bestErr2 = std::numeric_limits<float>::max();
+	int bestIdx1 = std::numeric_limits<int>::min(), bestIdx2 = std::numeric_limits<int>::min();
+
+	for (int idx = 0; idx < sample; idx++) {
+		if (smoothSsdErrors[idx] < bestErr1) {
+			bestErr1 = smoothSsdErrors[idx];
+			bestIdx1 = idx;
+		}
+	}
+
 	// Find second best not near best.
 	for (int idx = 0; idx < sample; idx++) {
-		// Only update 2nd best if 1st best is not within n pixels.
-		if ((idx < (bestIdx1 - 2) || idx > (bestIdx1 + 2)) && ssdErrors[idx] < bestErr2) {
-			bestErr2 = ssdErrors[idx];
+		if ((idx < (bestIdx1 - 1) || idx > (bestIdx1 + 1)) && smoothSsdErrors[idx] < bestErr2) {
+			bestErr2 = smoothSsdErrors[idx];
 			bestIdx2 = idx;
 		}
 	}
 
-//	std::cout << "pntLeft(x,y):" << u_left << "," << v_left << "\t";
-//	std::cout << "Best:" << bestErr1 << "@" << bestIdx1 << "," << bestErr2 << "@" << bestIdx2 << "\t";
-//	std::cout << "1st/2nd:" << bestErr1 / bestErr2 << "\n";
-
-	float disparity = uInc * bestIdx1; // Ignore v for now.
-	float baseline = t.norm();
-	float focalLength = Kr[lvl](0, 0);
-	float idepth = disparity / (baseline * focalLength); // TODO needs to compute with LR rotation
-	assert(idepth >= 0);
-	if (bestErr1 < 2000 && bestErr1 / bestErr2 < 0.6) {
+	if (bestErr1 < 2000 && (bestErr1 / bestErr2 < 0.75 || abs(bestIdx1 - bestIdx2) < 3)) {
+		float disparity = uInc * bestIdx1; // Ignore v for now.
+		float baseline = lrt.norm();
+		float focalLength = Kr[lvl](0, 0);
+		float idepth = disparity / (baseline * focalLength);
 		pntLeft->idepthLr = idepth;
-		pntLeft->idepth = idepth;
-		pntLeft->iR = idepth;
-		pntLeft->isGood = true;
-	} else {
-		pntLeft->idepthLr = -1;
-		pntLeft->idepth = 1;
-		pntLeft->iR = 1;
-		pntLeft->isGood = false;
+		assert(idepth >= 0);
+		return true;
 	}
 
-	std::cout << "pntLeft(x,y):(" << uLeft << "," << vLeft << ") " << disparity << "(" << pntLeft->idepth << ")\t";
-	std::cout << "Best:" << bestIdx1 << "(" << bestErr1 << "), " << bestIdx2 << "(" << bestErr2 << ")\t";
-	std::cout << "1st/2nd:" << bestErr1 / bestErr2 << "\t" << (pntLeft->isGood ? "*" : "") << "\n";
-
-	if (disparity < 0) {
-		assert(disparity >= 0);
-	}
-
-	// Translate point from left to right camera plane. Right point not scaled to z = 1.
-	Vec3f pointRight = R * Ki[lvl] * pointLeft + t;
-	assert(pointRight[2] > 0);
-	// Scale x,y to camera plane. z = 1.
-	pointRight /= pointRight[2];
-
-	// Camera plane to image plane.
-	pointRight = K[lvl] * pointRight;
-
-	// std::cout << "pointLeft:\n" << pointLeft << "\nlineRight:\n" << lineRight << "\npointRight:\n" << pointRight << "\n";
-
-	// std::cout << "pointRightFar:\n" << pointRightFar << "\n";
-
-	//errSum += lineRight.transpose() * pointRightFar;
-
-//		if (pIdx % 132 == 0) {
-//			std::cout << pntLeft->u << "," << pntLeft->v << "\n";
-//		}
-
-//	std::cout << "Ftl:\n" << Ftl[lvl] << "\nerrSum:" << errSum << "\nerrCnt:" << errCnt << "\nAvgErr:" << (errSum / errCnt) << "\n";
+	return false;
 }
 }
 

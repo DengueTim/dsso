@@ -736,16 +736,13 @@ void __attribute__((optimize(0))) FullSystem::addActiveFrame(ImageAndExposure *i
 		// first frame set. fh is kept by coarseInitializer.
 		fh->makeImages<true>(image->imageL, image->imageR, &Hcalib);
 		coarseInitializer->setFirst(fh, outputWrapper);
-		coarseInitializer->debugPlot(outputWrapper);
+//		std::this_thread::sleep_for (std::chrono::milliseconds(100)); // Time to update UI..
 	} else if (!initialized) {
 		// Initializing...
 		fh->makeImages<false>(image->imageL, image->imageR, &Hcalib);
 		if (coarseInitializer->trackFrame(fh, outputWrapper)) {
 			// if SNAPPED
-//			const float rescaleFactor = coarseInitializer->computeRescale();
-//			coarseInitializer->rescale(rescaleFactor);
-			coarseInitializer->debugPlot(outputWrapper);
-			initializeFromInitializer(fh, 1);
+			initializeFromInitializer(fh);
 			lock.unlock();
 			deliverTrackedFrame(fh, true);
 		} else {
@@ -754,6 +751,7 @@ void __attribute__((optimize(0))) FullSystem::addActiveFrame(ImageAndExposure *i
 			delete fh;
 			printf("Still initializing...\n");
 		}
+//		std::this_thread::sleep_for (std::chrono::milliseconds(100)); // Time to update UI..
 	} else {
 		fh->makeImages<false>(image->imageL, image->imageR, &Hcalib);
 		// do front-end operation.
@@ -797,9 +795,6 @@ void __attribute__((optimize(0))) FullSystem::addActiveFrame(ImageAndExposure *i
 		lock.unlock();
 		deliverTrackedFrame(fh, needToMakeKF);
 	}
-
-	// Time to update UI..
-//	std::this_thread::sleep_for (std::chrono::seconds(1));
 }
 void FullSystem::deliverTrackedFrame(FrameHessian *fh, bool needKF) {
 
@@ -1030,7 +1025,7 @@ void FullSystem::makeKeyFrame(FrameHessian *fh) {
 
 }
 
-void FullSystem::initializeFromInitializer(FrameHessian *newFrame, float rescaleFactor) {
+void FullSystem::initializeFromInitializer(FrameHessian *newFrame) {
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
 	// add firstframe.
@@ -1052,21 +1047,12 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame, float rescale
 	firstFrame->pointHessiansMarginalized.reserve(wG[0] * hG[0] * 0.2f);
 	firstFrame->pointHessiansOut.reserve(wG[0] * hG[0] * 0.2f);
 
-	if (rescaleFactor < 0.0) {
-		float sumID = 1e-5, numID = 1e-5;
-		for (int i = 0; i < coarseInitializer->numPoints[0]; i++) {
-			sumID += coarseInitializer->points[0][i].iR;
-			numID++;
-		}
-		rescaleFactor = 1 / (sumID / numID);
-	}
-
 	// randomly sub-select the points I need.
 	float keepPercentage = setting_desiredPointDensity / coarseInitializer->numPoints[0];
 
 	if (!setting_debugout_runquiet)
-		printf("Initialization: keep %.1f%% (need %d, have %d) rescaleFactor: %f\n", 100 * keepPercentage,
-				(int) (setting_desiredPointDensity), coarseInitializer->numPoints[0], rescaleFactor);
+		printf("Initialization: keep %.1f%% (need %d, have %d)\n", 100 * keepPercentage, (int) (setting_desiredPointDensity),
+				coarseInitializer->numPoints[0]);
 
 	for (int i = 0; i < coarseInitializer->numPoints[0]; i++) {
 		if (rand() / (float) RAND_MAX > keepPercentage)
@@ -1088,7 +1074,7 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame, float rescale
 			continue;
 		}
 
-		ph->setIdepthScaled(point->iR * rescaleFactor);
+		ph->setIdepthScaled(point->iR);
 		ph->setIdepthZero(ph->idepth);
 		ph->hasDepthPrior = true;
 		ph->setPointStatus(PointHessian::ACTIVE);
@@ -1108,7 +1094,6 @@ void FullSystem::initializeFromInitializer(FrameHessian *newFrame, float rescale
 	}
 
 	SE3 firstToNew = coarseInitializer->thisToNext;
-	firstToNew.translation() /= rescaleFactor;
 
 	// really no lock required, as we are initializing.
 	{

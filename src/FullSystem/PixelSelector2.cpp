@@ -77,7 +77,7 @@ void PixelSelector::makeHists(const FrameHessian *const fh) {
 	int h32 = h / 32;
 	thsStep = w32;
 
-	for (int y = 0; y < h32; y++)
+	for (int y = 0; y < h32; y++) {
 		for (int x = 0; x < w32; x++) {
 			float *map0 = mapmax0 + 32 * x + 32 * y * w;
 			int *hist0 = gradHist;	// + 50*(x+y*w32);
@@ -98,8 +98,9 @@ void PixelSelector::makeHists(const FrameHessian *const fh) {
 
 			ths[x + y * w32] = computeHistQuantil(hist0, setting_minGradHistCut) + setting_minGradHistAdd;
 		}
+	}
 
-	for (int y = 0; y < h32; y++)
+	for (int y = 0; y < h32; y++) {
 		for (int x = 0; x < w32; x++) {
 			float sum = 0, num = 0;
 			if (x > 0) {
@@ -142,8 +143,9 @@ void PixelSelector::makeHists(const FrameHessian *const fh) {
 			thsSmoothed[x + y * w32] = (sum / num) * (sum / num);
 
 		}
-
+	}
 }
+
 int PixelSelector::makeMaps(const FrameHessian *const fh, char *map_out, float density, int recursionsLeft, bool plot,
 		float thFactor) {
 	float numHave = 0;
@@ -228,6 +230,7 @@ int PixelSelector::makeMaps(const FrameHessian *const fh, char *map_out, float d
 
 	int numHaveSub = numHave;
 	if (quotia < 0.95) {
+		// Random prune if we Have more than we want.
 		int wh = wG[0] * hG[0];
 		int rn = 0;
 		unsigned char charTH = 255 * quotia;

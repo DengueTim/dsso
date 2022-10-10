@@ -159,7 +159,7 @@ private:
 	void activatePointsOldFirst();
 	void flagPointsForRemoval();
 	void makeNewTraces(FrameHessian *newFrame);
-	void initializeFromInitializer(FrameHessian *newFrame, float rescaleFactor = -1.0);
+	void initializeFromInitializer(FrameHessian *newFrame);
 	void flagFramesForMarginalization(FrameHessian *newFH);
 
 	void removeOutliers();

@@ -79,8 +79,6 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	void setFirst(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	bool trackFrame(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	void calcTGrads(FrameHessian *newFrameHessian);
-	float computeRescale();
-	float rescale(float factor);
 	void debugPlot(std::vector<IOWrap::Output3DWrapper*> &wraps, int lvl = 0);
 
 	int frameID;
@@ -116,8 +114,8 @@ private:
 	SE3 leftToRight;
 	void makeK(CalibHessian *HCalib);
 
-	Mat33f R;
-	Vec3f t;
+	Mat33f lrR;
+	Vec3f lrt;
 	Mat33f Ftl[MAX_PYR_LEVELS];
 	Mat33f KrRKil[MAX_PYR_LEVELS];
 	Vec2f rotatedPattern[MAX_PYR_LEVELS][MAX_RES_PER_POINT];
@@ -158,7 +156,7 @@ private:
 
 	void makeNN();
 
-	void epeLine(int lvl, Pnt *pntLeft);
+	bool idepthLrEstimate(int lvl, Pnt *pntLeft);
 };
 
 struct FLANNPointcloud {

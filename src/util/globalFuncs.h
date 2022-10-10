@@ -285,56 +285,32 @@ EIGEN_ALWAYS_INLINE Eigen::Vector2f getInterpolatedElement42(const Eigen::Vector
 			+ (dx - dxdy) * *(const Eigen::Vector2f*) (bp + 1) + (1 - dx - dy + dxdy) * *(const Eigen::Vector2f*) (bp);
 }
 
-inline Vec3f makeRainbowf3F(float id) {
-	id *= freeDebugParam3;
+inline Vec3b makeRainbow3B(float id, int oobPinkFar = 192, int oobPinkNear = 255) {
 	if (id < 0)
-		return Vec3f(1, 1, 1);
+		return Vec3b(oobPinkFar, 0, oobPinkFar);
 
-	int icP = id;
-	float ifP = id - icP;
-	icP = icP % 3;
+	if (id <= 1.0) {
+		int i = id * 255;
+		return Vec3b(255 - i, i, 0); // Blue(far) to Green(1).
+	}
 
-	if (icP == 0)
-		return Vec3f((1 - ifP), ifP, 0);
-	if (icP == 1)
-		return Vec3f(0, (1 - ifP), ifP);
-	if (icP == 2)
-		return Vec3f(ifP, 0, (1 - ifP));
-	assert(false);
-	return Vec3f(1, 1, 1);
+	if (id <= 3) {
+		int i = (id - 1) * 127; // Green(1) to Yellow(3)
+		return Vec3b(0, 255, i);
+	}
+
+	if (id <= 5) {
+		int i = (id - 3) * 127; // Yellow(3) to Red(5)
+		return Vec3b(0, 255 - i, 255);
+	}
+
+	if (id <= 10) {
+		int i = (id - 5) * 20;
+		return Vec3b(i, i, 255); // Red(5) to light Red(10)
+	}
+
+	return Vec3b(oobPinkNear, 0, oobPinkNear);
 }
-
-inline Vec3b makeRainbow3B(float id) {
-	id *= freeDebugParam3;
-	if (!(id > 0))
-		return Vec3b(255, 255, 255);
-
-	int icP = id;
-	float ifP = id - icP;
-	icP = icP % 3;
-
-	if (icP == 0)
-		return Vec3b(255 * (1 - ifP), 255 * ifP, 0);
-	if (icP == 1)
-		return Vec3b(0, 255 * (1 - ifP), 255 * ifP);
-	if (icP == 2)
-		return Vec3b(255 * ifP, 0, 255 * (1 - ifP));
-	return Vec3b(255, 255, 255);
-}
-
-//inline Vec3b makeRainbow3B(float id) {
-//	id *= freeDebugParam3;
-//	if (id < 0)
-//		return Vec3b(255, 255, 255);
-//
-//	if (id <= 1.0) {
-//		int i = id * 255;
-//		return Vec3b(255 - i, i, 0);
-//	}
-//
-//	int i = id >= 5 ? 255 : (id - 1) * 64;
-//	return Vec3b(0, 255 - i, i);
-//}
 
 inline Vec3b makeJet3B(float id) {
 	if (id <= 0)
