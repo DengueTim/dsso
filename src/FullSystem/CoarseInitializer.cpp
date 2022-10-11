@@ -827,7 +827,7 @@ void CoarseInitializer::setFirst(FrameHessian *newFrameHessian, std::vector<IOWr
 		float idepthLrSqSum = 0;
 		int idepthLrCounter = 0;
 		int goodIdepthLr = 0;
-		float bestParentDist[numPoints[lvl + 1]];
+		float bestParentDist[(lvl + 1) < pyrLevelsUsed ? numPoints[lvl + 1] : 0];
 
 		for (int i = 0; i < numPoints[lvl]; i++) {
 			Pnt *p = &points[lvl][i];

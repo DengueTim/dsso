@@ -3,7 +3,7 @@
 
 The changes from DSO are outlined [here](DSSO.md).
 
-Seems to work quite well as long as the CoarseInitializer gets the rescaling right. Currently has a very basic implementation that has a lot of room for improvment. 
+I'm currently changing the CoarseInitializer to initialize at scale using the left-right stereo images. It's working, but can be improved by making the optimization in trackFrame() make better use of the depth estimates from LR stereo.  The videos below are using very basic rescaling to initialize. Initialization works better now. Will update videos once the optimization is done. 
 
 ##### Videos of DSO vs DSSO on The EuRoC MAV Dataset
 
