@@ -712,7 +712,7 @@ void FullSystem::flagPointsForRemoval() {
 	}
 }
 
-void __attribute__((optimize(0))) FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
+void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
 
 	if (isLost)
 		return;

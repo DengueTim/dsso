@@ -94,7 +94,7 @@ CoarseInitializer::~CoarseInitializer() {
 	delete[] JbBuffer_new;
 }
 
-bool __attribute__((optimize(0))) CoarseInitializer::trackFrame(FrameHessian *newFrameHessian,
+bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian,
 		std::vector<IOWrap::Output3DWrapper*> &wraps) {
 	newFrame = newFrameHessian;
 
@@ -249,7 +249,7 @@ bool __attribute__((optimize(0))) CoarseInitializer::trackFrame(FrameHessian *ne
 	return snapped && (ttnTransNorm > lrTransNorm * 0.5); // || frameID > snappedAt + 10);
 }
 
-void __attribute__((optimize(0))) CoarseInitializer::debugPlot(std::vector<IOWrap::Output3DWrapper*> &wraps, int lvl) {
+void CoarseInitializer::debugPlot(std::vector<IOWrap::Output3DWrapper*> &wraps, int lvl) {
 	bool needCall = false;
 	for (IOWrap::Output3DWrapper *ow : wraps)
 		needCall = needCall || ow->needPushDepthImage();
@@ -895,7 +895,7 @@ void CoarseInitializer::resetPoints(int lvl) {
 	}
 }
 
-void __attribute__((optimize(0))) CoarseInitializer::doIdepthStepUpdate(int lvl, float lambda, Vec8f inc) {
+void CoarseInitializer::doIdepthStepUpdate(int lvl, float lambda, Vec8f inc) {
 	const float maxPixelStep = 0.25;
 	const float idMaxStep = 1e10;
 	Pnt *pts = points[lvl];

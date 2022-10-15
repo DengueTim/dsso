@@ -32,7 +32,7 @@ protected:
 
 	// Schur Complement blocks..
 	// Haa' = Haa - Hba.transpose() * Hbb.inverse() * Hba
-	void __attribute__((optimize(0))) addPointToHsc(EFPoint &p, MatXX &Hab, VecX &Hbb) {
+	void addPointToHsc(EFPoint &p, MatXX &Hab, VecX &Hbb) {
 		int oldCols = Hab.cols();
 		int rows = Hab.rows();
 		MatXX HabTmp = Hab;
