@@ -42,13 +42,13 @@ protected:
 		is.close();
 		frameHessian = new FrameHessian();
 		frameHessian->makeImages<true>(leftImage, rightImage, Hcalib);
-		delete leftImage;
-		delete rightImage;
+		delete[] leftImage;
+		delete[] rightImage;
 
 		coarseInitializer = new CoarseInitializer(Hcalib, imageWidth, imageHeight);
 	}
 
-	void TearDown() {
+	void TearDown() override {
 		delete coarseInitializer;
 		delete frameHessian;
 		delete Hcalib;

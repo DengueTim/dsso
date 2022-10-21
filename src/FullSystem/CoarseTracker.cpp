@@ -647,8 +647,8 @@ bool CoarseTracker::trackNewestCoarse(FrameHessian *newFrameHessian, SE3 &lastTo
 	lastToNew_out = refToNew_current;
 	aff_g2l_out = aff_g2l_current;
 
-	if ((setting_affineOptModeA != 0 && (fabsf(aff_g2l_out.a) > 1.2))
-			|| (setting_affineOptModeB != 0 && (fabsf(aff_g2l_out.b) > 200)))
+	if ((setting_affineOptModeA != 0 && (fabs(aff_g2l_out.a) > 1.2))
+			|| (setting_affineOptModeB != 0 && (fabs(aff_g2l_out.b) > 200)))
 		return false;
 
 	Vec2f relAff =
