@@ -2,10 +2,12 @@
 
 
 ./build/Debug/bin/dso_dataset \
-	files=~/Downloads/sequence_01/images.zip \
-	calib=~/Downloads/sequence_01/camera.txt \
-	gamma=~/Downloads/sequence_01/pcalib.txt \
-	vignette=~/Downloads/sequence_01/vignette.png \
-	preset=0 \
+	leftFiles=$HOME/src/dsso/EuRoC_MAV/sequence/cam0/data \
+	rightFiles=$HOME/src/dsso/EuRoC_MAV/sequence/cam1/data \
+	leftCalib=$HOME/src/dsso/EuRoC_MAV/cameraLeft.txt \
+	rightCalib=$HOME/src/dsso/EuRoC_MAV/cameraRight.txt \
+	gamma=$HOME/src/dsso/EuRoC_MAV/pcalib.txt \
+	vignette=$HOME/src/dsso/EuRoC_MAV/vignette.png \
+	preset=0
 	mode=0
 
