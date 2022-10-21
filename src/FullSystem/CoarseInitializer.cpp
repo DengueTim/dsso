@@ -298,7 +298,7 @@ void __attribute__((optimize(0))) CoarseInitializer::debugPlot(std::vector<IOWra
 			sid += point->iR;
 		}
 	}
-	float fac = nid / sid;
+	float fac = 1; //nid / sid;
 
 	int lvlScale = 1 << lvl;
 
@@ -599,7 +599,7 @@ void CoarseInitializer::updateIdepthRegularisation(int lvl) {
 					if (point->neighbours[j] == -1)
 						continue;
 					Pnt *other = ptsl + point->neighbours[j];
-					if (!other->isGood)
+					if (other->idepthLr < 0) // (!other->isGood)
 						continue;
 					idnn[nnn] = other->idepthLr;
 					nnn++;
@@ -608,6 +608,7 @@ void CoarseInitializer::updateIdepthRegularisation(int lvl) {
 				if (nnn > 2) {
 					std::nth_element(idnn, idnn + nnn / 2, idnn + nnn);
 					point->iR = (1 - regWeight) * point->idepth + regWeight * idnn[nnn / 2];
+					assert(point->iR >= 0);
 				}
 			}
 		}
@@ -634,6 +635,7 @@ void CoarseInitializer::updateIdepthRegularisation(int lvl) {
 		if (nnn > 2) {
 			std::nth_element(idnn, idnn + nnn / 2, idnn + nnn);
 			point->iR = (1 - regWeight) * point->idepth + regWeight * idnn[nnn / 2];
+			assert(point->iR >= 0);
 		}
 	}
 
@@ -670,6 +672,7 @@ void CoarseInitializer::propagateUp(int srcLvl) {
 		if (parent->iRSumNum > 0) {
 			parent->idepth = parent->iR = (parent->iR / parent->iRSumNum);
 			parent->isGood = true;
+			assert(parent->iR >= 0);
 		}
 	}
 
@@ -694,10 +697,12 @@ void CoarseInitializer::propagateDown(int srcLvl) {
 			point->iR = point->idepth = point->idepth_new = parent->iR;
 			point->isGood = true;
 			point->lastHessian = 0;
+			assert(point->iR >= 0);
 		} else {
 			float newiR = (point->iR * point->lastHessian * 2 + parent->iR * parent->lastHessian)
 					/ (point->lastHessian * 2 + parent->lastHessian);
 			point->iR = point->idepth = point->idepth_new = newiR;
+			assert(point->iR >= 0);
 		}
 	}
 	updateIdepthRegularisation(srcLvl - 1);
@@ -890,6 +895,7 @@ void CoarseInitializer::resetPoints(int lvl) {
 			if (sn > 0) {
 				pts[i].isGood = true;
 				pts[i].iR = pts[i].idepth = pts[i].idepth_new = snd / sn;
+				assert(pts[i].iR >= 0);
 			}
 		}
 	}
@@ -907,8 +913,7 @@ void __attribute__((optimize(0))) CoarseInitializer::doIdepthStepUpdate(int lvl,
 		float b = JbBuffer[i][8] + JbBuffer[i].head<8>().dot(inc);
 		float step = -b * JbBuffer[i][9] / (1 + lambda);
 
-		float stepFactor = pts[i].idepthLr >= 0 ? 0.01 : 1.0;
-		float maxstep = maxPixelStep * pts[i].maxstep * stepFactor;
+		float maxstep = maxPixelStep * pts[i].maxstep;
 		if (maxstep > idMaxStep)
 			maxstep = idMaxStep;
 
@@ -916,6 +921,9 @@ void __attribute__((optimize(0))) CoarseInitializer::doIdepthStepUpdate(int lvl,
 			step = maxstep;
 		if (step < -maxstep)
 			step = -maxstep;
+
+		if (pts[i].idepthLr >= 0)
+			step *= 0.5; // 0.5 Value discovered by TAE. :/
 
 		float newIdepth = pts[i].idepth + step;
 		if (newIdepth < 1e-3)

@@ -32,7 +32,7 @@
 namespace dso {
 
 template<int mode>
-void __attribute__((optimize(0))) AccumulatedTopHessianSSE::addPoint(EFPoint *p, Mat18f *adHTdeltaF, VecC *cDelta, int tid) { // 0 = active, 1 = linearized, 2=marginalize
+void AccumulatedTopHessianSSE::addPoint(EFPoint *p, Mat18f *adHTdeltaF, VecC *cDelta, int tid) { // 0 = active, 1 = linearized, 2=marginalize
 	assert(mode == 0 || mode == 1 || mode == 2);
 
 	float bd_acc = 0;
