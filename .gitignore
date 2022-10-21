@@ -12,3 +12,7 @@ thirdparty/libzip-1.1.1
 .cproject
 .settings
 result.txt
+/_build/
+.externalToolBuilders
+.idea
+cmake-build-*

@@ -41,6 +41,14 @@ namespace dso {
 #define SOLVER_STEPMOMENTUM (int)1024
 #define SOLVER_ORTHOGONALIZE_X_LATER (int)2048
 
+#ifdef __clang__
+#define O0 __attribute__((optnone))
+#elif __GNUC__
+#define O0 __attribute__((optimize(0)))
+#else
+#define O0
+#endif
+
 // ============== PARAMETERS TO BE DECIDED ON COMPILE TIME =================
 #define MAX_PYR_LEVELS 6
 extern int pyrLevelsUsed; // This can be less than MAX_PYR_LEVELS depending on image size. See setGlobalCalib().
