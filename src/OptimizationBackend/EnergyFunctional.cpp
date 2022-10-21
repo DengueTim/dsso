@@ -53,6 +53,10 @@ void EnergyFunctional::setAdjointsF(CalibHessian *Hcalib) {
 			FrameHessian *host = frames[h]->fh;
 			FrameHessian *target = frames[t]->fh;
 
+            assert(!target->get_worldToCam_evalPT().matrix3x4().hasNaN());
+            assert(!host->get_worldToCam_evalPT().matrix3x4().hasNaN());
+            assert(!Hcalib->getLeftToRight().matrix3x4().hasNaN());
+
 			SE3 hostToTarget =
 					(h != t) ? target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse() : Hcalib->getLeftToRight();
 			//SE3 hostToTarget = target->get_worldToCam_evalPT() * host->get_worldToCam_evalPT().inverse();
@@ -81,6 +85,9 @@ void EnergyFunctional::setAdjointsF(CalibHessian *Hcalib) {
 
 			adHost[h + t * nFrames] = AH;
 			adTarget[h + t * nFrames] = AT;
+
+            assert(!AH.hasNaN());
+            assert(!AT.hasNaN());
 		}
 	cPrior.head(8) = Vec8::Constant(setting_initialCalibHessian);
 	cPrior.segment<3>(8) = Vec3::Constant(setting_initialTransPrior);
@@ -251,7 +258,7 @@ void EnergyFunctional::resubstituteF_MT(VecX x, CalibHessian *HCalib, bool MT) {
 			xAd[nFrames * h->idxInFrames + t->idxInFrames] = xF.segment<8>(CPARS + 8 * h->idxInFrames).transpose()
 					* adHostF[h->idxInFrames + nFrames * t->idxInFrames]
 					+ xF.segment<8>(CPARS + 8 * t->idxInFrames).transpose() * adTargetF[h->idxInFrames + nFrames * t->idxInFrames];
-		}
+        }
 	}
 
 	if (MT)
@@ -280,10 +287,14 @@ void EnergyFunctional::resubstituteFPt(const VecCf &cstep, Mat18f *xAd, int min,
 		for (EFResidual *r : p->residualsAll) {
 			if (!r->isActive)
 				continue;
-			b -= xAd[r->hostIDX * nFrames + r->targetIDX] * r->JpJdF;
-			if (!std::isfinite(b)) {
-				assert(false);
-			}
+			int xAdIdx = r->hostIDX * nFrames + r->targetIDX;
+			b -= xAd[xAdIdx] * r->JpJdF;
+            if (!std::isfinite(b)) {
+                assert(xAdIdx >= 0 && xAdIdx < nFrames * nFrames);
+                assert(!xAd[xAdIdx].hasNaN());
+                assert(!r->JpJdF.hasNaN());
+                assert(!std::isfinite(b));
+            }
 		}
 
 		p->ph->step = -b * p->HdiF;
@@ -707,7 +718,7 @@ void EnergyFunctional::orthogonalize(VecX *b, MatXX *H) {
 
 }
 
-void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *HCalib) {
+void O0 EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *HCalib) {
 	if (setting_solverMode & SOLVER_USE_GN)
 		lambda = 0;
 	if (setting_solverMode & SOLVER_FIX_LAMBDA)
@@ -803,6 +814,17 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian *
 		VecX SVecI = (HFinal_top.diagonal() + VecX::Constant(HFinal_top.cols(), 10)).cwiseSqrt().cwiseInverse();
 		MatXX HFinalScaled = SVecI.asDiagonal() * HFinal_top * SVecI.asDiagonal();
 		x = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFinal_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
+        if (x.hasNaN()) {
+            assert(!HFinal_top.hasNaN());
+            if (SVecI.hasNaN()) {
+                VecX v = HFinal_top.diagonal() + VecX::Constant(HFinal_top.cols(), 10);
+                std::cout << v.transpose() << "\n" << v.cwiseSqrt().cwiseInverse().transpose() << "\n";
+            }
+            assert(!SVecI.hasNaN());
+            assert(!HFinalScaled.hasNaN());
+            assert(!bFinal_top.hasNaN());
+            assert(!x.hasNaN());
+        }
 	}
 
 	if ((setting_solverMode & SOLVER_ORTHOGONALIZE_X )
