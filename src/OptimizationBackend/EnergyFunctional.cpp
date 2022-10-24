@@ -818,7 +818,9 @@ void O0 EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessia
             assert(!HFinal_top.hasNaN());
             if (SVecI.hasNaN()) {
                 VecX v = HFinal_top.diagonal() + VecX::Constant(HFinal_top.cols(), 10);
-                std::cout << v.transpose() << "\n" << v.cwiseSqrt().cwiseInverse().transpose() << "\n";
+                std::cout << "HFinal_top.diagonal:\t" << v.transpose().head(22) << "\n";
+                std::cout << "HFinal_top.d.sq.inv:\t" << v.cwiseSqrt().cwiseInverse().transpose().head(22) << "\n";
+                std::cout << "             bFinal:\t" << bFinal_top.transpose().head(22) << "\n";
             }
             assert(!SVecI.hasNaN());
             assert(!HFinalScaled.hasNaN());

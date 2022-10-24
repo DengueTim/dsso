@@ -157,7 +157,7 @@ void AccumulatedSCHessianSSE::stitchDoubleInternal(MatXX *H, VecX *b, int min, i
 	}
 
 // One camera params block
-	if (tid == 0) {
+	if (min == 0) {
 		for (int tid2 = 0; tid2 < toAggregate; tid2++) {
 			H[tid].topLeftCorner<CIPARS, CIPARS>() += accHcc[tid2].A.cast<double>();
 			b[tid].head<CIPARS>() += accbc[tid2].A.cast<double>();
