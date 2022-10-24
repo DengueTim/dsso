@@ -23,9 +23,19 @@ find_package(Pangolin 0.2 QUIET)
 find_package(OpenCV QUIET)
 
 # flags
+if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin" AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64") # OSX
+    	set(CPU_CXX_FLAG -mcpu=apple-m1)
+    else()
+    	set(CPU_CXX_FLAG -mcpu=x86_64)
+    endif()
+else()
+    set(CPU_CXX_FLAG -march=native)
+endif()
+
 add_definitions("-DENABLE_SSE")
 set(CMAKE_CXX_FLAGS
-   "${SSE_FLAGS} -O3 -g -std=c++0x -march=native"
+   "${SSE_FLAGS} -O3 -g -std=c++0x ${CPU_CXX_FLAG}"
 #   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
 )
 

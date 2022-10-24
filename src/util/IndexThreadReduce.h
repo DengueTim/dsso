@@ -28,8 +28,9 @@
 #include "boost/thread.hpp"
 #include <stdio.h>
 #include <iostream>
+#include <functional>
 
-
+using namespace boost::placeholders;
 
 namespace dso
 {
