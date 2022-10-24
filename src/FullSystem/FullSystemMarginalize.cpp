@@ -133,10 +133,7 @@ void FullSystem::marginalizeFrame(FrameHessian *frame) {
 
 	assert((int )frame->pointHessians.size() == 0);
 
-	ef->marginalizeFrame(frame->efFrame);
-
-	// drop all observations of existing points in that frame.
-
+	// drop all observations of existing points in frame before deleting the EFFrame...
 	for (FrameHessian *fh : frameHessians) {
 		if (fh == frame)
 			continue;
@@ -162,6 +159,8 @@ void FullSystem::marginalizeFrame(FrameHessian *frame) {
 			}
 		}
 	}
+
+	ef->marginalizeFrame(frame->efFrame);
 
 	{
 		std::vector<FrameHessian*> v;

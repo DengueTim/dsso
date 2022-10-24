@@ -59,12 +59,12 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	EnergyFunctional();
 	~EnergyFunctional();
 
-	EFResidual* insertResidual(PointFrameResidual *r);
-	EFFrame* insertFrame(FrameHessian *fh, CalibHessian *Hcalib);
-	EFPoint* insertPoint(PointHessian *ph);
+	void insertResidual(PointFrameResidual *r);
+	void insertFrame(FrameHessian *fh, CalibHessian *Hcalib);
+	void insertPoint(PointHessian *ph);
 
 	void dropResidual(EFResidual *r);
-	void marginalizeFrame(EFFrame *fh);
+	void marginalizeFrame(EFFrame *eff);
 	void removePoint(EFPoint *ph);
 
 	void marginalizePointsF();
@@ -82,7 +82,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	std::vector<EFFrame*> frames;
 	int nPoints, nFrames, nResiduals;
 
-	// Contribution from marginalied frames/points..
+	// Contribution from marginalised frames/points..
 	MatXX HM;
 	VecX bM;
 

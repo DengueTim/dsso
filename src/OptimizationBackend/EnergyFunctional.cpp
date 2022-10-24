@@ -395,7 +395,7 @@ double EnergyFunctional::calcLEnergyF_MT() {
 	return E + red->stats[0];
 }
 
-EFResidual* EnergyFunctional::insertResidual(PointFrameResidual *r) {
+void EnergyFunctional::insertResidual(PointFrameResidual *r) {
 	EFResidual *efr = new EFResidual(r, r->point->efPoint, r->point->host->efFrame, r->target->efFrame);
 	efr->idxInAll = r->point->efPoint->residualsAll.size();
 	r->point->efPoint->residualsAll.push_back(efr);
@@ -404,9 +404,9 @@ EFResidual* EnergyFunctional::insertResidual(PointFrameResidual *r) {
 
 	nResiduals++;
 	r->efResidual = efr;
-	return efr;
 }
-EFFrame* EnergyFunctional::insertFrame(FrameHessian *fh, CalibHessian *Hcalib) {
+
+void EnergyFunctional::insertFrame(FrameHessian *fh, CalibHessian *Hcalib) {
 	EFFrame *eff = new EFFrame(this, fh);
 	eff->idxInFrames = frames.size();
 	frames.push_back(eff);
@@ -433,11 +433,9 @@ EFFrame* EnergyFunctional::insertFrame(FrameHessian *fh, CalibHessian *Hcalib) {
 		if (fh2 != eff)
 			connectivityMap[(((uint64_t) fh2->keyFrameID) << 32) + ((uint64_t) eff->keyFrameID)] = Eigen::Vector2i(0, 0);
 	}
-
-	return eff;
 }
 
-EFPoint* EnergyFunctional::insertPoint(PointHessian *ph) {
+void EnergyFunctional::insertPoint(PointHessian *ph) {
 	EFPoint *efp = new EFPoint(ph, ph->host->efFrame);
 	efp->idxInPoints = ph->host->efFrame->points.size();
 	ph->host->efFrame->points.push_back(efp);
@@ -446,8 +444,6 @@ EFPoint* EnergyFunctional::insertPoint(PointHessian *ph) {
 	ph->efPoint = efp;
 
 	EFIndicesValid = false;
-
-	return efp;
 }
 
 void EnergyFunctional::dropResidual(EFResidual *r) {
@@ -468,13 +464,13 @@ void EnergyFunctional::dropResidual(EFResidual *r) {
 	r->data->efResidual = 0;
 	delete r;
 }
-void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
+void EnergyFunctional::marginalizeFrame(EFFrame *eff) {
 
 	assert(EFDeltaValid);
 	assert(EFAdjointsValid);
 	assert(EFIndicesValid);
 
-	assert((int )fh->points.size() == 0);
+	assert((int )eff->points.size() == 0);
 	int ndim = nFrames * 8 + CPARS - 8;  // new dimension
 	int odim = nFrames * 8 + CPARS;  // old dimension
 
@@ -482,9 +478,9 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 //	std::sort(eigenvaluesPre.data(), eigenvaluesPre.data()+eigenvaluesPre.size());
 //
 
-	if ((int) fh->idxInFrames != (int) frames.size() - 1) {
-		int io = fh->idxInFrames * 8 + CPARS;	// index of frame to move to end
-		int ntail = 8 * (nFrames - fh->idxInFrames - 1);
+	if ((int) eff->idxInFrames != (int) frames.size() - 1) {
+		int io = eff->idxInFrames * 8 + CPARS;	// index of frame to move to end
+		int ntail = 8 * (nFrames - eff->idxInFrames - 1);
 		assert((io+8+ntail) == nFrames*8+CPARS);
 
 		Vec8 bTmp = bM.segment<8>(io);
@@ -504,8 +500,8 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 	}
 
 //	// marginalize. First add prior here, instead of to active.
-	HM.bottomRightCorner<8, 8>().diagonal() += fh->prior;
-	bM.tail<8>() += fh->prior.cwiseProduct(fh->delta_prior);
+	HM.bottomRightCorner<8, 8>().diagonal() += eff->prior;
+	bM.tail<8>() += eff->prior.cwiseProduct(eff->delta_prior);
 
 //	std::cout << std::setprecision(16) << "HMPre:\n" << HM << "\n\n";
 
@@ -539,13 +535,13 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 	bM = bMScaled.head(ndim);
 
 	// remove from vector, without changing the order!
-	for (unsigned int i = fh->idxInFrames; i + 1 < frames.size(); i++) {
+	for (unsigned int i = eff->idxInFrames; i + 1 < frames.size(); i++) {
 		frames[i] = frames[i + 1];
 		frames[i]->idxInFrames = i;
 	}
 	frames.pop_back();
 	nFrames--;
-	fh->fh->efFrame = 0;
+	eff->fh->efFrame = 0;
 
 	assert((int)frames.size()*8+CPARS == (int)HM.rows());
 	assert((int)frames.size()*8+CPARS == (int)HM.cols());
@@ -565,7 +561,7 @@ void EnergyFunctional::marginalizeFrame(EFFrame *fh) {
 	EFDeltaValid = false;
 
 	makeIDX();
-	delete fh;
+	delete eff;
 }
 
 void EnergyFunctional::marginalizePointsF() {
