@@ -40,13 +40,17 @@ find_package(OpenCV QUIET)
 
 # flags
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin" AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-	if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64") # OSX
-    	set(CPU_CXX_FLAG -mcpu=apple-m1)
+    if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64") # OSX
+	set(CPU_CXX_FLAG -mcpu=apple-m1)
     else()
     	set(CPU_CXX_FLAG -mcpu=x86_64)
     endif()
 else()
-    set(CPU_CXX_FLAG -march=native)
+    if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "armv7l") # OSX
+	set(CPU_CXX_FLAG "-march=native -mfpu=neon")
+    else()
+	set(CPU_CXX_FLAG -march=native)
+    endif()
 endif()
 
 add_definitions("-DENABLE_SSE")
