@@ -138,7 +138,6 @@ private:
 
 	float alphaK;
 	float alphaW;
-	float regWeight;
 
 	Vec3f calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out, Mat88f &H_out_sc, Vec8f &b_out_sc, const SE3 &refToNew,
 			AffLight refToNew_aff);

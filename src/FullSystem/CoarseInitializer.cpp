@@ -94,8 +94,7 @@ CoarseInitializer::~CoarseInitializer() {
 	delete[] JbBuffer_new;
 }
 
-bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian,
-		std::vector<IOWrap::Output3DWrapper*> &wraps) {
+bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps) {
 	newFrame = newFrameHessian;
 
 	for (IOWrap::Output3DWrapper *ow : wraps)
@@ -105,7 +104,6 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian,
 
 	alphaK = 2.5 * 2.5; //*freeDebugParam1*freeDebugParam1;
 	alphaW = 150 * 150; //*freeDebugParam2*freeDebugParam2;
-	regWeight = 0.8; //*freeDebugParam4;
 
 	if (!snapped) {
 		thisToNext.translation().setZero();
@@ -119,7 +117,7 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian,
 				} else {
 					ptsl[i].iR = 1;
 					ptsl[i].idepth_new = 1;
-					ptsl[i].isGood = false;
+					ptsl[i].isGood = true;
 				}
 				ptsl[i].lastHessian = 0;
 			}
@@ -199,9 +197,11 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian,
 			}
 
 			if (accept) {
-
-				if (resNew[1] == alphaK * numPoints[lvl])
+				if (resNew[1] == alphaK * numPoints[lvl]) {
+					if (printDebug && snapped == false)
+						printf("Snapped!\n");
 					snapped = true;
+				}
 				H = H_new;
 				b = b_new;
 				Hsc = Hsc_new;
@@ -246,7 +246,7 @@ bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian,
 
 	float lrTransNorm = leftToRight.translation().norm();
 	float ttnTransNorm = thisToNext.translation().norm();
-	return snapped && (ttnTransNorm > lrTransNorm * 0.5); // || frameID > snappedAt + 10);
+	return snapped && (ttnTransNorm > lrTransNorm && frameID > snappedAt + 5);
 }
 
 void CoarseInitializer::debugPlot(std::vector<IOWrap::Output3DWrapper*> &wraps, int lvl) {
@@ -327,7 +327,7 @@ void CoarseInitializer::debugPlot(std::vector<IOWrap::Output3DWrapper*> &wraps, 
 		ow->pushDepthImage(&imgLeft, &imgRight);
 }
 
-// calculates residual, Hessian and Hessian-block neede for re-substituting depth.
+// calculates residual, Hessian and Hessian-block needed for re-substituting depth.
 Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out, Mat88f &H_out_sc, Vec8f &b_out_sc,
 		const SE3 &refToNew, AffLight refToNew_aff) {
 	int wl = w[lvl], hl = h[lvl];
@@ -450,7 +450,7 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 			// Left/right residual only depends on depth.
 			float dxddr = (tlr[0]-tlr[2]*ur)/ptr[2];
 			float dyddr = (tlr[1]-tlr[2]*vr)/ptr[2];
-			dId[idx] += hw*hitColorRight[1]*fxrl * dxddr + hw*hitColorRight[2]*fyrl * dyddr;
+			dId[idx] += hw*hitColorRight[1] * fxrl * dxddr + hw*hitColorRight[2] * fyrl * dyddr;
 
 			r[idx] = hw*residual;// Huber weighted residual.
 
@@ -470,7 +470,7 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 			JbBuffer_new[i][9] += dId[idx]*dId[idx];
 		}
 
-		if (!isGood || energy > (patternNum * setting_outlierTH) * 20) {
+		if (!isGood || energy > (patternNum * setting_outlierTH) * 10) {
 			E.updateSingle((float) (point->energy[0]));
 			point->isGood_new = false;
 			point->energy_new = point->energy;
@@ -504,14 +504,10 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 
 	//printf("AE = %f * %f + %f\n", alphaW, EAlpha.A, refToNew.translation().squaredNorm() * npts);
 
-	// compute alpha opt.
-	float alphaOpt;
-	if (alphaEnergy > alphaK * npts) {
-		// Snapped condition. There is enough camera translation(energy) to initialise idepth estimates.
-		alphaOpt = 0;
+	// Snapped condition. There is enough camera translation(energy) to initialise idepth estimates.
+	bool snapped = alphaEnergy > alphaK * npts;
+	if (snapped) {
 		alphaEnergy = alphaK * npts;
-	} else {
-		alphaOpt = alphaW;
 	}
 
 	acc9SC.initialize();
@@ -522,13 +518,12 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 
 		point->lastHessian_new = JbBuffer_new[i][9];
 
-		if (alphaOpt != 0) {
-			JbBuffer_new[i][8] += alphaOpt * (point->idepth_new - 1);
-			JbBuffer_new[i][9] += alphaOpt;
-		} else {
-			// "snapped"
+		if (snapped) {
 			JbBuffer_new[i][8] += (point->idepth_new - point->iR);
 			JbBuffer_new[i][9] += 1;
+		} else {
+			JbBuffer_new[i][8] += alphaW * (point->idepth_new - 1);
+			JbBuffer_new[i][9] += alphaW;
 		}
 
 		JbBuffer_new[i][9] = 1 / (1 + JbBuffer_new[i][9]);
@@ -544,16 +539,15 @@ Vec3f CoarseInitializer::calcResidualAndGS(int lvl, Mat88f &H_out, Vec8f &b_out,
 	H_out_sc = acc9SC.H.topLeftCorner<8, 8>();	// / acc9.num;
 	b_out_sc = acc9SC.H.topRightCorner<8, 1>();	// / acc9.num;
 
-	if (alphaOpt != 0) {
-		// Not snapped..
-		H_out(0, 0) += alphaOpt * npts;
-		H_out(1, 1) += alphaOpt * npts;
-		H_out(2, 2) += alphaOpt * npts;
+	if (!snapped) {
+		H_out(0, 0) += alphaW * npts;
+		H_out(1, 1) += alphaW * npts;
+		H_out(2, 2) += alphaW * npts;
 
 		Vec3f tlog = refToNew.log().head<3>().cast<float>();
-		b_out[0] += tlog[0] * alphaOpt * npts;
-		b_out[1] += tlog[1] * alphaOpt * npts;
-		b_out[2] += tlog[2] * alphaOpt * npts;
+		b_out[0] += tlog[0] * alphaW * npts;
+		b_out[1] += tlog[1] * alphaW * npts;
+		b_out[2] += tlog[2] * alphaW * npts;
 	}
 
 	return Vec3f(E.A, alphaEnergy, E.num);  // Accumulation of point residual error, translation * npoints, npoints.
@@ -584,6 +578,8 @@ Vec3f CoarseInitializer::calcDepthRegularisationCouplingEnergy(int lvl) {
  * Sets point->iR on all good points to the mid iR(idepth) of nearest neighbours..
  */
 void CoarseInitializer::updateIdepthRegularisation(int lvl) {
+	const float regWeight = 0.7; //*freeDebugParam4;
+
 	int npts = numPoints[lvl];
 	Pnt *ptsl = points[lvl];
 	if (!snapped) {
@@ -599,7 +595,7 @@ void CoarseInitializer::updateIdepthRegularisation(int lvl) {
 					if (point->neighbours[j] == -1)
 						continue;
 					Pnt *other = ptsl + point->neighbours[j];
-					if (other->idepthLr < 0) // (!other->isGood)
+					if (!other->isGood || other->idepthLr < 0) // (!other->isGood)
 						continue;
 					idnn[nnn] = other->idepthLr;
 					nnn++;
@@ -921,9 +917,6 @@ void CoarseInitializer::doIdepthStepUpdate(int lvl, float lambda, Vec8f inc) {
 			step = maxstep;
 		if (step < -maxstep)
 			step = -maxstep;
-
-		if (pts[i].idepthLr >= 0)
-			step *= 0.5; // 0.5 Value discovered by TAE. :/
 
 		float newIdepth = pts[i].idepth + step;
 		if (newIdepth < 1e-3)
