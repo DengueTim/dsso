@@ -1,4 +1,4 @@
-SET(PROJECT_NAME DSO)
+SET(PROJECT_NAME DSSO)
 
 # On Mac, use gnu gcc over clang. Compiles slower and has missing LD simbols!?
 #set(CMAKE_C_COMPILER "gcc-12")
@@ -35,7 +35,7 @@ FetchContent_MakeAvailable(googletest)
 
 # optional libraries
 find_package(LibZip QUIET)
-find_package(Pangolin 0.2 QUIET)
+find_package(Pangolin 0.8 QUIET)
 find_package(OpenCV QUIET)
 
 # flags
@@ -64,7 +64,7 @@ if (MSVC)
 endif (MSVC)
 
 # Sources files
-set(dso_SOURCE_FILES
+set(dsso_SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystem.cpp
   ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystemOptimize.cpp
   ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystemOptPoint.cpp
@@ -98,31 +98,31 @@ include_directories(
 
 # decide if we have pangolin
 if (Pangolin_FOUND)
-	message("--- found PANGOLIN, compiling dso_pangolin library.")
+	message("--- found PANGOLIN, compiling dsso_pangolin library.")
 	include_directories( ${Pangolin_INCLUDE_DIRS} ) 
-	set(dso_pangolin_SOURCE_FILES 
+	set(dsso_pangolin_SOURCE_FILES
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/Pangolin/KeyFrameDisplay.cpp
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/Pangolin/PangolinDSOViewer.cpp)
 	set(HAS_PANGOLIN 1)
 else ()
-	message("--- could not find PANGOLIN, not compiling dso_pangolin library.")
-	message("    this means there will be no 3D display / GUI available for dso_dataset.")
-	set(dso_pangolin_SOURCE_FILES )
+	message("--- could not find PANGOLIN, not compiling dsso_pangolin library.")
+	message("    this means there will be no 3D display / GUI available for dsso_dataset.")
+	set(dsso_pangolin_SOURCE_FILES )
 	set(HAS_PANGOLIN 0)
 endif ()
 
 # decide if we have openCV
 if (OpenCV_FOUND)
-	message("--- found OpenCV, compiling dso_opencv library.")
+	message("--- found OpenCV, compiling dsso_opencv library.")
 	include_directories( ${OpenCV_INCLUDE_DIRS} )
-	set(dso_opencv_SOURCE_FILES 
+	set(dsso_opencv_SOURCE_FILES
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/OpenCV/ImageDisplay_OpenCV.cpp
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/OpenCV/ImageRW_OpenCV.cpp)
 	set(HAS_OPENCV 1)
 else ()
-	message("--- could not find OpenCV, not compiling dso_opencv library.")
+	message("--- could not find OpenCV, not compiling dsso_opencv library.")
 	message("    this means there will be no image display, and image read / load functionality.")
-	set(dso_opencv_SOURCE_FILES 
+	set(dsso_opencv_SOURCE_FILES
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageDisplay_dummy.cpp
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageRW_dummy.cpp)
 	set(HAS_OPENCV 0)
@@ -141,9 +141,9 @@ endif()
 
 # compile main library.
 include_directories( ${CSPARSE_INCLUDE_DIR} ${CHOLMOD_INCLUDE_DIR}) 
-add_library(dso ${dso_SOURCE_FILES} ${dso_opencv_SOURCE_FILES} ${dso_pangolin_SOURCE_FILES})
+add_library(dsso ${dsso_SOURCE_FILES} ${dsso_opencv_SOURCE_FILES} ${dsso_pangolin_SOURCE_FILES})
 
-#set_property( TARGET dso APPEND_STRING PROPERTY COMPILE_FLAGS -Wall )
+#set_property( TARGET dsso APPEND_STRING PROPERTY COMPILE_FLAGS -Wall )
 
 
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # OSX
@@ -154,11 +154,11 @@ endif()
 
 # build main executable (only if we have both OpenCV and Pangolin)
 if (OpenCV_FOUND AND Pangolin_FOUND)
-	message("--- compiling dso_dataset.")
-	add_executable(dso_dataset ${PROJECT_SOURCE_DIR}/src/main_dso_pangolin.cpp )
-    target_link_libraries(dso_dataset dso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})
+	message("--- compiling dsso_dataset.")
+	add_executable(dsso_dataset ${PROJECT_SOURCE_DIR}/src/main_dso_pangolin.cpp )
+    target_link_libraries(dsso_dataset dsso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})
 else()
-	message("--- not building dso_dataset, since either don't have openCV or Pangolin.")
+	message("--- not building dsso_dataset, since either don't have openCV or Pangolin.")
 endif()
 
 enable_testing()
@@ -172,7 +172,7 @@ add_executable(
 
 target_link_libraries(
   all_tests
-  dso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS}
+  dsso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS}
   gtest_main
 )
 
