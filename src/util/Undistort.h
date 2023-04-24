@@ -166,5 +166,13 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 
 };
 
+class UndistortIdentity: public Undistort {
+public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    ;
+    UndistortIdentity(const char *configFileName, bool noprefix);
+    ~UndistortIdentity();
+    void distortCoordinates(float *in_x, float *in_y, float *out_x, float *out_y, int n) const;
+};
+
 }
 

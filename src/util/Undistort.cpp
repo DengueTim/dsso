@@ -309,6 +309,14 @@ Undistort* Undistort::getUndistorterForFile(std::string configFilename, std::str
 		}
 	}
 
+    else if (std::sscanf(l1.c_str(), "Identity") == 0) {
+        u = new UndistortIdentity(configFilename.c_str(), false);
+        if (!u->isValid()) {
+            delete u;
+            return 0;
+        }
+    }
+
 	else {
 		printf("could not read calib file! exit.");
 		exit(1);
@@ -670,13 +678,23 @@ void Undistort::readFromFile(const char *configFileName, int nPars, std::string 
 			infile.close();
 			return;
 		}
+    } else if (nPars == 0) // Identity model
+    {
+        if (std::sscanf(l2.c_str(), "%d %d", &wOrg, &hOrg) == 2) {
+            printf("Input resolution: %d %d\n", wOrg, hOrg);
+            printf("In: %s\n", prefix.c_str());
+        } else {
+            printf("Failed to read camera calibration (invalid format?)\nCalibration file: %s\n", configFileName);
+            infile.close();
+            return;
+        }
 	} else {
 		printf("called with invalid number of parameters.... forgot to implement me?\n");
 		infile.close();
 		return;
 	}
 
-	if (parsOrg[2] < 1 && parsOrg[3] < 1) {
+	if (parsOrg.rows() > 0 && parsOrg[2] < 1 && parsOrg[3] < 1) {
 		printf("\n\nFound fx=%f, fy=%f, cx=%f, cy=%f.\n I'm assuming this is the \"relative\" calibration file format,"
 				"and will rescale this by image width / height to fx=%f, fy=%f, cx=%f, cy=%f.\n\n", parsOrg[0], parsOrg[1],
 				parsOrg[2], parsOrg[3], parsOrg[0] * wOrg, parsOrg[1] * hOrg, parsOrg[2] * wOrg - 0.5, parsOrg[3] * hOrg - 0.5);
@@ -1039,6 +1057,25 @@ void UndistortPinhole::distortCoordinates(float *in_x, float *in_y, float *out_x
 		out_x[i] = ix;
 		out_y[i] = iy;
 	}
+}
+
+UndistortIdentity::UndistortIdentity(const char *configFileName, bool noprefix) {
+    printf("Creating UndistortIdentity undistorter\n");
+
+    if (noprefix)
+        readFromFile(configFileName, 0);
+    else
+        readFromFile(configFileName, 0, "Identity");
+
+}
+UndistortIdentity::~UndistortIdentity() {
+}
+
+void UndistortIdentity::distortCoordinates(float *in_x, float *in_y, float *out_x, float *out_y, int n) const {
+    for (int i = 0; i < n; i++) {
+        out_x[i] = in_x[i];
+        out_y[i] = in_y[i];
+    }
 }
 
 }
