@@ -173,6 +173,9 @@ FullSystem::FullSystem()
 	maxIdJetVisDebug = -1;
 	minIdJetVisTracker = -1;
 	maxIdJetVisTracker = -1;
+
+    ImuCalib defaultImuCalib;
+    imuIntegrator = new ImuIntegrator(defaultImuCalib);
 }
 
 FullSystem::~FullSystem()
@@ -798,10 +801,7 @@ void FullSystem::flagPointsForRemoval()
 
 }
 
-
-void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
-{
-
+void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasurements &imuMeasurements) {
     if(isLost) return;
 	boost::unique_lock<boost::mutex> lock(trackMutex);
 
@@ -820,22 +820,21 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 
 	// =========================== make Images / derivatives etc. =========================
 	fh->ab_exposure = image->exposure_time;
-    fh->makeImages(image->image, &Hcalib);
+    //fh->makeImages(image->image, &Hcalib);
+
+	imuIntegrator->integrateImuMeasurements(imuMeasurements);
 
 
-
-
-	if(!initialized)
-	{
-		// use initializer!
-		if(coarseInitializer->frameID<0)	// first frame set. fh is kept by coarseInitializer.
-		{
-
-			coarseInitializer->setFirst(&Hcalib, fh);
-		}
-		else if(coarseInitializer->trackFrame(fh, outputWrapper))	// if SNAPPED
-		{
-
+	if (coarseInitializer->frameID < 0) {
+		// first frame set. fh is kept by coarseInitializer.
+		fh->makeImages(image->image, &Hcalib);
+		coarseInitializer->setFirst(&Hcalib, fh);
+//		std::this_thread::sleep_for (std::chrono::milliseconds(100)); // Time to update UI..
+	} else if (!initialized) {
+		// Initializing...
+		fh->makeImages(image->image, &Hcalib);
+		if (coarseInitializer->trackFrame(fh, outputWrapper)) {
+			// if SNAPPED
 			initializeFromInitializer(fh);
 			lock.unlock();
 			deliverTrackedFrame(fh, true);
@@ -888,8 +887,6 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		}
 
 
-
-
         for(IOWrap::Output3DWrapper* ow : outputWrapper)
             ow->publishCamPose(fh->shell, &Hcalib);
 
@@ -901,9 +898,8 @@ void FullSystem::addActiveFrame( ImageAndExposure* image, int id )
 		return;
 	}
 }
-void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF)
-{
 
+void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF) {
 
 	if(linearizeOperation)
 	{

@@ -55,6 +55,8 @@ std::string vignette = "";
 std::string gammaCalib = "";
 std::string source = "";
 std::string calib = "";
+std::string imuCalib = "";
+std::string imuData = "";
 double rescale = 1;
 bool reverse = false;
 bool disableROS = false;
@@ -292,8 +294,19 @@ void parseArgument(char* arg)
 		return;
 	}
 
-	if(1==sscanf(arg,"rescale=%f",&foption))
-	{
+    if (1 == sscanf(arg, "imuCalib=%s", buf)) {
+        imuCalib = buf;
+        printf("loading imuCalib from %s!\n", imuCalib.c_str());
+        return;
+    }
+
+    if (1 == sscanf(arg, "imuData=%s", buf)) {
+        imuData= buf;
+        printf("loading imuData from %s!\n", imuData.c_str());
+        return;
+    }
+
+	if (1 == sscanf(arg, "rescale=%f", &foption)) {
 		rescale = foption;
 		printf("RESCALE %f!\n", rescale);
 		return;
@@ -372,10 +385,12 @@ int main( int argc, char** argv )
 		exit(1);
 	}
 
+    if (imuData.length() > 0 && reader->loadImuMeasurements(imuCalib, imuData) == 0) {
+        printf("ERROR: No(or incomplete) IMU data/calibration data loaded for given filenames.");
+        exit(1);
+    }
 
-
-
-	int lstart=start;
+	int lstart = start;
 	int lend = end;
 	int linc = 1;
 	if(reverse)
@@ -400,6 +415,7 @@ int main( int argc, char** argv )
 
 
 
+
     IOWrap::PangolinDSOViewer* viewer = 0;
 	if(!disableAllDisplay)
     {
@@ -411,8 +427,6 @@ int main( int argc, char** argv )
 
     if(useSampleOutput)
         fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper());
-
-
 
 
     // to make MacOS happy: run this in dedicated thread -- and use this one to run the GUI.
@@ -451,6 +465,9 @@ int main( int argc, char** argv )
         clock_t started = clock();
         double sInitializerOffset=0;
 
+		std::vector<ImuMeasurement>::iterator imuIt = reader->imuMeasurements.begin();
+		std::vector<ImuMeasurement>::iterator imuItEnd = reader->imuMeasurements.end();
+		ImuMeasurements imuMeasurements;
 
         for(int ii=0;ii<(int)idsToPlay.size(); ii++)
         {
@@ -487,12 +504,23 @@ int main( int argc, char** argv )
                 }
             }
 
+			if (reverse) {
+				printf("Reversing IMU data not implemented.");
+				return;
+			} else {
+				while (imuIt != imuItEnd && imuIt->timestamp < img->timestamp) {
+					imuMeasurements.push_back(*imuIt++);
+				}
+			}
 
+			if (ii == 0) {
+				imuMeasurements.clear();
+			}
 
-            if(!skipFrame) fullSystem->addActiveFrame(img, i);
-
-
-
+            if(!skipFrame) {
+				fullSystem->addActiveFrame(img, i, imuMeasurements);
+				imuMeasurements.clear();
+			}
 
             delete img;
 
