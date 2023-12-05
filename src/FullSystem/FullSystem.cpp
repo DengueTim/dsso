@@ -159,6 +159,9 @@ FullSystem::FullSystem(const Mat33 &leftK, const Mat33 &rightK, const SE3 &leftT
 	maxIdJetVisDebug = -1;
 	minIdJetVisTracker = -1;
 	maxIdJetVisTracker = -1;
+
+    ImuCalib defaultImuCalib;
+    imuIntegrator = new ImuIntegrator(defaultImuCalib);
 }
 
 FullSystem::~FullSystem() {
@@ -712,7 +715,7 @@ void FullSystem::flagPointsForRemoval() {
 	}
 }
 
-void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
+void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasurements &imuMeasurements) {
 
 	if (isLost)
 		return;
@@ -731,6 +734,8 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id) {
 
 	// =========================== make Images / derivatives etc. =========================
 	fh->ab_exposure = image->exposure_time;
+
+    imuIntegrator->integrateImuMeasurements(imuMeasurements);
 
 	if (coarseInitializer->frameID < 0) {
 		// first frame set. fh is kept by coarseInitializer.

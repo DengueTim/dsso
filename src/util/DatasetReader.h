@@ -33,6 +33,7 @@
 
 #include "util/Undistort.h"
 #include "IOWrapper/ImageRW.h"
+#include "util/ImuMeasurement.h"
 
 #if HAS_ZIPLIB
 	#include "zip.h"
@@ -208,10 +209,9 @@ public:
 		MinimalImageB *minimgL = getImageRaw_internal(id, false);
 		MinimalImageB *minimgR = getImageRaw_internal(id, true);
 
-		const int w = 0, h = 0;
-		if (iae == 0) {
-			iae = new ImageAndExposure(w, h);
-		}
+        if (iae == 0) {
+            iae = new ImageAndExposure(0, 0);
+        }
 
 		iae->timestamp = (timestamps.size() == 0 ? 0.0 : timestamps[id]);
 		iae->exposure_time = (!setting_useExposure || exposures.size() == 0) ? 1.0f : exposures[id];
@@ -232,9 +232,41 @@ public:
 		return undistortL->photometricUndist->getG();
 	}
 
+    inline int loadImuMeasurements(std::string &imuCalibFilename, std::string &imuDataFilename) {
+        //std::ifstream imuCalibStream(imuCalibFilename.c_str());
+        std::ifstream imuDataStream(imuDataFilename.c_str());
+
+        long long lastImuStamp = 0;
+
+        while (!imuDataStream.eof() && imuDataStream.good()) {
+            char lineBuf[256];
+            imuDataStream.getline(lineBuf, 256);
+
+            if (lineBuf[0] == '#') {
+                continue;
+            }
+
+            long long imuStamp;
+            double wx ,wy, wz, ax ,ay, az;
+
+            if (7 == sscanf(lineBuf, "%lld,%lf,%lf,%lf,%lf,%lf,%lf", &imuStamp, &wx ,&wy, &wz, &ax ,&ay, &az)) {
+                if (lastImuStamp == 0) {
+                    lastImuStamp = imuStamp;
+                }
+                imuMeasurements.emplace_back(wx ,wy, wz, ax ,ay, az, imuStamp, imuStamp - lastImuStamp);
+                lastImuStamp = imuStamp;
+            }
+        }
+
+        printf("ImageFolderReader: IMU Measurements: %d\n", (int) imuMeasurements.size());
+
+        return imuMeasurements.size();
+    }
+
 	// undistorter. [0] always exists, [1-2] only when MT is enabled.
 	Undistort *undistortR;
 	Undistort *undistortL;
+    ImuMeasurements imuMeasurements;
 private:
 
 	MinimalImageB* getImageRaw_internal(int id, bool rightNotLeft) {
@@ -273,30 +305,42 @@ private:
 		}
 	}
 
+    long long getTimestampFromFilename(const std::string filename) {
+        long long timestamp;
+        std::string f = filename.substr(filename.find_last_of("/\\") + 1);
+        std::sscanf(f.c_str(), "%lld.png", &timestamp);
+        return timestamp;
+    }
+
 	inline void loadTimestamps() {
 		std::ifstream tr;
 		std::string timesFile = pathL.substr(0, pathL.find_last_of('/')) + "/times.txt";
 		tr.open(timesFile.c_str());
-		while (!tr.eof() && tr.good()) {
-			std::string line;
-			char buf[1000];
-			tr.getline(buf, 1000);
+        if (tr.is_open()) {
+            while (!tr.eof() && tr.good()) {
+                std::string line;
+                char buf[1000];
+                tr.getline(buf, 1000);
 
-			int id;
-			double stamp;
-			float exposure = 0;
+                int id;
+                double stamp;
+                float exposure = 0;
 
-			if (3 == sscanf(buf, "%d %lf %f", &id, &stamp, &exposure)) {
-				timestamps.push_back(stamp);
-				exposures.push_back(exposure);
-			}
-
-			else if (2 == sscanf(buf, "%d %lf", &id, &stamp)) {
-				timestamps.push_back(stamp);
-				exposures.push_back(exposure);
-			}
-		}
-		tr.close();
+                if (3 == sscanf(buf, "%d %lf %f", &id, &stamp, &exposure)) {
+                    timestamps.push_back(stamp);
+                    exposures.push_back(exposure);
+                } else if (2 == sscanf(buf, "%d %lf", &id, &stamp)) {
+                    timestamps.push_back(stamp);
+                    exposures.push_back(exposure);
+                }
+            }
+            tr.close();
+        } else {
+            for (auto i = 0 ; i < files.size() ; i++) {
+                long long timestamp = getTimestampFromFilename(files[i]);
+                timestamps.push_back(timestamp);
+            }
+        }
 
 		// check if exposures are correct, (possibly skip)
 		bool exposuresGood = ((int) exposures.size() == (int) getNumImages());

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 
-./build/Debug/bin/dso_dataset \
+./build/Debug/bin/dsso_dataset \
 	leftFiles=$HOME/src/dsso/EuRoC_MAV/sequence/cam0/data \
 	rightFiles=$HOME/src/dsso/EuRoC_MAV/sequence/cam1/data \
 	leftCalib=$HOME/src/dsso/EuRoC_MAV/cameraLeft.txt \

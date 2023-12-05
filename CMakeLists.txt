@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.1)
 SET(PROJECT_NAME DSSO)
 
 # On Mac, use gnu gcc over clang. Compiles slower and has missing LD simbols!?
@@ -11,7 +12,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 3.14)
 
 set(CMAKE_CXX_STANDARD 14)
 
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Debug)
+#set(CMAKE_BUILD_TYPE Release)
 #set(CMAKE_BUILD_TYPE RelWithDebInfo)
 
 set(EXECUTABLE_OUTPUT_PATH bin)
@@ -21,13 +23,15 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 # required libraries
 find_package(SuiteParse REQUIRED)
 find_package(Eigen3 REQUIRED)
-find_package(Boost COMPONENTS system thread) 
+find_package(Boost COMPONENTS system thread)
+find_package(GTSAM REQUIRED)
 
 # Google Test
 include(FetchContent)
 FetchContent_Declare(
   googletest
   URL https://github.com/google/googletest/archive/refs/tags/release-1.11.0.zip
+  DOWNLOAD_NO_EXTRACT TRUE
 )
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -35,7 +39,7 @@ FetchContent_MakeAvailable(googletest)
 
 # optional libraries
 find_package(LibZip QUIET)
-find_package(Pangolin 0.8 QUIET)
+find_package(Pangolin 0.6 QUIET)
 find_package(OpenCV QUIET)
 
 # flags
@@ -83,18 +87,17 @@ set(dsso_SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/util/settings.cpp
   ${PROJECT_SOURCE_DIR}/src/util/Undistort.cpp
   ${PROJECT_SOURCE_DIR}/src/util/globalCalib.cpp
+  ${PROJECT_SOURCE_DIR}/src/FullSystem/IMU.cpp
 )
-
-
 
 include_directories(
   ${PROJECT_SOURCE_DIR}/src
   ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
   ${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
   ${EIGEN3_INCLUDE_DIR}
+  ${GTSAM_INCLUDE_DIR}
   ${PROJECT_SOURCE_DIR}/tests
 ) 
-
 
 # decide if we have pangolin
 if (Pangolin_FOUND)
@@ -156,7 +159,7 @@ endif()
 if (OpenCV_FOUND AND Pangolin_FOUND)
 	message("--- compiling dsso_dataset.")
 	add_executable(dsso_dataset ${PROJECT_SOURCE_DIR}/src/main_dso_pangolin.cpp )
-    target_link_libraries(dsso_dataset dsso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS})
+    target_link_libraries(dsso_dataset dsso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS} gtsam)
 else()
 	message("--- not building dsso_dataset, since either don't have openCV or Pangolin.")
 endif()

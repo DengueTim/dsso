@@ -38,6 +38,7 @@
 #include "util/IndexThreadReduce.h"
 #include "OptimizationBackend/EnergyFunctional.h"
 #include "FullSystem/PixelSelector2.h"
+#include "FullSystem/IMU.h"
 
 #include <math.h>
 
@@ -117,7 +118,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	virtual ~FullSystem();
 
 	// adds a new frame, and creates point & residual structs.
-	void addActiveFrame(ImageAndExposure *image, int id);
+	void addActiveFrame(ImageAndExposure *image, int id, const ImuMeasurements &imuMeasurements);
 
 	// marginalizes a frame. drops / marginalizes points & residuals.
 	void marginalizeFrame(FrameHessian *frame);
@@ -270,6 +271,8 @@ private:
 	bool needToKetchupMapping;
 
 	int lastRefStopID;
+
+    ImuIntegrator *imuIntegrator;
 };
 }
 
