@@ -175,10 +175,10 @@ add_executable(
 
 target_link_libraries(
   all_tests
-  dsso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS}
-  gtest_main
+  dsso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS} gtsam
+  gtest_main gtest gmock
 )
 
 include(GoogleTest)
-gtest_discover_tests(all_tests)
+gtest_discover_tests(all_tests PROPERTIES TEST_DISCOVERY_TIMEOUT 10000)
 
