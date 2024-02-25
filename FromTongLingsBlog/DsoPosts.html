@@ -1,0 +1,1841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Copied from https://tongling916.github.io/tags/#DSO</title>
+
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/hux-blog.min.css">
+    <link rel="stylesheet" href="css/mjx.css">
+    <link rel="stylesheet" href="css/syntax.css">
+
+    <script type="text/javascript" async="" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML">
+    </script>
+
+<!--    <style type="text/css">-->
+<!--        .MJX_Assistive_MathML_Block {-->
+<!--            display: none;-->
+<!--        }-->
+<!--    </style>-->
+
+<!--    <script type="text/javascript"-->
+<!--            src="https://d3eoax9i5htok0.cloudfront.net/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML">-->
+<!--    </script>-->
+</head>
+<body>
+    <h2>Copied from <a href="https://tongling916.github.io/tags/DsoPosts.html">Tong Ling's DSO blog posts</a></h2>
+
+    <h1>DSO-AccumulatedTopHessianSSE</h1>
+    <div class="
+                    col-lg-8 col-lg-offset-2
+                    col-md-10 col-md-offset-1
+                    post-container">
+
+        <h3 id="variable">Variable</h3>
+
+        <h3 id="function">Function</h3>
+
+        <h4 id="void-addpoint">void addPoint()</h4>
+
+        <div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">template</span> <span class="o">&lt;</span><span class="kt">int</span> <span class="n">mode</span><span class="p">&gt;</span>
+    <span class="kt">void</span> <span class="nf">addPoint</span><span class="p">(</span><span class="n">EFPoint</span><span class="o">*</span> <span class="k">const</span> <span class="n">p</span><span class="p">,</span> <span class="k">const</span> <span class="n">EnergyFunctional</span><span class="o">*</span> <span class="k">const</span> <span class="n">ef</span><span class="p">,</span>
+                  <span class="k">const</span> <span class="kt">int</span> <span class="n">tid</span> <span class="o">=</span> <span class="mi">0</span><span class="p">);</span>
+    </code></pre></div></div>
+        <ul>
+            <li>This function has three modes
+                <ul>
+                    <li><code class="language-plaintext highlighter-rouge">active: mode = 0</code></li>
+                    <li><code class="language-plaintext highlighter-rouge">marginalize: mode = 2</code></li>
+                    <li><code class="language-plaintext highlighter-rouge">linearize (mode = 1)</code>: NOT USED, because there are NEVER linearized and active points available.</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h4 id="void-stitchdoubleinternal">void stitchDoubleInternal()</h4>
+
+        <div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="nf">stitchDoubleInternal</span><span class="p">(</span><span class="n">MatXX</span><span class="o">*</span> <span class="n">H</span><span class="p">,</span> <span class="n">VecX</span><span class="o">*</span> <span class="n">b</span><span class="p">,</span> <span class="k">const</span> <span class="n">EnergyFunctional</span><span class="o">*</span> <span class="k">const</span> <span class="n">EF</span><span class="p">,</span>
+                              <span class="kt">bool</span> <span class="n">usePrior</span><span class="p">,</span> <span class="kt">int</span> <span class="n">min</span><span class="p">,</span> <span class="kt">int</span> <span class="n">max</span><span class="p">,</span> <span class="n">Vec10</span><span class="o">*</span> <span class="n">stats</span><span class="p">,</span>
+                              <span class="kt">int</span> <span class="n">tid</span><span class="p">);</span>
+    </code></pre></div></div>
+
+        <ul>
+            <li>Actually, this matrix computes <a href="#hessian">\(\mathbf{H}_{11}\)</a> and <a href="#b">\(\mathbf{b}_{1}\)</a>, but there are some equations to mention,
+                <ul>
+                    <li>
+                        \[\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}} = \frac{\partial r}{\partial \boldsymbol{\xi}_{ji}}\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}}\]
+                    </li>
+                    <li>
+                        \[\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}} = \frac{\partial r}{\partial \boldsymbol{\xi}_{ji}}\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}}\]
+                    </li>
+                    <li></li>
+                    <li>
+                        \[(\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}} = (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}})^{T}((\frac{\partial r}{\partial \boldsymbol{\xi}_{ji}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{ji}})\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}}\]
+                    </li>
+                    <li>
+                        \[(\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}} = (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}})^{T}((\frac{\partial r}{\partial \boldsymbol{\xi}_{ji}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{ji}})\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}}\]
+                    </li>
+                    <li>
+                        \[\frac{\partial r}{\partial \mathbf{a}_{i}} = \frac{\partial r}{\partial\mathbf{a}_{ji}}\frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{i}}\]
+                    </li>
+                    <li>
+                        \[\frac{\partial r}{\partial \mathbf{a}_{j}} = \frac{\partial r}{\partial\mathbf{a}_{ji}}\frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{j}}\]
+                    </li>
+                </ul>
+            </li>
+            <li>In the real implementation, we compute \(\mathbf{H}_{1}\) and \(\mathbf{b}_{1}\) block by block.
+                <ul>
+                    <li>
+                        \[\begin{bmatrix}(\frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}} &amp; (\frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}} \\ (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}} &amp; (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}} \end{bmatrix} = \begin{bmatrix} (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}})^{T} &amp; \\ &amp; (\frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{i}})^{T}\end{bmatrix} \begin{bmatrix}(\frac{\partial r}{\partial  \boldsymbol{\xi}_{ji}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{ji}} &amp; (\frac{\partial r}{\partial  \boldsymbol{\xi}_{ji}})^{T} \frac{\partial r}{\partial \mathbf{a}_{ji}} \\ (\frac{\partial r}{\partial \mathbf{a}_{ji}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{ji}} &amp; (\frac{\partial r}{\partial \mathbf{a}_{ji}})^{T} \frac{\partial r}{\partial \mathbf{a}_{ji}} \end{bmatrix}\begin{bmatrix} \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}} &amp; \\ &amp; \frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{i}}\end{bmatrix}\]
+                    </li>
+                    <li>
+                        \[\begin{bmatrix}(\frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{jw}} &amp; (\frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}} \\ (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{jw}} &amp; (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}} \end{bmatrix} = \begin{bmatrix} (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}})^{T} &amp; \\ &amp; (\frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{i}})^{T}\end{bmatrix} \begin{bmatrix}(\frac{\partial r}{\partial  \boldsymbol{\xi}_{ji}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{ji}} &amp; (\frac{\partial r}{\partial  \boldsymbol{\xi}_{ji}})^{T} \frac{\partial r}{\partial \mathbf{a}_{ji}} \\ (\frac{\partial r}{\partial \mathbf{a}_{ji}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{ji}} &amp; (\frac{\partial r}{\partial \mathbf{a}_{ji}})^{T} \frac{\partial r}{\partial \mathbf{a}_{ji}} \end{bmatrix}\begin{bmatrix} \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}} &amp; \\ &amp; \frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{j}}\end{bmatrix}\]
+                    </li>
+                    <li>
+                        \[\begin{bmatrix}(\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \mathbf{C}} \\ (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T}\frac{\partial r}{\partial \mathbf{C}} \end{bmatrix} = \begin{bmatrix} (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}})^{T} &amp; \\ &amp; (\frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{i}})^{T}\end{bmatrix} \begin{bmatrix}(\frac{\partial r}{\partial  \boldsymbol{\xi}_{ji}})^{T} \frac{\partial r}{\partial  \mathbf{C}} \\ (\frac{\partial r}{\partial \mathbf{a}_{ji}})^{T} \frac{\partial r}{\partial  \mathbf{C}} \end{bmatrix}\]
+                    </li>
+                    <li>
+                        \[\begin{bmatrix}r(\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \\ r(\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \end{bmatrix} = \begin{bmatrix} (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}})^{T} &amp; \\ &amp; (\frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{i}})^{T}\end{bmatrix}\begin{bmatrix}r(\frac{\partial r}{\partial \boldsymbol{\xi}_{ji}})^{T} \\ r(\frac{\partial r}{\partial \mathbf{a}_{ji}})^{T} \end{bmatrix}\]
+                    </li>
+                </ul>
+            </li>
+        </ul>
+
+        <h4 id="void-stitchdoublemt">void stitchDoubleMT()</h4>
+
+        <div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="nf">stitchDoubleMT</span><span class="p">(</span><span class="n">IndexThreadReduce</span><span class="o">&lt;</span><span class="n">Vec10</span><span class="o">&gt;*</span> <span class="n">red</span><span class="p">,</span> <span class="n">MatXX</span><span class="o">&amp;</span> <span class="n">H</span><span class="p">,</span> <span class="n">VecX</span><span class="o">&amp;</span> <span class="n">b</span><span class="p">,</span>
+                        <span class="k">const</span> <span class="n">EnergyFunctional</span><span class="o">*</span> <span class="k">const</span> <span class="n">EF</span><span class="p">,</span> <span class="k">const</span> <span class="kt">bool</span> <span class="n">usePrior</span><span class="p">,</span>
+                        <span class="k">const</span> <span class="kt">bool</span> <span class="n">MT</span><span class="p">);</span>
+    </code></pre></div></div>
+
+        <ul>
+            <li>Basically, this matrix computes <a href="#hessian">\(\mathbf{H}_{11}\)</a> and <a href="#b">\(\mathbf{b}_{1}\)</a>. Most of work will be done in <code class="language-plaintext highlighter-rouge">void stitchDoubleInternal()</code>. After that, this function will copy some existing elements over diagonal (due to the symmetric property).</li>
+        </ul>
+    </div>
+
+    <h1>DSO-AccumulatorApprox</h1>
+    <div class="
+                    col-lg-8 col-lg-offset-2
+                    col-md-10 col-md-offset-1
+                    post-container">
+
+        <h3 id="abstract">Abstract</h3>
+
+        <ul>
+            <li>This is a class to compute the <code class="language-plaintext highlighter-rouge">H</code> and <code class="language-plaintext highlighter-rouge">b</code> in the Gauss-Newton optimization. Related variables are
+                <ul>
+                    <li>Intrinsic parameters (\(f_x, f_y, c_x, c_y\))</li>
+                    <li>Relative pose (\(\boldsymbol{\xi}_{ji}\))</li>
+                    <li>Relative photometric parameters (\(-e^{a_{ji}}, -b_{ji}\))</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3 id="variable">Variable</h3>
+
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Formula</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">H</code></td>
+                <td><code class="language-plaintext highlighter-rouge">Mat1313f</code></td>
+                <td>\(\begin{bmatrix}\mathbf{J}^{T} \mathbf{J} &amp; \mathbf{b} \\ \mathbf{b}^{T} &amp; \mathbf{e}^{T} \mathbf{e} \end{bmatrix}\)</td>
+                <td>\(\mathbf{e} = \begin{bmatrix} r_{1} \\ \cdots \\ r_{n} \end{bmatrix}\), \(\mathbf{J} = \frac{\partial \mathbf{e}}{\partial \begin{bmatrix} \mathbf{C} \\ \boldsymbol{\xi}_{ji} \\ \mathbf{a}_{ji} \end{bmatrix}}\), \(\mathbf{b} = \mathbf{J}^{T} \mathbf{e}\)</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <h4 id="notes">Notes</h4>
+
+        <ol>
+            <li>In the real implementation, the matrix \(\mathbf{H} = \begin{bmatrix}\mathbf{J}^{T} \mathbf{J} &amp; \mathbf{b} \\ \mathbf{b}^{T} &amp; \mathbf{e}^{T} \mathbf{e} \end{bmatrix} = \begin{bmatrix}\mathbf{H}_{\text{tl}} &amp; \mathbf{H}_{\text{tr}} \\ \mathbf{H}_{\text{tr}}^{T} &amp; \mathbf{H}_{\text{br}} \end{bmatrix}\) is divided into three parts.
+                <ol>
+                    <li>The first part is the <strong>top left</strong> <code class="language-plaintext highlighter-rouge">10 x 10</code>.
+                        <ul>
+                            <li>\(\mathbf{H}_{\text{tl}} = \mathbf{J}_{\text{geo}}^{T}\mathbf{J}_{\text{geo}}\), where \(\mathbf{J}_{\text{geo}} = \frac{\partial \mathbf{e}}{\partial \begin{bmatrix} \mathbf{C} \\ \boldsymbol{\xi}_{ji}\end{bmatrix}}\).</li>
+                            <li>Due to the symmetric property, there are only \(10 + 9 + 8 + \cdots + 1 = 55\) elements computed.</li>
+                        </ul>
+                    </li>
+                    <li>The second part is the <strong>top right</strong> <code class="language-plaintext highlighter-rouge">10 x 3</code>.
+                        <ul>
+                            <li>\(\mathbf{H}_{\text{tr}} = \begin{bmatrix}\mathbf{J}_{\text{geo}}^{T}\mathbf{J}_{\text{photo}} &amp; \mathbf{J}_{\text{geo}}^{T} \mathbf{e}\end{bmatrix}\), where \(\mathbf{J}_{\text{photo}} = \frac{\partial \mathbf{e}}{\partial \mathbf{a}_{ji}}\).</li>
+                        </ul>
+                    </li>
+                    <li>The third part is the <strong>bottom right</strong> <code class="language-plaintext highlighter-rouge">3 x 3</code>.
+                        <ul>
+                            <li>\(\mathbf{H}_{\text{br}} = \begin{bmatrix}\mathbf{J}_{\text{photo}}^{T}\mathbf{J}_{\text{photo}} &amp; \mathbf{J}_{\text{photo}}^{T} \mathbf{e} \\ (\mathbf{J}_{\text{photo}}^{T} \mathbf{e})^{T} &amp; \mathbf{e}^{T} \mathbf{e} \end{bmatrix}\).</li>
+                            <li>Due to the symmetric property, there are only \(3 + 2 + 1 = 6\) elements computed.</li>
+                        </ul>
+                    </li>
+                </ol>
+            </li>
+        </ol>
+
+        <h3 id="function">Function</h3>
+
+        <h3 id="void-update">void update()</h3>
+
+        <div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cm">/** \brief Compute the top left part of Hessian
+     *
+     *  Compute the Hessian ONLY related to intrinsic parameters and relative
+     *  pose. Since it is a symmetric matrix, we only need to compute the upper
+     *  right part of it.
+    */</span>
+    <span class="kt">void</span> <span class="nf">update</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span><span class="o">*</span> <span class="k">const</span> <span class="n">x4</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span><span class="o">*</span> <span class="k">const</span> <span class="n">x6</span><span class="p">,</span>
+                <span class="k">const</span> <span class="kt">float</span><span class="o">*</span> <span class="k">const</span> <span class="n">y4</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span><span class="o">*</span> <span class="k">const</span> <span class="n">y6</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span> <span class="n">a</span><span class="p">,</span>
+                <span class="k">const</span> <span class="kt">float</span> <span class="n">b</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span> <span class="n">c</span><span class="p">);</span>
+    </code></pre></div></div>
+
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th>Formula</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">x4</code></td>
+                <td>\(\frac{\partial u_j}{\partial\begin{bmatrix} f_{x} \\ f_{y} \\ c_{x} \\ c_{y}\end{bmatrix}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">x6</code></td>
+                <td>\(\frac{\partial u_j}{\partial\boldsymbol{\xi_{ji}}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">y4</code></td>
+                <td>\(\frac{\partial v_j}{\partial\begin{bmatrix} f_{x} \\ f_{y} \\ c_{x} \\ c_{y}\end{bmatrix}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">y6</code></td>
+                <td>\(\frac{\partial v_j}{\partial\boldsymbol{\xi_{ji}}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">a</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial u_j}\frac{\partial r_{ji}}{\partial u_j}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">b</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial u_j}\frac{\partial r_{ji}}{\partial v_j}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">c</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial v_j}\frac{\partial r_{ji}}{\partial v_j}\)</td>
+                <td> </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <h3 id="void-updatetopright">void updateTopRight()</h3>
+
+        <div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">void</span> <span class="nf">updateTopRight</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span><span class="o">*</span> <span class="k">const</span> <span class="n">x4</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span><span class="o">*</span> <span class="k">const</span> <span class="n">x6</span><span class="p">,</span>
+                        <span class="k">const</span> <span class="kt">float</span><span class="o">*</span> <span class="k">const</span> <span class="n">y4</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span><span class="o">*</span> <span class="k">const</span> <span class="n">y6</span><span class="p">,</span>
+                        <span class="k">const</span> <span class="kt">float</span> <span class="n">TR00</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span> <span class="n">TR10</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span> <span class="n">TR01</span><span class="p">,</span>
+                        <span class="k">const</span> <span class="kt">float</span> <span class="n">TR11</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span> <span class="n">TR02</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span> <span class="n">TR12</span><span class="p">);</span>
+    </code></pre></div></div>
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th>Formula</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">x4</code></td>
+                <td>\(\frac{\partial u_j}{\partial\begin{bmatrix} f_{x} \\ f_{y} \\ c_{x} \\ c_{y}\end{bmatrix}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">x6</code></td>
+                <td>\(\frac{\partial u_j}{\partial\boldsymbol{\xi_{ji}}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">y4</code></td>
+                <td>\(\frac{\partial v_j}{\partial\begin{bmatrix} f_{x} \\ f_{y} \\ c_{x} \\ c_{y}\end{bmatrix}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">y6</code></td>
+                <td>\(\frac{\partial v_j}{\partial\boldsymbol{\xi_{ji}}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">TR00</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial (-e^{a_{ji}})}\frac{\partial r_{ji}}{\partial u_{j}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">TR10</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial (-e^{a_{ji}})}\frac{\partial r_{ji}}{\partial v_{j}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">TR01</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial (-b_{ji})}\frac{\partial r_{ji}}{\partial u_{j}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">TR11</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial (-b_{ji})}\frac{\partial r_{ji}}{\partial v_{ji}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">TR02</code></td>
+                <td>\(r_{ji}\frac{\partial r_{ji}}{\partial u_{j}}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">TR12</code></td>
+                <td>\(r_{ji}\frac{\partial r_{ji}}{\partial v_{j}}\)</td>
+                <td> </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <h3 id="void-updatebotright">void updateBotRight()</h3>
+
+        <div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cm">/** \brief Compute the bottom right part of Hessian
+     *
+     * Compute the Hessian and b ONLY related to photometric affine parameters
+    */</span>
+    <span class="kt">void</span> <span class="nf">updateBotRight</span><span class="p">(</span><span class="k">const</span> <span class="kt">float</span> <span class="n">a00</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span> <span class="n">a01</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span> <span class="n">a02</span><span class="p">,</span>
+                        <span class="k">const</span> <span class="kt">float</span> <span class="n">a11</span><span class="p">,</span> <span class="k">const</span> <span class="kt">float</span> <span class="n">a12</span><span class="p">,</span>
+                        <span class="k">const</span> <span class="kt">float</span> <span class="n">a22</span><span class="p">);</span>
+    </code></pre></div></div>
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th>Formula</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">a00</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial (-e^{a_{ji}})}\frac{\partial r_{ji}}{\partial (-e^{a_{ji}})}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">a01</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial (-e^{a_{ji}})}\frac{\partial r_{ji}}{\partial (-b_{ji})}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">a02</code></td>
+                <td>\(r_{ji}\frac{\partial r_{ji}}{\partial (-e^{a_{ji}})}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">a11</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial (-b_{ji})}\frac{\partial r_{ji}}{\partial (-b_{ji})}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">a12</code></td>
+                <td>\(r_{ji}\frac{\partial r_{ji}}{\partial (-b_{ji})}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">a22</code></td>
+                <td>\(r_{ji}^{2}\)</td>
+                <td> </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h1>DSO-CoarseInitializer</h1>
+    <div class="
+                    col-lg-8 col-lg-offset-2
+                    col-md-10 col-md-offset-1
+                    post-container">
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable used in <code class="language-plaintext highlighter-rouge">CoarseInitializer</code></th>
+                <th>Variable used here</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">residual</code></td>
+                <td>\(I_{j}\left[\mathbf{p}_{j}\right]-e^{a_{ji}}I_{i}[\mathbf{p}_{i}] - b_{ji}\)</td>
+                <td>single residual</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">hw</code></td>
+                <td>\(\omega_{h}\)</td>
+                <td>Huber weight</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">refToNew_aff_current</code></td>
+                <td>\(\begin{bmatrix}a_{ji} \\ b_{ji}\end{bmatrix}\)</td>
+                <td>photometric affine parameters</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">r2new_aff</code></td>
+                <td>\(\begin{bmatrix}e^{a_{ji}} \\ b_{ji}\end{bmatrix}\)</td>
+                <td>photometric affine parameters</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">dp0</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial t_{ji}^x}\)</td>
+                <td>derivative wrt. <code class="language-plaintext highlighter-rouge">translation</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">dp1</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial t_{ji}^y}\)</td>
+                <td>derivative wrt. <code class="language-plaintext highlighter-rouge">translation</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">dp2</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial t_{ji}^z}\)</td>
+                <td>derivative wrt. <code class="language-plaintext highlighter-rouge">translation</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">dp3</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial \phi_{ji}^x}\)</td>
+                <td>derivative wrt. <code class="language-plaintext highlighter-rouge">rotation</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">dp4</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial \phi_{ji}^y}\)</td>
+                <td>derivative wrt. <code class="language-plaintext highlighter-rouge">rotation</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">dp5</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial \phi_{ji}^z}\)</td>
+                <td>derivative wrt. <code class="language-plaintext highlighter-rouge">rotation</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">dp6</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial a_{ji}}\)</td>
+                <td>derivative wrt. photometric affine parameters</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">dp7</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial b_{ji}}\)</td>
+                <td>derivative wrt. photometric affine parameters</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">dd</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial \rho_{i}}\)</td>
+                <td>derivative wrt. inverse depth i</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">r</code></td>
+                <td>\(r_{ji}\)</td>
+                <td>single residual after applying Huber kernel</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h1>DSO-EFResidual</h1>
+    <div class="
+                    col-lg-8 col-lg-offset-2
+                    col-md-10 col-md-offset-1
+                    post-container">
+
+        <h3 id="variable">Variable</h3>
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Formula</th>
+                <th>Description</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JpJdF</code></td>
+                <td>\(\begin{bmatrix} (\frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{ji}})^T\frac{\partial r_{ji}}{\partial \rho_{i}} \\ (\frac{\partial r_{ji}}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}})^{T}\frac{\partial r_{ji}}{\partial \rho_{i}} \end{bmatrix}\)</td>
+                <td> </td>
+            </tr>
+            </tbody>
+        </table>
+
+        <h3 id="function">Function</h3>
+
+        <h3 id="void-fixlinearizationf">void fixLinearizationF()</h3>
+
+        <div class="language-c++ highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="cm">/** \brief Fix a point's residual */</span>
+    <span class="kt">void</span> <span class="nf">fixLinearizationF</span><span class="p">(</span><span class="n">EnergyFunctional</span><span class="o">*</span> <span class="n">ef</span><span class="p">);</span>
+    </code></pre></div></div>
+
+        <ul>
+            <li>This function is usually called when we want to remove some point, so we need to fix the residual (not update it anymore).
+                <ul>
+                    <li>The formula to compute the residual is \(r_{ji} = r_{ji}^{0} + \begin{bmatrix} \frac{\partial r_{ji}}{\partial \mathbf{p}_{j}} &amp; \frac{\partial r_{ji}}{\partial \mathbf{a}_{ji}}\end{bmatrix} \begin{bmatrix}\delta{\mathbf{p}_{j}} \\ \delta{\mathbf{a}_{ji}}\end{bmatrix}\), where</li>
+                </ul>
+            </li>
+        </ul>
+
+        \[\delta \mathbf{p}_{j} = \begin{bmatrix}
+        \frac{\partial \mathbf{p}_{j}}{\partial \mathbf{C}} &amp; \frac{\partial \mathbf{p}_{j}}{\partial \boldsymbol{\xi}_{ji}} &amp; \frac{\partial \mathbf{p}_{j}}{\partial \rho_{i}}
+        \end{bmatrix}
+        \begin{bmatrix}
+        \delta \mathbf{C} \\
+        \delta \boldsymbol{\xi}_{ji} \\
+        \delta \rho_{i}
+        \end{bmatrix}\]
+
+        \[\delta{\boldsymbol{\xi}_{ji}} = \begin{bmatrix} \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}} &amp; \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}}\end{bmatrix} \begin{bmatrix}\delta{\boldsymbol{\xi}_{iw}} \\  \delta{\boldsymbol{\xi}_{jw}}\end{bmatrix}\]
+
+        \[\delta{\mathbf{a}_{ji}}  = \begin{bmatrix} \frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{i}} &amp; \frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{j}}\end{bmatrix}\begin{bmatrix} \delta{\mathbf{a}_{i}} \\ \delta{\mathbf{a}_{j}}\end{bmatrix}\]
+    </div>
+
+    <h1>DSO-EnergyFunctional</h1>
+    <div class="
+                    col-lg-8 col-lg-offset-2
+                    col-md-10 col-md-offset-1
+                    post-container">
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Type</th>
+                <th>Size</th>
+                <th>Formula</th>
+                <th>Description</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">nFrames</code></td>
+                <td><code class="language-plaintext highlighter-rouge">int</code></td>
+                <td> </td>
+                <td> </td>
+                <td>Number of frames</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">adHost</code></td>
+                <td><code class="language-plaintext highlighter-rouge">Mat88*</code></td>
+                <td><code class="language-plaintext highlighter-rouge">nFrames x nFrames</code></td>
+                <td>\(\begin{bmatrix} (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}})^{T} &amp; \\ &amp; (\frac{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}{\partial \mathbf{a}_{i}})^{T}\end{bmatrix} = \begin{bmatrix} (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}})^{T} &amp; \\ &amp; (\frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{i}})^{T}\end{bmatrix}\)</td>
+                <td>For a pair of frames <code class="language-plaintext highlighter-rouge">(host, target)</code>, the corresponding <strong>index</strong> is <code class="language-plaintext highlighter-rouge">(host id + target id * nFrames)</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">adTarget</code></td>
+                <td><code class="language-plaintext highlighter-rouge">Mat88*</code></td>
+                <td><code class="language-plaintext highlighter-rouge">nFrames x nFrames</code></td>
+                <td>\(\begin{bmatrix} (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}})^{T} &amp; \\ &amp; (\frac{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}{\partial \mathbf{a}_{j}})^{T}\end{bmatrix}= \begin{bmatrix} (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}})^{T} &amp; \\ &amp; (\frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{j}})^{T}\end{bmatrix}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">adHTdeltaF</code></td>
+                <td><code class="language-plaintext highlighter-rouge">Mat18f*</code></td>
+                <td><code class="language-plaintext highlighter-rouge">nFrames x nFrames</code></td>
+                <td>\(\begin{bmatrix}\delta{\boldsymbol{\xi}_{ji}} &amp; \delta{\mathbf{a}_{ji}} \end{bmatrix} = \begin{bmatrix}(\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}} \delta{\boldsymbol{\xi}_{iw}})^{T} + (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}} \delta{\boldsymbol{\xi}_{jw}})^{T} &amp; (\frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{i}}\delta{\mathbf{a}_{i}})^{T} + (\frac{\partial \mathbf{a}_{ji}}{\partial \mathbf{a}_{j}}\delta{\mathbf{a}_{j}})^{T} \end{bmatrix}\)</td>
+                <td>Increment of relative pose and relative photometric parameters</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h1>DSO-Jacobians</h1>
+    <div class="
+                    col-lg-8 col-lg-offset-2
+                    col-md-10 col-md-offset-1
+                    post-container">
+
+        <blockquote>
+            <p>Foreknowledge about Lie groups and Lie algebra can be found <a href="http://tongling916.github.io/2020/04/02/Jacobian-Matrices/">here</a></p>
+        </blockquote>
+
+        <h3 id="photometric-error">Photometric Error</h3>
+
+        \[E_{\mathbf{p} j}:=\sum_{\mathbf{p} \in \mathcal{N}_{\mathrm{p}}} w_{\mathbf{p}}\left\|\left(I_{j}\left[\mathbf{p}^{\prime}\right]-b_{j}\right)-\frac{t_{j} e^{a_{j}}}{t_{i} e^{a_{i}}}\left(I_{i}[\mathbf{p}]-b_{i}\right)\right\|_{\gamma}\]
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>\(\mathbf{p}\)</td>
+                <td>pixel position</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{p}^{\prime}\)</td>
+                <td>projected pixel position of \(\mathbf{p}\)</td>
+            </tr>
+            <tr>
+                <td>\(\mathcal{N}_{\mathrm{p}}\)</td>
+                <td>residual pattern (8 pixels)</td>
+            </tr>
+            <tr>
+                <td>\(t_j, t_i\)</td>
+                <td>exposure time</td>
+            </tr>
+            <tr>
+                <td>\(I_j, I_i\)</td>
+                <td>Intensity (or irradiance as said in DSO)</td>
+            </tr>
+            <tr>
+                <td>\(w_{\mathbf{p}}:=\frac{c^{2}}{c^{2}+\left|\nabla I_{i}(\mathbf{p})\right|_{2}^{2}}\)</td>
+                <td>gradient-dependent weighting</td>
+            </tr>
+            <tr>
+                <td>\(a_i, b_i\)</td>
+                <td>affine brightness transfer function \(e^{-a_{i}}\left(I_{i}-b_{i}\right)\)</td>
+            </tr>
+            <tr>
+                <td>\(|\cdot|_{\gamma}\)</td>
+                <td>Huber cost function</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <p>In the following sections, we only consider the <strong>residual of a single point</strong></p>
+
+        \[r_{ji} = w_{\mathbf{p}}\left\|\left(I_{j}\left[\mathbf{p}^{\prime}\right]-b_{j}\right)-\frac{t_{j} e^{a_{j}}}{t_{i} e^{a_{i}}}\left(I_{i}[\mathbf{p}]-b_{i}\right)\right\|_{\gamma}\]
+
+        <p>Actually, Jakob Engel has converted the above formulation into the following one which is easier for the optimization</p>
+
+        \[\begin{aligned}
+        r_{ji} &amp;= \left\|I_{j}\left[\mathbf{p}_{j}\right]-e^{a_{ji}}I_{i}[\mathbf{p}_{i}] - b_{ji}\right\|_{\gamma} \\
+        &amp;= \omega_{h} (I_{j}\left[\mathbf{p}_{j}\right]-e^{a_{ji}}I_{i}[\mathbf{p}_{i}] - b_{ji})
+        \end{aligned}\]
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>\(e^{a_{ji}} = \frac{t_{j}}{t_{i}}e^{a_{j} - a_{i}}\)</td>
+                <td>\(a_{ji}\) is an affine tranfer parameter from \(i\) to \(j\)</td>
+            </tr>
+            <tr>
+                <td>\(a_{ji} = \ln(\frac{t_{j}}{t_{i}}) + a_{j} - a_{i}\)</td>
+                <td>\(a_{ji}\) is an affine tranfer parameter from \(i\) to \(j\)</td>
+            </tr>
+            <tr>
+                <td>\(b_{ji} = b_{j} - e^{a_{ji}}b_{i}\)</td>
+                <td>\(b_{ji}\) is an affine tranfer parameter from \(i\) to \(j\)</td>
+            </tr>
+            <tr>
+                <td>\(\omega_{h}\)</td>
+                <td>Huber weight, considered a constant</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <h3 id="preparation">Preparation</h3>
+
+        <p>Suppose camera \(i\)’s coordinate system is the same as the world coodinate system, then we have</p>
+
+        \[\mathbf{p}_{i} = \mathbf{K} \rho_{i} \begin{bmatrix}
+        \mathbf{I} &amp;  \mathbf{0}
+        \end{bmatrix} \mathbf{p}^{w} = \mathbf{K} \rho_{i} \mathbf{p}^{w} = \mathbf{K} \rho_{i} \mathbf{p}^{c}_{i}\]
+
+        \[\mathbf{p}_{j} = \mathbf{K} \rho_{j} \begin{bmatrix}
+        \mathbf{R}_{ji} &amp;  \mathbf{t}_{ji}
+        \end{bmatrix} \mathbf{p}^{w} = \mathbf{K} \rho_{j} (\mathbf{R}_{ji} \mathbf{p}^{w} + \mathbf{t}_{ji})\]
+
+        <p>Thus, replacing \(p^w\) in the second formel with the variables in the first one gives us</p>
+
+        \[\begin{aligned}
+        \mathbf{p}_{j} &amp;= \mathbf{K} \rho_{j} \left ( \frac{1}{\rho_{i}} \mathbf{R}_{ji}\mathbf{K}^{-1}\mathbf{p}_i + \mathbf{t}_{ji}\right )\\
+        &amp;= \mathbf{K} \rho_{j} \left ( \mathbf{R}_{ji} \mathbf{p}^c_i + \mathbf{t}_{ji}\right ) \\
+        &amp;= \mathbf{K} \rho_{j} \mathbf{p}^c_j \\
+        &amp;= \mathbf{K} \mathbf{p}^n_j
+        \end{aligned}\]
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>\(\rho_{j}\)</td>
+                <td>point inverse depth wrt. image \(j\)</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{p}_{j}\)</td>
+                <td>pixel position in image \(j\)</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{p}^n_j = \mathbf{K}^{-1} \mathbf{p}_{j} = \rho_{j} \mathbf{p}^c_j\)</td>
+                <td>point position in the normalized plane</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{p}^c_j = \begin{bmatrix}x^c_j \\ y^c_j \\ z^c_j\end{bmatrix}\)</td>
+                <td>point position in the camera \(j\) coodinate system</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{p}^w\)</td>
+                <td>point position in the world coodinate system</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <h3 id="relative-camera-pose">Relative Camera Pose</h3>
+
+        \[\frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{ji}} = \frac{\partial r_{ji}}{\partial \mathbf{p}_{j}} \frac{\partial \mathbf{p}_{j}}{\partial \boldsymbol{\xi}_{ji}}\]
+
+        <p>The first part can be computed as follows</p>
+
+        \[\frac{\partial r_{ji}}{\partial \mathbf{p}_{j}} = \omega_{h} \frac{\partial I_{j}\left[\mathbf{p}_{j}\right]}{\partial \mathbf{p}_{j}} = \omega_{h} \begin{bmatrix}
+        g^j_x &amp; g^j_y
+        \end{bmatrix}\]
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>\(g^j_x\)</td>
+                <td>gradient in image \(j\) in x-direction (u-direction)</td>
+            </tr>
+            <tr>
+                <td>\(g^j_y\)</td>
+                <td>gradient in image \(j\) in y-direction (v-direction)</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <p>For the second part, we have</p>
+
+        \[\frac{\partial \mathbf{p}_{j}}{\partial \boldsymbol{\xi}_{ji}} = \frac{\partial \mathbf{p}_{j}}{\partial \mathbf{p}^n_j} \frac{\partial \mathbf{p}^n_j}{\partial \boldsymbol{\xi}_{ji}}\]
+
+        <p>According the <a href="#preparation">preparation</a>
+            \(\mathbf{p}_j = \mathbf{K} \mathbf{p}^n_j = \begin{bmatrix}
+            f_x x^n_j + c_x\\
+            f_y y^n_j + c_y\\
+            1
+            \end{bmatrix}\) we have</p>
+
+        \[\frac{\partial \mathbf{p}_{j}}{\partial \mathbf{p}^n_j} = \begin{bmatrix}
+        f_x &amp; 0 &amp; 0\\
+        0 &amp; f_y &amp; 0\\
+        0 &amp; 0 &amp; 0
+        \end{bmatrix}\]
+
+        <p>Then, we compute</p>
+
+        \[\begin{aligned}
+        \frac{\partial \mathbf{p}^n_j}{\partial \boldsymbol{\xi}_{ji}} &amp;= \frac{\partial (\rho_{j}\mathbf{p}^c_j)}{\partial \boldsymbol{\xi}_{ji}} \\
+        &amp;= \frac{\partial \mathbf{p}^c_j}{\partial \boldsymbol{\xi}_{ji}} \rho_{j} +\mathbf{p}^c_j \frac{\partial \rho_{j}}{\partial \boldsymbol{\xi}_{ji}}
+        \end{aligned}\]
+
+        <p>where</p>
+
+        \[\begin{aligned}
+        \frac{\partial \mathbf{p}^c_j}{\partial \boldsymbol{\xi}_{ji}} &amp;= \frac{\partial (\mathbf{T}_{ji}\mathbf{p}^c_i)}{\partial \boldsymbol{\xi}_{ji}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{\exp{(\delta\boldsymbol{\xi}^{\wedge})}\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i -\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{(\mathbf{I} + \delta \boldsymbol{\xi}^{\wedge})\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i -\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}}\\
+        &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{\delta \boldsymbol{\xi}^{\wedge}\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}}\\
+        &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{(\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i)^{\odot}\delta \boldsymbol{\xi} }{\delta \boldsymbol{\xi}}\\
+        &amp;= (\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i)^{\odot} \\
+        &amp;= (\mathbf{p}^c_j)^{\odot} \\
+        &amp;= \begin{bmatrix}
+        1 &amp; 0 &amp; 0 &amp; 0 &amp; z^c_j &amp; -y^c_j\\
+        0 &amp; 1 &amp; 0 &amp; -z^c_j &amp; 0 &amp; x^c_j\\
+        0 &amp; 0 &amp; 1 &amp; y^c_j &amp; -x^c_j &amp; 0\\
+        0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0
+        \end{bmatrix}
+        \end{aligned}\]
+
+        \[\begin{aligned}
+        \frac{\partial \rho_{j}}{\partial \boldsymbol{\xi}_{ji}} &amp;= \frac{\partial \frac{1}{z^c_j}}{\partial \boldsymbol{\xi}_{ji}} \\
+        &amp;= \frac{\partial \frac{1}{z^c_j}}{\partial z^c_j}\frac{\partial z^c_j}{\partial \boldsymbol{\xi}_{ji}} \\
+        &amp;= -\frac{1}{(z^c_j)^2}\begin{bmatrix}
+        0 &amp; 0 &amp; 1 &amp; y^c_j &amp; -x^c_j &amp; 0
+        \end{bmatrix} \\
+        &amp;= \begin{bmatrix}
+        0 &amp; 0 &amp; -\rho^2_j &amp; -\rho_{j} y^n_j &amp; \rho_{j} x^n_j &amp; 0
+        \end{bmatrix}
+        \end{aligned}\]
+
+        <p>Thus,</p>
+
+        \[\begin{aligned}
+        \frac{\partial \mathbf{p}^n_j}{\partial \boldsymbol{\xi}_{ji}} &amp;= \frac{\partial (\rho_{j}\mathbf{p}^c_j)}{\partial \boldsymbol{\xi}_{ji}} \\
+        &amp;= \frac{\partial \mathbf{p}^c_j}{\partial \boldsymbol{\xi}_{ji}} \rho_{j} +\frac{\partial \rho_{j}}{\partial \boldsymbol{\xi}_{ji}} \mathbf{p}^c_j \\
+        &amp;= \begin{bmatrix}
+        \rho_{j} &amp; 0 &amp; 0 &amp; 0 &amp; 1 &amp; -y^n_j\\
+        0 &amp; \rho_{j} &amp; 0 &amp; -1 &amp; 0 &amp; x^n_j\\
+        0 &amp; 0 &amp; \rho_{j} &amp; y^n_j &amp; -x^n_j &amp; 0
+        \end{bmatrix} + \begin{bmatrix}
+        0 &amp; 0 &amp; -\rho_{j}x^{n}_{j} &amp; -x^{n}_{j}y^{n}_{j} &amp; (x^n_j)^2 &amp; 0\\
+        0 &amp; 0 &amp; -\rho_{j}y^{n}_{j}  &amp; -(y^n_j)^2 &amp; x^{n}_{j}y^{n}_{j} &amp; 0\\
+        0 &amp; 0 &amp; -\rho_{j} &amp; -y^n_j &amp; x^n_j &amp; 0
+        \end{bmatrix} \\
+        &amp;= \begin{bmatrix}
+        \rho_{j} &amp; 0 &amp; -\rho_{j}x^{n}_{j} &amp; -x^{n}_{j}y^{n}_{j} &amp; 1 + (x^n_j)^2 &amp; -y^n_j\\
+        0 &amp; \rho_{j} &amp; -\rho_{j}y^{n}_{j} &amp; -1-(y^n_j)^2 &amp; x^{n}_{j}y^{n}_{j} &amp; x^n_j\\
+        0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0
+        \end{bmatrix}
+        \end{aligned}\]
+
+        <p>Therefore,</p>
+
+        <p>\(\begin{aligned}
+            \frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{ji}} &amp;= \frac{\partial r_{ji}}{\partial \mathbf{p}_{j}} \frac{\partial \mathbf{p}_{j}}{\partial \boldsymbol{\xi}_{ji}} \\
+            &amp;= \frac{\partial r_{ji}}{\partial \mathbf{p}_{j}} \frac{\partial \mathbf{p}_{j}}{\partial \mathbf{p}^n_{j}} \frac{\partial \mathbf{p}^n_{j}}{\partial \boldsymbol{\xi}_{ji}} \\
+            &amp;= \omega_{h}
+            \begin{bmatrix}
+            g^j_x &amp; g^j_y
+            \end{bmatrix}
+            \begin{bmatrix}
+            f_x &amp; 0 &amp; 0\\
+            0 &amp; f_y &amp; 0
+            \end{bmatrix}
+            \begin{bmatrix}
+            \rho_{j} &amp; 0 &amp; -\rho_{j}x^{n}_{j} &amp; -x^{n}_{j}y^{n}_{j} &amp; 1 + (x^n_j)^2 &amp; -y^n_j\\
+            0 &amp; \rho_{j} &amp; -\rho_{j}y^{n}_{j} &amp; -1-(y^n_j)^2 &amp; x^{n}_{j}y^{n}_{j} &amp; x^n_j\\
+            0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0
+            \end{bmatrix} \\
+            &amp;=
+            \begin{bmatrix}
+            \omega_{h} g^j_x f_x &amp; \omega_{h} g^j_y f_y &amp; 0
+            \end{bmatrix}
+            \begin{bmatrix}
+            \rho_{j} &amp; 0 &amp; -\rho_{j}x^{n}_{j} &amp; -x^{n}_{j}y^{n}_{j} &amp; 1 + (x^n_j)^2 &amp; -y^n_j\\
+            0 &amp; \rho_{j} &amp; -\rho_{j}y^{n}_{j} &amp; -1-(y^n_j)^2 &amp; x^{n}_{j}y^{n}_{j} &amp; x^n_j\\
+            0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0
+            \end{bmatrix} \\
+            &amp;= \begin{bmatrix}
+            \rho_{j} m_x  \\ \rho_{j} m_y  \\ -\rho_{j} (m_x x^n_j + m_y y^n_j) \\ - m_x x^n_j y^n_j - m_y(1 + (y^n_j)^2)  \\ m_x(1+(x^n_j)^2) + m_y x^{n}_{j}y^{n}_{j}  \\ -m_x y^{n}_{j} + m_y x^{n}_{j}
+            \end{bmatrix}^T
+            \end{aligned}\) where
+            \(m_x = \omega_{h} g^j_x f_x, \quad m_y = \omega_{h} g^j_y f_y\)</p>
+
+        <h3 id="absolute-camera-pose">Absolute Camera Pose</h3>
+
+        \[\frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{iw}} = \frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{ji}}\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}}\]
+
+        \[\frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{jw}} = \frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{ji}}\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}}\]
+
+        <p>As we have computed \(\frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{ji}}\) before, we just need to compute \(\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}}\) and \(\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}}\) here.</p>
+
+        \[\begin{aligned}
+        \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}} &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \delta \boldsymbol{\xi}_{ji}}{ \delta \boldsymbol{\xi}_{iw}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{ji})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} (\exp{(\delta \boldsymbol{\xi}_{iw})}^{\wedge}\mathbf{T}_{iw})^{-1} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} \mathbf{T}_{iw}^{-1} \exp{(-\delta \boldsymbol{\xi}_{iw})}^{\wedge} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{ji} \exp{(-\delta \boldsymbol{\xi}_{iw})}^{\wedge} \mathbf{T}_{ji}^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\exp{(-\mathcal{T}_{ji}\delta \boldsymbol{\xi}_{iw})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{-\mathcal{T}_{ji}\delta \boldsymbol{\xi}_{iw}}{ \delta \boldsymbol{\xi}_{iw}} \\
+        &amp;= -\mathcal{T}_{ji}
+        \end{aligned}\]
+
+        \[\begin{aligned}
+        \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}} &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \delta \boldsymbol{\xi}_{ji}}{ \delta \boldsymbol{\xi}_{jw}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{ji})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{jw})}^{\wedge}\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{jw})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
+        &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{\delta \boldsymbol{\xi}_{jw}}{ \delta \boldsymbol{\xi}_{jw}} \\
+        &amp;= \mathbf{I}
+        \end{aligned}\]
+
+        <h3 id="relative-photometric-parameters">Relative Photometric Parameters</h3>
+
+        \[\begin{aligned}
+        \frac{\partial r_{ji}}{\partial \begin{bmatrix} a_{ji} \\ b_{ji}\end{bmatrix}} &amp;= \frac{\partial (\omega_{h} (I_{j}\left[\mathbf{p}_{j}\right]-e^{a_{ji}}I_{i}[\mathbf{p}_{i}] - b_{ji}))}{\partial \begin{bmatrix} a_{ji} \\ b_{ji}\end{bmatrix}} \\
+        &amp;= \begin{bmatrix} -\omega_{h}I_{i}[\mathbf{p}_{i}]e^{a_{ji}} \\ -\omega_{h}\end{bmatrix}^T
+        \end{aligned}\]
+
+        <h3 id="absolute-photometric-parameters">Absolute Photometric Parameters</h3>
+
+        <p>In the real implementation of DSO, the derivative wrt. the absolute photometric values are computed in a <strong>weird</strong> way as follows</p>
+
+        \[\begin{aligned}
+        \frac{\partial r_{ji}}{\partial \begin{bmatrix} a_{i} \\ b_{i}\end{bmatrix}}
+        &amp;= \frac{\partial r_{ji}}{\partial \mathbf{a}_{ji}}\frac{\partial \mathbf{a}_{ji}}{\partial \begin{bmatrix} a_{i} \\ b_{i}\end{bmatrix}} \\
+        &amp;= \frac{\partial r_{ji}}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}\frac{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}{\partial \begin{bmatrix} a_{i} \\ b_{i}\end{bmatrix}}
+        \end{aligned}\]
+
+        <p>Since</p>
+
+        \[e^{a_{ji}} = \frac{t_{j}}{t_{i}}e^{a_{j} - a_{i}}\]
+
+        \[b_{ji} = b_{j} - e^{a_{ji}}b_{i}\]
+
+        \[r_{ji} = \omega_{h} (I_{j}\left[\mathbf{p}_{j}\right]-e^{a_{ji}}I_{i}[\mathbf{p}_{i}] - b_{ji})\]
+
+        <p>we have</p>
+
+        \[\frac{\partial r_{ji}}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}} = \begin{bmatrix}\omega_{h}(I_{i}[\mathbf{p}_{i}] - b_{i}) &amp; \omega_{h} \end{bmatrix}\]
+
+        \[\frac{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}{\partial \begin{bmatrix} a_{i} \\ b_{i}\end{bmatrix}} = \begin{bmatrix}e^{a_{ji}} &amp; 0 \\ -e^{a_{ji}}b_{i} &amp; e^{a_{ji}} \end{bmatrix}\]
+
+        \[\frac{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}{\partial \begin{bmatrix} a_{j} \\ b_{j}\end{bmatrix}} = \begin{bmatrix}-e^{a_{ji}} &amp; 0 \\ e^{a_{ji}}b_{i} &amp; -1\end{bmatrix}\]
+
+        <h3 id="inverse-depth">Inverse Depth</h3>
+
+        \[\begin{aligned}
+        \frac{\partial r_{ji}}{\partial \rho_{i}} &amp;= \frac{\partial r_{ji}}{\partial \mathbf{p}_{j}} \frac{\partial \mathbf{p}_{j}}{\partial \rho_{i}} \\ &amp;= \frac{\partial r_{ji}}{\partial \mathbf{p}_{j}} \frac{\partial \mathbf{p}_{j}}{\partial \mathbf{p}^n_{j}}\frac{\partial \mathbf{p}^n_{j}}{\partial \rho_{i}}
+        \end{aligned}\]
+
+        <p>Therefore, we just need to compute the last part
+            \(\frac{\partial \mathbf{p}^n_{j}}{\partial \rho_{i}}\)</p>
+
+        <p>Due to the fact</p>
+
+        \[\begin{aligned}
+        \mathbf{p}^n_{j} &amp;= \rho_{j} \left ( \frac{1}{\rho_{i}} \mathbf{R}_{ji}\mathbf{K}^{-1}\mathbf{p}_i + \mathbf{t}_{ji}\right ) \\
+        &amp;= \rho_{j} \left ( \rho^{-1}_{i} \mathbf{M} \mathbf{p}_i + \mathbf{t}_{ji}\right )
+        \end{aligned}\]
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>\(\mathbf{p}^n_{j} = \begin{bmatrix} x^n_j \\ y^n_j \\ 1 \end{bmatrix}\)</td>
+                <td>point position in the normalized plane</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{M} = \mathbf{R}_{ji}\mathbf{K}^{-1}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{t}_{ji} = \begin{bmatrix} t^x \\ t^y \\ t^z \end{bmatrix}\)</td>
+                <td>translation from \(i\) to \(j\)</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <p>Then, we have</p>
+
+        \[\begin{bmatrix} x^n_j \\ y^n_j \\ 1 \end{bmatrix} =
+        \rho_{j}
+        \begin{bmatrix}
+        \rho^{-1}_{i} \mathbf{M}^x \mathbf{p}_i + t^x \\
+        \rho^{-1}_{i} \mathbf{M}^y \mathbf{p}_i + t^y \\
+        \rho^{-1}_{i} \mathbf{M}^z \mathbf{p}_i + t^z
+        \end{bmatrix}\]
+
+        <p>So</p>
+
+        \[\rho_{j} = \frac{1}{\rho^{-1}_{i} \mathbf{M}^z \mathbf{p}_i + t^z}\]
+
+        \[x^n_j = \frac{\rho^{-1}_{i} \mathbf{M}^x \mathbf{p}_i + t^x}{\rho^{-1}_{i} \mathbf{M}^z \mathbf{p}_i + t^z} = \frac{\mathbf{M}^x \mathbf{p}_i + t^x \rho_{i}}{\mathbf{M}^z \mathbf{p}_i + t^z \rho_{i}}\]
+
+        \[y^n_j = \frac{\rho^{-1}_{i} \mathbf{M}^y \mathbf{p}_i + t^y}{\rho^{-1}_{i} \mathbf{M}^z \mathbf{p}_i + t^z} = \frac{\mathbf{M}^y \mathbf{p}_i + t^y \rho_{i}}{\mathbf{M}^z \mathbf{p}_i + t^z \rho_{i}}\]
+
+        <p>Compute the parital derivatives</p>
+
+        \[\begin{aligned}
+        \frac{\partial x^n_j}{\partial \rho_i} &amp;= \frac{t^x}{\mathbf{M}^z \mathbf{p}_i + t^z \rho_{i}} - (\mathbf{M}^x \mathbf{p}_i + t^x \rho_{i}) \frac{1}{(\mathbf{M}^z \mathbf{p}_i + t^z \rho_{i})^2} t^z \\
+        &amp;= \frac{1}{\mathbf{M}^z \mathbf{p}_i + t^z \rho_{i}}(t^x - \frac{\mathbf{M}^x \mathbf{p}_i + t^x \rho_{i}}{\mathbf{M}^z \mathbf{p}_i + t^z \rho_{i}} t^z) \\
+        &amp;= \frac{1}{\rho_{i}} \frac{1}{\rho^{-1}_{i} \mathbf{M}^z \mathbf{p}_i + t^z}(t^x - x^n_j t^z) \\
+        &amp;= \frac{\rho_j}{\rho_i}(t^x - x^n_j t^z)
+        \end{aligned}\]
+
+        \[\begin{aligned}
+        \frac{\partial y^n_j}{\partial \rho_i} &amp;= \frac{t^y}{\mathbf{M}^z \mathbf{p}_i + t^z \rho_{i}} - (\mathbf{M}^y \mathbf{p}_i + t^y \rho_{i}) \frac{1}{(\mathbf{M}^z \mathbf{p}_i + t^z \rho_{i})^2} t^z \\
+        &amp;= \frac{1}{\mathbf{M}^z \mathbf{p}_i + t^z \rho_{i}}(t^y - \frac{\mathbf{M}^y \mathbf{p}_i + t^y \rho_{i}}{\mathbf{M}^z \mathbf{p}_i + t^z \rho_{i}} t^z) \\
+        &amp;= \frac{1}{\rho_{i}} \frac{1}{\rho^{-1}_{i} \mathbf{M}^z \mathbf{p}_i + t^z}(t^y - y^n_j t^z) \\
+        &amp;= \frac{\rho_j}{\rho_i}(t^y - y^n_j t^z)
+        \end{aligned}\]
+
+        <p>Therefore,</p>
+
+        \[\begin{aligned}
+        \frac{\partial r_{ji}}{\partial \rho_{i}} &amp;= \frac{\partial r_{ji}}{\partial \mathbf{p}_{j}} \frac{\partial \mathbf{p}_{j}}{\partial \rho_{i}} \\ &amp;= \frac{\partial r_{ji}}{\partial \mathbf{p}_{j}} \frac{\partial \mathbf{p}_{j}}{\partial \mathbf{p}^n_{j}}\frac{\partial \mathbf{p}^n_{j}}{\partial \rho_{i}} \\
+        &amp;= \omega_{h}
+        \begin{bmatrix}
+        g^j_x &amp; g^j_y
+        \end{bmatrix}
+        \begin{bmatrix}
+        f_x &amp; 0 &amp; 0\\
+        0 &amp; f_y &amp; 0
+        \end{bmatrix}\begin{bmatrix}
+        \frac{\rho_j}{\rho_i}(t^x - x^n_j t^z)  \\
+        \frac{\rho_j}{\rho_i}(t^y - y^n_j t^z) \\
+        0
+        \end{bmatrix} \\
+        &amp;=
+        m_x \frac{\rho_j}{\rho_i}(t^x - x^n_j t^z) +
+        m_y \frac{\rho_j}{\rho_i}(t^y - y^n_j t^z)
+        \end{aligned}\]
+
+        <p>where
+            \(m_x = \omega_{h} g^j_x f_x, \quad m_y = \omega_{h} g^j_y f_y\)</p>
+
+        <h3 id="intrinsic-parameters">Intrinsic parameters</h3>
+
+        \[\frac{\partial \mathbf{p}_{j}}{\partial \mathbf{C}} = \begin{bmatrix}
+        \frac{\partial u_{j}}{\partial f_{x}} &amp; \frac{\partial u_{j}}{\partial f_{y}} &amp; \frac{\partial u_{j}}{\partial c_{x}} &amp; \frac{\partial u_{j}}{\partial c_{y}} \\
+        \frac{\partial v_{j}}{\partial f_{x}} &amp; \frac{\partial v_{j}}{\partial f_{y}} &amp; \frac{\partial v_{j}}{\partial c_{x}} &amp; \frac{\partial v_{j}}{\partial c_{y}}
+        \end{bmatrix}\]
+
+        <p>Due to the fact that</p>
+
+        \[\mathbf{p}_j = \mathbf{K} \mathbf{p}^n_j = \begin{bmatrix}
+        f_x x^n_j + c_x\\
+        f_y y^n_j + c_y\\
+        1
+        \end{bmatrix}\]
+
+        <p>we have
+            \(\begin{aligned}
+            \frac{\partial u_{j}}{\partial f_{x}} &amp;= x^n_j + f_x \frac{\partial x^n_j}{\partial f_{x}} \\
+            \frac{\partial u_{j}}{\partial f_{y}} &amp;= f_x \frac{\partial x^n_j}{\partial f_{y}} \\
+            \frac{\partial u_{j}}{\partial c_{x}} &amp;= f_x \frac{\partial x^n_j}{\partial c_{x}} + 1 \\
+            \frac{\partial u_{j}}{\partial c_{y}} &amp;= f_x \frac{\partial x^n_j}{\partial c_{y}} \\
+            \frac{\partial v_{j}}{\partial f_{x}} &amp;= f_y \frac{\partial y^n_j}{\partial f_{y}} \\
+            \frac{\partial v_{j}}{\partial f_{y}} &amp;= y^n_j + f_y \frac{\partial y^n_j}{\partial f_{y}} \\
+            \frac{\partial v_{j}}{\partial c_{x}} &amp;= f_y \frac{\partial y^n_j}{\partial c_{x}} \\
+            \frac{\partial v_{j}}{\partial c_{y}} &amp;= f_y \frac{\partial y^n_j}{\partial c_{y}} + 1
+            \end{aligned}\)</p>
+
+        <p>Now, the important thing is to compute \(\frac{\partial \mathbf{p}^{n}_{j}}{\partial \mathbf{C}}\).</p>
+
+        <p>Due to the fact
+            \(\begin{aligned}
+            \mathbf{p}^{n}_{j} &amp;= \rho_{j} \left ( \frac{1}{\rho_{i}} \mathbf{R}_{ji}\mathbf{K}^{-1}\mathbf{p}_i + \mathbf{t}_{ji}\right ) \\
+            &amp;= \frac{\rho_{j}}{\rho_{i}}\mathbf{R}_{ji}\mathbf{K}^{-1}\mathbf{p}_i + \rho_{j}\mathbf{t}_{ji} \\
+            &amp;= \frac{\rho_{j}}{\rho_{i}}\begin{bmatrix}r_{00} &amp; r_{00} &amp; r_{01} \\ r_{10} &amp; r_{11} &amp; r_{12} \\ r_{20} &amp; r_{21} &amp; r_{22}\end{bmatrix}\begin{bmatrix}
+            f_{x}^{-1} &amp; 0 &amp; -f_{x}^{-1} c_{x} \\
+            0 &amp; f_{y}^{-1} &amp; -f_{y}^{-1} c_{y} \\
+            0 &amp; 0 &amp; 1
+            \end{bmatrix}\begin{bmatrix}
+            u_{i} \\
+            v_{i} \\
+            1
+            \end{bmatrix}+\rho_{j} \begin{bmatrix} t^x \\ t^y \\ t^z \end{bmatrix}
+            \end{aligned}\)</p>
+
+        <p>then we have</p>
+
+        \[\begin{aligned}
+        &amp;u_{j}^{n}=\frac{\frac{\rho_{j}}{\rho_{i}}\left(r_{00} f_{x}^{-1}\left(u_{i}-c_{x}\right)+r_{01} f_{y}^{-1}\left(v_{i}-c_{y}\right)+r_{02}\right)+\rho_{j} t_{21}^{x}}{\frac{\rho_{j}}{\rho_{i}}\left(r_{20} f_{x}^{-1}\left(u_{i}-c_{x}\right)+r_{21} f_{y}^{-1}\left(v_{i}-c_{y}\right)+r_{22}\right)+\rho_{j} t_{21}^{z}}=\frac{A}{C}\\
+        &amp;v_{j}^{n}=\frac{\frac{\rho_{j}}{\rho_{i}}\left(r_{10} f_{x}^{-1}\left(u_{i}-c_{x}\right)+r_{11} f_{y}^{-1}\left(v_{i}-c_{y}\right)+r_{12}\right)+\rho_{j} t_{21}^{y}}{\frac{\rho_{j}}{\rho_{i}}\left(r_{20} f_{x}^{-1}\left(u_{i}-c_{x}\right)+r_{21} f_{y}^{-1}\left(v_{i}-c_{y}\right)+r_{22}\right)+\rho_{j} t_{21}^{z}}=\frac{B}{C}
+        \end{aligned}\]
+
+        <p>Actually, \(C = 1\), but we still need to consider this part while computing Jacobian.</p>
+
+        \[\begin{aligned}
+        \frac{\partial u_{j}^{n}}{\partial f_{x}} &amp;=\frac{\partial A}{\partial f_{x}} \frac{1}{C}+A \frac{1}{C^{2}}(-1) \frac{\partial C}{\partial f_{x}} \\
+        &amp;=\frac{\rho_{j}}{\rho_{i}} r_{00}\left(u_{i}-c_{x}\right) f_{x}^{-2}(-1) \frac{1}{C}-\frac{A}{C} \frac{1}{C} \frac{\rho_{j}}{\rho_{i}} r_{20}\left(u_{i}-c_{x}\right) f_{x}^{-2}(-1) \\
+        &amp;=\frac{1}{C}\left(\frac{\rho_{j}}{\rho_{i}} r_{00}\left(u_{i}-c_{x}\right) f_{x}^{-2}(-1)+\frac{\rho_{j}}{\rho_{i}} r_{20}\left(u_{i}-c_{x}\right) f_{x}^{-2} u_{j}^{n}\right) \\
+        &amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{20} u_{j}^{n}-r_{00}\right) f_{x}^{-2}\left(u_{i}-c_{x}\right)
+        \end{aligned}\]
+
+        <p>Similarly, we have</p>
+
+        \[\begin{aligned}
+        \frac{\partial u_{j}^{n}}{\partial f_{x}}&amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{20} u_{j}^{n}-r_{00}\right) f_{x}^{-2}\left(u_{i}-c_{x}\right) \\ \frac{\partial u_{j}^{n}}{\partial f_{y}}&amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{21} u_{j}^{n}-r_{01}\right) f_{y}^{-2}\left(v_{i}-c_{y}\right)\\
+        \frac{\partial u_{j}^{n}}{\partial c_{x}}&amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{20} u_{j}^{n}-r_{00}\right) f_{x}^{-1} \\ \frac{\partial u_{j}^{n}}{\partial c_{y}}&amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{21} u_{j}^{n}-r_{01}\right) f_{y}^{-1}\\
+        \frac{\partial v_{j}^{n}}{\partial f_{x}}&amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{20} v_{j}^{n}-r_{10}\right) f_{x}^{-2}\left(u_{i}-c_{x}\right) \\ \frac{\partial v_{j}^{n}}{\partial f_{y}}&amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{21} v_{j}^{n}-r_{11}\right) f_{y}^{-2}\left(v_{i}-c_{y}\right)\\
+        \frac{\partial v_{j}^{n}}{\partial c_{x}}&amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{20} v_{j}^{n}-r_{10}\right) f_{x}^{-1} \\ \frac{\partial v_{j}^{n}}{\partial c_{y}}&amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{21} v_{j}^{n}-r_{11}\right) f_{y}^{-1}
+        \end{aligned}\]
+
+        <p>Finally, we have</p>
+
+        \[\begin{aligned}
+        \frac{\partial u_{j}}{\partial f_{x}} &amp;=u_{j}^{n}+f_{x} \frac{\partial u_{j}^{n}}{\partial f_{x}} \\
+        &amp;=u_{j}^{n}+\frac{\rho_{j}}{\rho_{i}}\left(r_{20} u_{j}^{n}-r_{00}\right) f_{x}^{-1}\left(u_{i}-c_{x}\right) \\
+        \frac{\partial u_{j}}{\partial f_{y}} &amp;=f_{x} \frac{\partial u_{j}^{n}}{\partial f_{y}} \\
+        &amp;=\frac{f_{x}}{f_{y}} \frac{\rho_{j}}{\rho_{i}}\left(r_{21} u_{j}^{n}-r_{01}\right) f_{y}^{-1}\left(v_{i}-c_{y}\right) \\
+        \frac{\partial u_{j}}{\partial c_{x}} &amp;=f_{x} \frac{\partial u_{j}^{n}}{\partial c_{x}}+1 \\
+        &amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{20} u_{j}^{n}-r_{00}\right)+1 \\
+        \frac{\partial u_{j}}{\partial c_{y}} &amp;=f_{x} \frac{\partial u_{j}^{n}}{\partial c_{y}} \\
+        &amp;=\frac{f_{x}}{f_{y}} \frac{\rho_{j}}{\rho_{i}}\left(r_{21} u_{j}^{n}-r_{01}\right) \\
+        \frac{\partial v_{j}}{\partial f_{x}} &amp;=f_{y} \frac{\partial v_{j}^{n}}{\partial f_{x}} \\
+        &amp;=\frac{f_{y}}{f_{x}} \frac{\rho_{j}}{\rho_{i}}\left(r_{20} v_{j}^{n}-r_{10}\right) f_{x}^{-1}\left(u_{i}-c_{x}\right) \\
+        \frac{\partial v_{j}}{\partial f_{y}} &amp;=v_{j}^{n}+f_{y} \frac{\partial v_{j}^{n}}{\partial f_{y}} \\
+        &amp;=v_{j}^{n}+\frac{\rho_{j}}{\rho_{i}}\left(r_{21} v_{j}^{n}-r_{11}\right) f_{y}^{-1}\left(v_{i}-c_{y}\right) \\
+        \frac{\partial v_{j}}{\partial c_{x}} &amp;=f_{y} \frac{\partial v_{j}^{n}}{\partial c_{x}} \\
+        &amp;=\frac{f_{y}}{f_{x}} \frac{\rho_{j}}{\rho_{i}}\left(r_{20} v_{j}^{n}-r_{10}\right) \\
+        \frac{\partial v_{j}}{\partial c_{y}} &amp;=f_{y} \frac{\partial v_{j}^{n}}{\partial c_{y}}+1 \\
+        &amp;=\frac{\rho_{j}}{\rho_{i}}\left(r_{21} v_{j}^{n}-r_{11}\right)+1
+        \end{aligned}\]
+
+        <h3 id="complete-jacobian">Complete Jacobian</h3>
+
+        <h4 id="initialization">Initialization</h4>
+
+        <ul>
+            <li>
+                <p>For each optimization, we have total <code class="language-plaintext highlighter-rouge">8 + N</code> variables to optmize, i.e., <code class="language-plaintext highlighter-rouge">6</code> for the relative pose \(\mathbf{T}_{ji}\), <code class="language-plaintext highlighter-rouge">2</code> for the relative photometric parameters \(a_{ji}, b_{ji}\), <code class="language-plaintext highlighter-rouge">N</code> for inverse depths of <code class="language-plaintext highlighter-rouge">N</code> points of interest.</p>
+            </li>
+            <li>
+                <p>Considering a non-linear least squares formualtion, we have \(E(\mathbf{x}) = \mathbf{e}^T\mathbf{e}\)</p>
+            </li>
+        </ul>
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>\(E\)</td>
+                <td>Total energy to minimize</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{e} = \begin{bmatrix}r_{1} \\ r_{2} \\ . \\.\\. \\ r_{N} \end{bmatrix}\)</td>
+                <td>residual vector comprised of <code class="language-plaintext highlighter-rouge">N</code> points’ residuals</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{x} = \begin{bmatrix} t^x \\t^y \\t^z \\ \phi^x \\\phi^y\\\phi^z \\ a \\ b \\ \rho_1 \\ \rho_2 \\ . \\ . \\. \\ \rho_N \end{bmatrix}\)</td>
+                <td>variables to optimize (<code class="language-plaintext highlighter-rouge">8 + N</code>)</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <ul>
+            <li><strong>Complete Jacobian</strong> (\(N \times (8 + N)\))</li>
+        </ul>
+
+        \[\mathbf{J}=\begin{bmatrix}
+        \frac{\partial r_{1}}{\partial t^x} &amp; \frac{\partial r_{1}}{\partial t^y} &amp; \frac{\partial r_{1}}{\partial t^z} &amp; \frac{\partial r_{1}}{\partial \phi^x} &amp; \frac{\partial r_{1}}{\partial \phi^y} &amp; \frac{\partial r_{1}}{\partial \phi^z} &amp; \frac{\partial r_{1}}{\partial a} &amp; \frac{\partial r_{1}}{\partial b} &amp; \frac{\partial r_{1}}{\partial \rho_{1}} &amp; 0 &amp; . &amp; . &amp; . &amp; 0 \\
+        \frac{\partial r_{2}}{\partial t^x} &amp; \frac{\partial r_{2}}{\partial t^y} &amp; \frac{\partial r_{2}}{\partial t^z} &amp; \frac{\partial r_{2}}{\partial \phi^x} &amp; \frac{\partial r_{2}}{\partial \phi^y} &amp; \frac{\partial r_{2}}{\partial \phi^z} &amp; \frac{\partial r_{2}}{\partial a} &amp; \frac{\partial r_{2}}{\partial b} &amp; 0 &amp; \frac{\partial r_{2}}{\partial \rho_{2}} &amp; . &amp; . &amp; . &amp; 0 \\
+        . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . \\
+        . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . \\
+        . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . \\
+        \frac{\partial r_{N}}{\partial t^x} &amp; \frac{\partial r_{N}}{\partial t^y} &amp; \frac{\partial r_{N}}{\partial t^z} &amp; \frac{\partial r_{N}}{\partial \phi^x} &amp; \frac{\partial r_{N}}{\partial \phi^y} &amp; \frac{\partial r_{N}}{\partial \phi^z} &amp; \frac{\partial r_{N}}{\partial a} &amp; \frac{\partial r_{N}}{\partial b} &amp; 0 &amp; 0 &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial \rho_{N}}
+        \end{bmatrix}\]
+
+        <h4 id="sliding-window-optimization">Sliding Window Optimization</h4>
+
+        <p>Suppose that we have totally <code class="language-plaintext highlighter-rouge">M</code> frames, <code class="language-plaintext highlighter-rouge">N</code> points, <code class="language-plaintext highlighter-rouge">L</code> residuals, then our Jacobian is a \(L \times (4 + 8 * M + N)\) matrix, because a camera has <code class="language-plaintext highlighter-rouge">4</code> intrinsic parameters (\(f_x, f_y, c_x, c_y\)), every frame has a pose (<code class="language-plaintext highlighter-rouge">6</code> DoF) and <code class="language-plaintext highlighter-rouge">2</code> photometric parameters (\(a, b\)), and every point has <code class="language-plaintext highlighter-rouge">1</code> inverse depth wrt. its host frame (in which it was first time observed).</p>
+    </div>
+
+    <h1>DSO-RawResidualJacobian</h1>
+    <div class="
+                    col-lg-8 col-lg-offset-2
+                    col-md-10 col-md-offset-1
+                    post-container">
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable used in <code class="language-plaintext highlighter-rouge">RawResidualJacobian</code></th>
+                <th>Variable used here</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">resF</code></td>
+                <td> </td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">Jpdxi</code></td>
+                <td>\(\frac{\partial\mathbf{p}_j}{\partial\boldsymbol{\xi_{ji}}}\)</td>
+                <td>derivative of pixel <code class="language-plaintext highlighter-rouge">j</code> wrt. <code class="language-plaintext highlighter-rouge">relative pose</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">Jpdc</code></td>
+                <td>\(\frac{\partial\mathbf{p}_j}{\partial\begin{bmatrix} f_{x} \\ f_{y} \\ c_{x} \\ c_{y}\end{bmatrix}} = \frac{\partial r_{ji}}{\partial \mathbf{C}}\)</td>
+                <td>derivative of pixel <code class="language-plaintext highlighter-rouge">j</code> wrt. <code class="language-plaintext highlighter-rouge">intrinsic parameters</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">Jpdd</code></td>
+                <td>\(\frac{\partial\mathbf{p}_j}{\partial \rho_{i}}\)</td>
+                <td>derivative of pixel <code class="language-plaintext highlighter-rouge">j</code> wrt. <code class="language-plaintext highlighter-rouge">inverse depth i</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JIdx</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial\mathbf{p}_j}\)</td>
+                <td>derivative of residual wrt. pixel <code class="language-plaintext highlighter-rouge">j</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JabF</code></td>
+                <td>\(\frac{\partial r_{ji}}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}} = \frac{\partial r_{ji}}{\partial \mathbf{a}_{ji}}\)</td>
+                <td>derivative of residual wrt. <code class="language-plaintext highlighter-rouge">photometric parameters</code></td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JIdx2</code></td>
+                <td>\((\frac{\partial r_{ji}}{\partial\mathbf{p}_j})^{T}\frac{\partial r_{ji}}{\partial\mathbf{p}_j}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JabJIdx</code></td>
+                <td>\((\frac{\partial r_{ji}}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}})^{T}\frac{\partial r_{ji}}{\partial\mathbf{p}_j}\)</td>
+                <td> </td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">Jab2</code></td>
+                <td>\((\frac{\partial r_{ji}}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}})^{T}\frac{\partial r_{ji}}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}\)</td>
+                <td> </td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h1>DSO-Schur-Complement</h1>
+    <div class="
+                    col-lg-8 col-lg-offset-2
+                    col-md-10 col-md-offset-1
+                    post-container">
+
+        <blockquote>
+            <p>Foreknowledge about Schur complement can be found <a href="http://tongling916.github.io/2020/04/02/Schur-Complement/">here</a></p>
+        </blockquote>
+
+        <h3 id="initialization">Initialization</h3>
+
+        <h4 id="preparation">Preparation</h4>
+
+        <p>As introduced <a href="http://tongling916.github.io/2020/04/02/Jacobian-Matrices/">here</a>, we have</p>
+
+        \[\mathbf{J}=\begin{bmatrix}
+        \frac{\partial r_{1}}{\partial t^x} &amp; \frac{\partial r_{1}}{\partial t^y} &amp; \frac{\partial r_{1}}{\partial t^z} &amp; \frac{\partial r_{1}}{\partial \phi^x} &amp; \frac{\partial r_{1}}{\partial \phi^y} &amp; \frac{\partial r_{1}}{\partial \phi^z} &amp; \frac{\partial r_{1}}{\partial a} &amp; \frac{\partial r_{1}}{\partial b} &amp; \frac{\partial r_{1}}{\partial \rho_{1}} &amp; 0 &amp; . &amp; . &amp; . &amp; 0 \\
+        \frac{\partial r_{2}}{\partial t^x} &amp; \frac{\partial r_{2}}{\partial t^y} &amp; \frac{\partial r_{2}}{\partial t^z} &amp; \frac{\partial r_{2}}{\partial \phi^x} &amp; \frac{\partial r_{2}}{\partial \phi^y} &amp; \frac{\partial r_{2}}{\partial \phi^z} &amp; \frac{\partial r_{2}}{\partial a} &amp; \frac{\partial r_{2}}{\partial b} &amp; 0 &amp; \frac{\partial r_{2}}{\partial \rho_{2}} &amp; . &amp; . &amp; . &amp; 0 \\
+        . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . \\
+        . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . \\
+        . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . \\
+        \frac{\partial r_{N}}{\partial t^x} &amp; \frac{\partial r_{N}}{\partial t^y} &amp; \frac{\partial r_{N}}{\partial t^z} &amp; \frac{\partial r_{N}}{\partial \phi^x} &amp; \frac{\partial r_{N}}{\partial \phi^y} &amp; \frac{\partial r_{N}}{\partial \phi^z} &amp; \frac{\partial r_{N}}{\partial a} &amp; \frac{\partial r_{N}}{\partial b} &amp; 0 &amp; 0 &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial \rho_{N}}
+        \end{bmatrix}\]
+
+        \[\mathbf{e} = \begin{bmatrix}r_{1} \\ r_{2} \\ . \\.\\. \\ r_{N} \end{bmatrix}\]
+
+        <p>\(\mathbf{x} = \begin{bmatrix} t^x \\t^y \\t^z \\ \phi^x \\\phi^y\\\phi^z \\ a \\ b \\ \rho_1 \\ \rho_2 \\ . \\ . \\. \\ \rho_N \end{bmatrix} = \begin{bmatrix}\mathbf{x}_1 \\ \mathbf{x}_{2} \end{bmatrix}\), where \(\mathbf{x}_1 = \begin{bmatrix}t^x \\t^y \\t^z \\ \phi^x \\\phi^y\\\phi^z \\ a \\ b \end{bmatrix}\), \(\mathbf{x}_2 = \begin{bmatrix}\rho_1 \\ \rho_2 \\ . \\ . \\. \\ \rho_N \end{bmatrix}\)</p>
+
+        <p>In Gauss-Newton, our Hessian matrix can be formulated as</p>
+
+        \[\begin{aligned}
+        \mathbf{H} &amp;= \mathbf{J}^T\mathbf{J} \\
+        &amp;=
+        \begin{bmatrix}
+        \frac{\partial r_{1}}{\partial t^x} &amp; \frac{\partial r_{2}}{\partial t^x} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial t^x}\\
+        \frac{\partial r_{1}}{\partial t^y} &amp; \frac{\partial r_{2}}{\partial t^y} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial t^y}
+        \\ \frac{\partial r_{1}}{\partial t^z} &amp; \frac{\partial r_{2}}{\partial t^z} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial t^z}
+        \\ \frac{\partial r_{1}}{\partial \phi^x} &amp; \frac{\partial r_{2}}{\partial \phi^x} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial \phi^x}
+        \\ \frac{\partial r_{1}}{\partial \phi^y} &amp; \frac{\partial r_{2}}{\partial \phi^y} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial \phi^y}
+        \\ \frac{\partial r_{1}}{\partial \phi^z} &amp; \frac{\partial r_{2}}{\partial \phi^z} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial \phi^z}
+        \\ \frac{\partial r_{1}}{\partial a} &amp; \frac{\partial r_{2}}{\partial a} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial a}
+        \\ \frac{\partial r_{1}}{\partial b} &amp; \frac{\partial r_{2}}{\partial b} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial b}
+        \\ \frac{\partial r_{1}}{\partial \rho_{1}}  &amp; 0 &amp; . &amp;. &amp; . &amp; 0
+        \\ 0 &amp; \frac{\partial r_{2}}{\partial \rho_{2}}  &amp; . &amp; . &amp; . &amp; 0\\ 0 &amp; . &amp; . &amp; .&amp; . &amp; 0 \\ 0 &amp; . &amp;. &amp; .&amp; . &amp; 0\\ 0 &amp; . &amp;. &amp; . &amp; .&amp; 0\\ 0 &amp; . &amp;. &amp; . &amp; 0 &amp; \frac{\partial r_{N}}{\partial \rho_{N}}
+        \end{bmatrix}
+        \begin{bmatrix}
+        \frac{\partial r_{1}}{\partial t^x} &amp; \frac{\partial r_{1}}{\partial t^y} &amp; \frac{\partial r_{1}}{\partial t^z} &amp; \frac{\partial r_{1}}{\partial \phi^x} &amp; \frac{\partial r_{1}}{\partial \phi^y} &amp; \frac{\partial r_{1}}{\partial \phi^z} &amp; \frac{\partial r_{1}}{\partial a} &amp; \frac{\partial r_{1}}{\partial b} &amp; \frac{\partial r_{1}}{\partial \rho_{1}} &amp; 0 &amp; . &amp; . &amp; . &amp; 0 \\
+        \frac{\partial r_{2}}{\partial t^x} &amp; \frac{\partial r_{2}}{\partial t^y} &amp; \frac{\partial r_{2}}{\partial t^z} &amp; \frac{\partial r_{2}}{\partial \phi^x} &amp; \frac{\partial r_{2}}{\partial \phi^y} &amp; \frac{\partial r_{2}}{\partial \phi^z} &amp; \frac{\partial r_{2}}{\partial a} &amp; \frac{\partial r_{2}}{\partial b} &amp; 0 &amp; \frac{\partial r_{2}}{\partial \rho_{2}} &amp; . &amp; . &amp; . &amp; 0 \\
+        . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . \\
+        . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . \\
+        . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . &amp; . \\
+        \frac{\partial r_{N}}{\partial t^x} &amp; \frac{\partial r_{N}}{\partial t^y} &amp; \frac{\partial r_{N}}{\partial t^z} &amp; \frac{\partial r_{N}}{\partial \phi^x} &amp; \frac{\partial r_{N}}{\partial \phi^y} &amp; \frac{\partial r_{N}}{\partial \phi^z} &amp; \frac{\partial r_{N}}{\partial a} &amp; \frac{\partial r_{N}}{\partial b} &amp; 0 &amp; 0 &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial \rho_{N}}
+        \end{bmatrix} \\
+        &amp;= \begin{bmatrix}
+        \mathbf{H}_{11} &amp; \mathbf{H}_{12}\\
+        \mathbf{H}_{12}^{T} &amp; \mathbf{H}_{22}
+        \end{bmatrix}
+        \end{aligned}\]
+
+        \[\mathbf{H}_{11} = \sum^N_{i = 1}\begin{bmatrix}
+        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial t^x}) &amp;
+        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial t^y}) &amp;
+        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial t^z}) &amp;
+        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial a})&amp;
+        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial b}) \\
+        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial t^x}) &amp;
+        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial t^y}) &amp;
+        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial t^z}) &amp;
+        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial a})&amp;
+        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial b}) \\
+        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial t^x}) &amp;
+        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial t^y}) &amp;
+        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial t^z}) &amp;
+        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial a})&amp;
+        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial b}) \\
+        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial t^x}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial t^y}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial t^z}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial a}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial b})\\
+        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial t^x}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial t^y}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial t^z}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial a}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial b})\\
+        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial t^x}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial t^y}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial t^z}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial a}) &amp;
+        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial b})\\
+        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial t^x}) &amp;
+        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial t^y}) &amp;
+        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial t^z}) &amp;
+        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial a}) &amp;
+        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial b})\\
+        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial t^x}) &amp;
+        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial t^y}) &amp;
+        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial t^z}) &amp;
+        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial a}) &amp;
+        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial b})
+        \end{bmatrix}\]
+
+        \[\mathbf{H}_{12} = \begin{bmatrix}
+        (\frac{\partial r_{1}}{\partial t^x}\frac{\partial r_{1}}{\partial \rho_{1}}) &amp;
+        (\frac{\partial r_{2}}{\partial t^x}\frac{\partial r_{2}}{\partial \rho_{2}}) &amp;
+        . &amp;
+        . &amp;
+        . &amp;
+        (\frac{\partial r_{N}}{\partial t^x}\frac{\partial r_{N}}{\partial \rho_{N}})
+        \\
+        (\frac{\partial r_{1}}{\partial t^y}\frac{\partial r_{1}}{\partial \rho_{1}}) &amp;
+        (\frac{\partial r_{2}}{\partial t^y}\frac{\partial r_{2}}{\partial \rho_{2}}) &amp;
+        . &amp;
+        . &amp;
+        . &amp;
+        (\frac{\partial r_{N}}{\partial t^y}\frac{\partial r_{N}}{\partial \rho_{N}})
+        \\
+        (\frac{\partial r_{1}}{\partial t^z}\frac{\partial r_{1}}{\partial \rho_{1}}) &amp;
+        (\frac{\partial r_{2}}{\partial t^z}\frac{\partial r_{2}}{\partial \rho_{2}}) &amp;
+        . &amp;
+        . &amp;
+        . &amp;
+        (\frac{\partial r_{N}}{\partial t^z}\frac{\partial r_{N}}{\partial \rho_{N}})
+        \\
+        (\frac{\partial r_{1}}{\partial \phi^x}\frac{\partial r_{1}}{\partial \rho_{1}}) &amp;
+        (\frac{\partial r_{2}}{\partial \phi^x}\frac{\partial r_{2}}{\partial \rho_{2}}) &amp;
+        . &amp;
+        . &amp;
+        . &amp;
+        (\frac{\partial r_{N}}{\partial \phi^x}\frac{\partial r_{N}}{\partial \rho_{N}})
+        \\
+        (\frac{\partial r_{1}}{\partial \phi^y}\frac{\partial r_{1}}{\partial \rho_{1}}) &amp;
+        (\frac{\partial r_{2}}{\partial \phi^y}\frac{\partial r_{2}}{\partial \rho_{2}}) &amp;
+        . &amp;
+        . &amp;
+        . &amp;
+        (\frac{\partial r_{N}}{\partial \phi^y}\frac{\partial r_{N}}{\partial \rho_{N}})
+        \\
+        (\frac{\partial r_{1}}{\partial \phi^z}\frac{\partial r_{1}}{\partial \rho_{1}}) &amp;
+        (\frac{\partial r_{2}}{\partial \phi^z}\frac{\partial r_{2}}{\partial \rho_{2}}) &amp;
+        . &amp;
+        . &amp;
+        . &amp;
+        (\frac{\partial r_{N}}{\partial \phi^z}\frac{\partial r_{N}}{\partial \rho_{N}})
+        \\
+        (\frac{\partial r_{1}}{\partial a}\frac{\partial r_{1}}{\partial \rho_{1}}) &amp;
+        (\frac{\partial r_{2}}{\partial a}\frac{\partial r_{2}}{\partial \rho_{2}}) &amp;
+        . &amp;
+        . &amp;
+        . &amp;
+        (\frac{\partial r_{N}}{\partial a}\frac{\partial r_{N}}{\partial \rho_{N}})
+        \\
+        (\frac{\partial r_{1}}{\partial b}\frac{\partial r_{1}}{\partial \rho_{1}}) &amp;
+        (\frac{\partial r_{2}}{\partial b}\frac{\partial r_{2}}{\partial \rho_{2}}) &amp;
+        . &amp;
+        . &amp;
+        . &amp;
+        (\frac{\partial r_{N}}{\partial b}\frac{\partial r_{N}}{\partial \rho_{N}})
+        \end{bmatrix}\]
+
+        \[\mathbf{H}_{22} = \begin{bmatrix}
+        (\frac{\partial r_{1}}{\partial \rho_{1}})^2 &amp; 0 &amp; . &amp; . &amp; . &amp; 0 \\
+        0 &amp; (\frac{\partial r_{2}}{\partial \rho_{2}})^2 &amp; . &amp; . &amp; . &amp; 0 \\
+        0 &amp; 0 &amp; . &amp; . &amp; . &amp; 0 \\
+        0 &amp; 0 &amp; . &amp; . &amp; . &amp; 0 \\
+        0 &amp; 0 &amp; . &amp; . &amp; 0 &amp; (\frac{\partial r_{N}}{\partial \rho_{N}})^2
+        \end{bmatrix}\]
+
+        \[\begin{aligned}
+        \mathbf{b} &amp;= \mathbf{J}^T\mathbf{e} \\
+        &amp;= \begin{bmatrix}
+        \frac{\partial r_{1}}{\partial t^x} &amp; \frac{\partial r_{2}}{\partial t^x} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial t^x}\\
+        \frac{\partial r_{1}}{\partial t^y} &amp; \frac{\partial r_{2}}{\partial t^y} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial t^y}
+        \\ \frac{\partial r_{1}}{\partial t^z} &amp; \frac{\partial r_{2}}{\partial t^z} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial t^z}
+        \\ \frac{\partial r_{1}}{\partial \phi^x} &amp; \frac{\partial r_{2}}{\partial \phi^x} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial \phi^x}
+        \\ \frac{\partial r_{1}}{\partial \phi^y} &amp; \frac{\partial r_{2}}{\partial \phi^y} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial \phi^y}
+        \\ \frac{\partial r_{1}}{\partial \phi^z} &amp; \frac{\partial r_{2}}{\partial \phi^z} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial \phi^z}
+        \\ \frac{\partial r_{1}}{\partial a} &amp; \frac{\partial r_{2}}{\partial a} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial a}
+        \\ \frac{\partial r_{1}}{\partial b} &amp; \frac{\partial r_{2}}{\partial b} &amp; . &amp; . &amp; . &amp; \frac{\partial r_{N}}{\partial b}
+        \\ \frac{\partial r_{1}}{\partial \rho_{1}}  &amp; 0 &amp; . &amp;. &amp; . &amp; 0
+        \\ 0 &amp; \frac{\partial r_{2}}{\partial \rho_{2}}  &amp; . &amp; . &amp; . &amp; 0\\ 0 &amp; . &amp; . &amp; .&amp; . &amp; 0 \\ 0 &amp; . &amp;. &amp; .&amp; . &amp; 0\\ 0 &amp; . &amp;. &amp; . &amp; .&amp; 0\\ 0 &amp; . &amp;. &amp; . &amp; 0 &amp; \frac{\partial r_{N}}{\partial \rho_{N}}
+        \end{bmatrix} \begin{bmatrix}r_{1} \\ r_{2} \\ . \\.\\. \\ r_{N} \end{bmatrix}
+        \\
+        &amp;= \begin{bmatrix}
+        \sum^N_{i=1}(\frac{\partial r_{i}}{\partial t^x} r_{i}) \\
+        \sum^N_{i=1}(\frac{\partial r_{i}}{\partial t^y} r_{i}) \\
+        \sum^N_{i=1}(\frac{\partial r_{i}}{\partial t^z} r_{i}) \\
+        \sum^N_{i=1}(\frac{\partial r_{i}}{\partial \phi^x} r_{i})\\
+        \sum^N_{i=1}(\frac{\partial r_{i}}{\partial \phi^y} r_{i}) \\
+        \sum^N_{i=1}(\frac{\partial r_{i}}{\partial \phi^z} r_{i}) \\
+        \sum^N_{i=1}(\frac{\partial r_{i}}{\partial a} r_{i}) \\
+        \sum^N_{i=1}(\frac{\partial r_{i}}{\partial b} r_{i}) \\
+        \frac{\partial r_{1}}{\partial \rho_{1}} r_{1} \\
+        \frac{\partial r_{2}}{\partial \rho_{2}} r_{2} \\
+        . \\
+        . \\
+        . \\
+        \frac{\partial r_{N}}{\partial \rho_{N}} r_{N} \\
+        \end{bmatrix}
+        \end{aligned}\]
+
+        <h4 id="schur-complement">Schur complement</h4>
+
+        <p>Obviously, we can exploit the spartsiy in \(\mathbf{H}_{22}\) to solve \(\delta \mathbf{x}_{1}\) with</p>
+
+        \[(\mathbf{H}_{11}-\mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{H}_{12}^{T})\delta \mathbf{x}_{1} = -(\mathbf{b}_{1}-\mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{b}_{2})\]
+
+        <p>and solve \(\delta \mathbf{x}_{2}\) with</p>
+
+        \[\delta \mathbf{x}_{2} = -\mathbf{H}_{22}^{-1}(\mathbf{b}_{2} + \mathbf{H}^T_{12}\delta\mathbf{x}_{1})\]
+
+        <p>Remember,</p>
+
+        \[\mathbf{H}_{22}^{-1} = \begin{bmatrix}
+        (\frac{\partial r_{1}}{\partial \rho_{1}})^{-2} &amp; 0 &amp; . &amp; . &amp; . &amp; 0 \\
+        0 &amp; (\frac{\partial r_{2}}{\partial \rho_{2}})^{-2} &amp; . &amp; . &amp; . &amp; 0 \\
+        0 &amp; 0 &amp; . &amp; . &amp; . &amp; 0 \\
+        0 &amp; 0 &amp; . &amp; . &amp; . &amp; 0 \\
+        0 &amp; 0 &amp; . &amp; . &amp; 0 &amp; (\frac{\partial r_{N}}{\partial \rho_{N}})^{-2}
+        \end{bmatrix}\]
+
+        <h4 id="codes">Codes</h4>
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable used in <code class="language-plaintext highlighter-rouge">CoarseInitializer</code></th>
+                <th>Variable used here</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][0]</code></td>
+                <td>\(\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
+                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][1]</code></td>
+                <td>\(\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
+                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][2]</code></td>
+                <td>\(\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
+                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][3]</code></td>
+                <td>\(\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
+                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][4]</code></td>
+                <td>\(\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
+                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][5]</code></td>
+                <td>\(\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
+                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][6]</code></td>
+                <td>\(\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
+                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][7]</code></td>
+                <td>\(\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
+                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][8]</code></td>
+                <td>\(r_{i} \frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
+                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{b}\)所需的中间量</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][9]</code></td>
+                <td>\((\frac{\partial r_{i}}{\partial \rho_{i}})^2\)</td>
+                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{22}\)以及\(\mathbf{H}_{22}^{-1}\)所需的中间量</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">Accumulator9 acc9</code></td>
+                <td> </td>
+                <td>计算\(\mathbf{H}_{11}\)和\(\mathbf{b}_{1}\)</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">Accumulator9 acc9SC</code></td>
+                <td> </td>
+                <td>计算\(\mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{H}_{12}^{T}\)和\(\mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{b}_{2}\)</td>
+            </tr>
+            <tr>
+                <td><code class="language-plaintext highlighter-rouge">Accumulator11 E</code></td>
+                <td> </td>
+                <td>计算总的光度误差</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <h3 id="sliding-window-optimization">Sliding Window Optimization</h3>
+
+        <h4 id="preparation-1">Preparation</h4>
+
+        <p>For convenience, we consider only <strong>one</strong> residual (which is DEFINITELY <strong>IMPOSSIBLE</strong>) wrt. two frames in the following sections.</p>
+
+        <p>As introduced <a href="http://tongling916.github.io/2020/04/02/Jacobian-Matrices/">here</a>, we have</p>
+
+        \[\mathbf{J}=\begin{bmatrix}
+        \frac{\partial r}{\partial \mathbf{C}} &amp; \frac{\partial r}{\partial \boldsymbol{\xi}_{iw}} &amp; \frac{\partial r}{\partial \mathbf{a}_{i}} &amp; \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}} &amp; \frac{\partial r}{\partial \mathbf{a}_{j}} &amp; \frac{\partial r}{\partial \rho}
+        \end{bmatrix}\]
+
+        \[\mathbf{e} = \begin{bmatrix}r\end{bmatrix}\]
+
+        <p>\(\mathbf{x} = \begin{bmatrix} \mathbf{C} \\ \boldsymbol{\xi}_{iw} \\ \mathbf{a}_{i} \\ \boldsymbol{\xi}_{jw} \\ \mathbf{a}_{j} \\  \rho \end{bmatrix} = \begin{bmatrix}\mathbf{x}_1 \\ \mathbf{x}_{2} \end{bmatrix}\), where
+            \(\mathbf{x}_1 = \begin{bmatrix}\mathbf{C} \\ \boldsymbol{\xi}_{iw} \\ \mathbf{a}_{i} \\ \boldsymbol{\xi}_{jw} \\ \mathbf{a}_{j}\end{bmatrix}\), \(\mathbf{x}_2 = \begin{bmatrix}\rho \end{bmatrix}\)</p>
+
+        <table  class="table">
+            <thead>
+            <tr>
+                <th>Variable</th>
+                <th>Meaning</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td>\(r\)</td>
+                <td>single residual</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{C}=\begin{bmatrix}f_{x} \\ f_{y} \\ c_{x} \\ c_{y} \end{bmatrix}\)</td>
+                <td>intrinsic parameters (<code class="language-plaintext highlighter-rouge">4 x 1</code>)</td>
+            </tr>
+            <tr>
+                <td>\(\boldsymbol{\xi}_{iw}\)</td>
+                <td>pose \(\mathbf{T}_{iw}\) of frame i (<code class="language-plaintext highlighter-rouge">6 x 1</code>)</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{a}_{i}=\begin{bmatrix}a_{i} \\ b_{i}\end{bmatrix}\)</td>
+                <td>photometric parameters of frame i (<code class="language-plaintext highlighter-rouge">2 x 1</code>)</td>
+            </tr>
+            <tr>
+                <td>\(\boldsymbol{\xi}_{jw}\)</td>
+                <td>pose \(\mathbf{T}_{jw}\) of frame j (<code class="language-plaintext highlighter-rouge">6 x 1</code>)</td>
+            </tr>
+            <tr>
+                <td>\(\mathbf{a}_{j}=\begin{bmatrix}a_{j} \\ b_{j}\end{bmatrix}\)</td>
+                <td>photometric parameters of frame j (<code class="language-plaintext highlighter-rouge">2 x 1</code>)</td>
+            </tr>
+            <tr>
+                <td>\(\rho\)</td>
+                <td>inverse depth (<code class="language-plaintext highlighter-rouge">1 x 1</code>)</td>
+            </tr>
+            </tbody>
+        </table>
+
+        <h4 id="hessian">Hessian</h4>
+
+        \[\begin{aligned}
+        \mathbf{H} &amp;= \mathbf{J}^T\mathbf{J} \\
+        &amp;= \begin{bmatrix}
+        (\frac{\partial r}{\partial \mathbf{C}})^{T}
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T}
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T}
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T}
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T}
+        \\ (\frac{\partial r}{\partial \rho})^{T}
+        \end{bmatrix}
+        \begin{bmatrix}
+        \frac{\partial r}{\partial \mathbf{C}}
+        &amp; \frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp; \frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp; \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp; \frac{\partial r}{\partial \mathbf{a}_{j}}
+        &amp; \frac{\partial r}{\partial \rho}
+        \end{bmatrix} \\
+        &amp;= \begin{bmatrix}
+        (\frac{\partial r}{\partial \mathbf{C}})^{T}\frac{\partial r}{\partial \mathbf{C}}
+        &amp;(\frac{\partial r}{\partial \mathbf{C}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp;(\frac{\partial r}{\partial \mathbf{C}})^{T}\frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp;(\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp;(\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}}
+        &amp;(\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial \rho}\\
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \mathbf{C}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T}\frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \rho}\\
+        (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T}\frac{\partial r}{\partial \mathbf{C}}
+        &amp; (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp; (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp; (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp; (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}}
+        &amp;(\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \rho}\\
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T}\frac{\partial r}{\partial \mathbf{C}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \rho}\\
+        (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \mathbf{C}}
+        &amp; (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp;  (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp;  (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp;  (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}}
+        &amp;  (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \rho}\\
+        (\frac{\partial r}{\partial \rho})^{T} \frac{\partial r}{\partial \mathbf{C}}
+        &amp; (\frac{\partial r}{\partial \rho})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp; (\frac{\partial r}{\partial \rho})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp; (\frac{\partial r}{\partial \rho})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp; (\frac{\partial r}{\partial \rho})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}}
+        &amp; (\frac{\partial r}{\partial \rho})^{T} \frac{\partial r}{\partial \rho}
+        \end{bmatrix} \\
+        &amp;= \begin{bmatrix}
+        \mathbf{H}_{11} &amp; \mathbf{H}_{12} \\
+        \mathbf{H}_{12}^T &amp; \mathbf{H}_{22}
+        \end{bmatrix}
+        \end{aligned}\]
+
+        \[\mathbf{H}_{11} = \begin{bmatrix}
+        (\frac{\partial r}{\partial \mathbf{C}})^{T}\frac{\partial r}{\partial \mathbf{C}}
+        &amp;(\frac{\partial r}{\partial \mathbf{C}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp;(\frac{\partial r}{\partial \mathbf{C}})^{T}\frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp;(\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp;(\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}} \\
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \mathbf{C}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T}\frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}} \\
+        (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T}\frac{\partial r}{\partial \mathbf{C}}
+        &amp; (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp; (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp; (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp; (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}} \\
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T}\frac{\partial r}{\partial \mathbf{C}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp; (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}} \\
+        (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \mathbf{C}}
+        &amp; (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T}\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}
+        &amp;  (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}}
+        &amp;  (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}
+        &amp;  (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \mathbf{a}_{j}}
+        \end{bmatrix}\]
+
+        \[\mathbf{H}_{12} = \begin{bmatrix}
+        (\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial \rho}
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \rho}
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \rho}
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \rho}
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{j}} )^{T} \frac{\partial r}{\partial \rho}
+        \end{bmatrix}\]
+
+        \[\mathbf{H}_{22} =
+        \begin{bmatrix}
+        (\frac{\partial r}{\partial \rho})^{T} \frac{\partial r}{\partial \rho}
+        \end{bmatrix} =
+        \begin{bmatrix}
+        (\frac{\partial r}{\partial \rho})^{2}
+        \end{bmatrix}\]
+
+        <h4 id="b">b</h4>
+
+        \[\begin{aligned}
+        \mathbf{b} &amp;= \mathbf{J}^T\mathbf{e} \\
+        &amp;= \begin{bmatrix}
+        (\frac{\partial r}{\partial \mathbf{C}})^{T}
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T}
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T}
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T}
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T}
+        \\ (\frac{\partial r}{\partial \rho})^{T}
+        \end{bmatrix} r
+        \end{aligned}\]
+
+        \[\mathbf{b}_{1} = \begin{bmatrix}
+        r(\frac{\partial r}{\partial \mathbf{C}})^{T}
+        \\ r(\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T}
+        \\ r(\frac{\partial r}{\partial \mathbf{a}_{i}})^{T}
+        \\ r(\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T}
+        \\ r(\frac{\partial r}{\partial \mathbf{a}_{j}})^{T}
+        \end{bmatrix}\]
+
+        \[\mathbf{b}_{2} = \begin{bmatrix}
+        r (\frac{\partial r}{\partial \rho})^{T}
+        \end{bmatrix}\]
+
+        <h4 id="implementation">Implementation</h4>
+
+        <p>In the real implementation, the author didn’t directly compute \(\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}}\), \(\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}}\), \(\frac{\partial r}{\partial \mathbf{a}_{i}}\) and \(\frac{\partial r}{\partial \mathbf{a}_{j}}\). Instead, he used the chain rules</p>
+
+        \[\begin{aligned}
+        \frac{\partial r}{\partial \boldsymbol{\xi}_{iw}} &amp;= \frac{\partial r}{\partial \boldsymbol{\xi}_{ji}} \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}}
+        \end{aligned}\]
+
+        \[\begin{aligned}
+        \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}} &amp;= \frac{\partial r}{\partial \boldsymbol{\xi}_{ji}} \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}}
+        \end{aligned}\]
+
+        \[\begin{aligned}
+        \frac{\partial r}{\partial \mathbf{a}_{i}} &amp;= \frac{\partial r}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}} \frac{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}{\partial \mathbf{a}_{i}}
+        \end{aligned}\]
+
+        \[\begin{aligned}
+        \frac{\partial r}{\partial \mathbf{a}_{j}} &amp;= \frac{\partial r}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}} \frac{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}{\partial \mathbf{a}_{j}}
+        \end{aligned}\]
+
+        <p>And their tranposes are</p>
+
+        \[\begin{aligned}
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} &amp;= (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}})^{T}(\frac{\partial r}{\partial \boldsymbol{\xi}_{ji}})^{T}
+        \end{aligned}\]
+
+        \[\begin{aligned}
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} &amp;= (\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}})^{T}(\frac{\partial r}{\partial \boldsymbol{\xi}_{ji}})^{T}
+        \end{aligned}\]
+
+        \[\begin{aligned}
+        (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} &amp;= (\frac{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}{\partial \mathbf{a}_{i}})^{T}(\frac{\partial r}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}})^{T}
+        \end{aligned}\]
+
+        \[\begin{aligned}
+        (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} &amp;= (\frac{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}}{\partial \mathbf{a}_{j}})^{T}(\frac{\partial r}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}})^{T}
+        \end{aligned}\]
+
+        <p>Details about these Jacobians can be found in this <a href="#DSO-Jacobians/">post</a>.</p>
+
+        <h4 id="schur-complement-1">Schur Complement</h4>
+
+        \[(\mathbf{H}_{11}-\mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{H}_{12}^{T})\delta \mathbf{x}_{1} = -(\mathbf{b}_{1}-\mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{b}_{2})\]
+
+        \[\begin{aligned}
+        \mathbf{H}_{\text{sc}} &amp;= \mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{H}_{12}^{T} \\
+        &amp;= \begin{bmatrix}
+        (\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}      {\partial \rho}
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac     {\partial r}{\partial \rho}
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}        {\partial \rho}
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac     {\partial r}{\partial \rho}
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{j}} )^{T} \frac{\partial r}       {\partial \rho}
+        \end{bmatrix}
+        \begin{bmatrix}
+        (\frac{\partial r}{\partial \rho})^{-2}
+        \end{bmatrix}
+        \begin{bmatrix}
+        (\frac{\partial r}{\partial \rho})^{T} \frac{\partial r}{\partial \mathbf{C}}
+        &amp; (\frac{\partial r}{\partial \rho})^{T}\frac{\partial r}   {\partial      \boldsymbol{\xi}_{iw}}
+        &amp; (\frac{\partial r}{\partial \rho})^{T} \frac{\partial r}  {\partial         \mathbf{a}_{i}}
+        &amp; (\frac{\partial r}{\partial \rho})^{T} \frac{\partial r}  {\partial         \boldsymbol{\xi}_{jw}}
+        &amp; (\frac{\partial r}{\partial \rho})^{T} \frac{\partial r}  {\partial         \mathbf{a}_{j}}
+        \end{bmatrix} \\
+        &amp;= \begin{bmatrix}
+        (\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial \mathbf{C}} &amp;
+        (\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}} &amp;
+        (\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}} &amp;
+        (\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}} &amp;
+        (\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}{\partial  \mathbf{a}_{j}}
+        \\
+        (\frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \mathbf{C}} &amp;
+        (\frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}} &amp;
+        (\frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}} &amp;
+        (\frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}} &amp;
+        (\frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}})^{T} \frac{\partial r}{\partial  \mathbf{a}_{j}}
+        \\
+        (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \mathbf{C}} &amp;
+        (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}} &amp;
+        (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}} &amp;
+        (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}} &amp;
+        (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}{\partial  \mathbf{a}_{j}}
+        \\
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \mathbf{C}} &amp;
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}} &amp;
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}} &amp;
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}} &amp;
+        (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac{\partial r}{\partial  \mathbf{a}_{j}}
+        \\
+        (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \mathbf{C}} &amp;
+        (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial  \boldsymbol{\xi}_{iw}} &amp;
+        (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \mathbf{a}_{i}} &amp;
+        (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial \boldsymbol{\xi}_{jw}} &amp;
+        (\frac{\partial r}{\partial \mathbf{a}_{j}})^{T} \frac{\partial r}{\partial  \mathbf{a}_{j}}
+        \end{bmatrix}
+        \end{aligned}\]
+
+        \[\begin{aligned}
+        \mathbf{b}_{\text{sc}} &amp;= \mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{b}_{2} \\
+        &amp;= \begin{bmatrix}
+        (\frac{\partial r}{\partial \mathbf{C}})^{T} \frac{\partial r}      {\partial \rho}
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} \frac     {\partial r}{\partial \rho}
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} \frac{\partial r}        {\partial \rho}
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} \frac     {\partial r}{\partial \rho}
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{j}} )^{T} \frac{\partial r}       {\partial \rho}
+        \end{bmatrix}
+        \begin{bmatrix}
+        (\frac{\partial r}{\partial \rho})^{-2}
+        \end{bmatrix}
+        \begin{bmatrix}
+        r (\frac{\partial r}{\partial \rho})^{T}
+        \end{bmatrix} \\
+        &amp;= \begin{bmatrix}
+        (\frac{\partial r}{\partial \mathbf{C}})^{T} r
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{iw}})^{T} r
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{i}})^{T} r
+        \\ (\frac{\partial r}{\partial \boldsymbol{\xi}_{jw}})^{T} r
+        \\ (\frac{\partial r}{\partial \mathbf{a}_{j}} )^{T} r
+        \end{bmatrix}
+        \end{aligned}\]
+    </div>
+</body>
+</html>
