@@ -606,7 +606,6 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 	EFDeltaValid=false;
 
 	makeIDX();
-	delete fh;
 }
 
 

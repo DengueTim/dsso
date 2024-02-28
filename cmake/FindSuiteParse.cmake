@@ -6,6 +6,7 @@ FIND_PATH(CHOLMOD_INCLUDE_DIR NAMES cholmod.h amd.h camd.h
     /opt/local/include/ufsparse
     /usr/local/include/ufsparse
     /sw/include/ufsparse
+    /opt/homebrew/include/suitesparse
   )
 
 FIND_LIBRARY(CHOLMOD_LIBRARY NAMES cholmod
@@ -110,6 +111,7 @@ FIND_PATH(CSPARSE_INCLUDE_DIR NAMES cs.h
   /opt/local/include/ufsparse
   /usr/local/include/ufsparse
   /sw/include/ufsparse
+  /opt/homebrew/include/suitesparse
   )
 
 FIND_LIBRARY(CSPARSE_LIBRARY NAMES cxsparse

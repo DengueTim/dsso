@@ -157,6 +157,7 @@ void FullSystem::marginalizeFrame(FrameHessian* frame)
 
 
 	ef->marginalizeFrame(frame->efFrame);
+	EFFrame* toDelete = frame->efFrame;
 
 	// drop all observations of existing points in that frame.
 
@@ -212,6 +213,7 @@ void FullSystem::marginalizeFrame(FrameHessian* frame)
 
 	setPrecalcValues();
 	ef->setAdjointsF(&Hcalib);
+	delete toDelete;
 }
 
 
