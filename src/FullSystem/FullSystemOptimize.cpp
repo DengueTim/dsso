@@ -239,8 +239,8 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 			fh->setState(fh->state_backup + step);
 			sumA += step[6]*step[6];
 			sumB += step[7]*step[7];
-			sumT += step.segment<3>(0).squaredNorm();
-			sumR += step.segment<3>(3).squaredNorm();
+			sumT += step.segment<3>(3).squaredNorm();
+			sumR += step.segment<3>(0).squaredNorm();
 
 			for(PointHessian* ph : fh->pointHessians)
 			{
@@ -262,8 +262,8 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 			fh->setState(fh->state_backup + pstepfac.cwiseProduct(fh->step));
 			sumA += fh->step[6]*fh->step[6];
 			sumB += fh->step[7]*fh->step[7];
-			sumT += fh->step.segment<3>(0).squaredNorm();
-			sumR += fh->step.segment<3>(3).squaredNorm();
+			sumT += fh->step.segment<3>(3).squaredNorm();
+			sumR += fh->step.segment<3>(0).squaredNorm();
 
 			for(PointHessian* ph : fh->pointHessians)
 			{
@@ -676,8 +676,8 @@ std::vector<VecX> FullSystem::getNullspaces(
 		for(FrameHessian* fh : frameHessians)
 		{
 			nullspace_x0.segment<6>(CPARS+fh->idx*8) = fh->nullspaces_pose.col(i);
-			nullspace_x0.segment<3>(CPARS+fh->idx*8) *= SCALE_XI_TRANS_INVERSE;
-			nullspace_x0.segment<3>(CPARS+fh->idx*8+3) *= SCALE_XI_ROT_INVERSE;
+			nullspace_x0.segment<3>(CPARS+fh->idx*8) *= SCALE_XI_ROT_INVERSE;
+			nullspace_x0.segment<3>(CPARS+fh->idx*8+3) *= SCALE_XI_TRANS_INVERSE;
 		}
 		nullspaces_x0_pre.push_back(nullspace_x0);
 		nullspaces_pose.push_back(nullspace_x0);
@@ -702,8 +702,8 @@ std::vector<VecX> FullSystem::getNullspaces(
 	for(FrameHessian* fh : frameHessians)
 	{
 		nullspace_x0.segment<6>(CPARS+fh->idx*8) = fh->nullspaces_scale;
-		nullspace_x0.segment<3>(CPARS+fh->idx*8) *= SCALE_XI_TRANS_INVERSE;
-		nullspace_x0.segment<3>(CPARS+fh->idx*8+3) *= SCALE_XI_ROT_INVERSE;
+		nullspace_x0.segment<3>(CPARS+fh->idx*8) *= SCALE_XI_ROT_INVERSE;
+		nullspace_x0.segment<3>(CPARS+fh->idx*8+3) *= SCALE_XI_TRANS_INVERSE;
 	}
 	nullspaces_x0_pre.push_back(nullspace_x0);
 	nullspaces_scale.push_back(nullspace_x0);

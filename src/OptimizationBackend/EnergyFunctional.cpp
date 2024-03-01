@@ -62,7 +62,7 @@ void EnergyFunctional::setAdjointsF(CalibHessian* Hcalib)
 			Mat88 AH = Mat88::Identity();
 			Mat88 AT = Mat88::Identity();
 
-			AH.topLeftCorner<6,6>() = -hostToTarget.Adj().transpose();
+			AH.topLeftCorner<6,6>() = flipTR66(-hostToTarget.Adj().transpose());
 			AT.topLeftCorner<6,6>() = Mat66::Identity();
 
 

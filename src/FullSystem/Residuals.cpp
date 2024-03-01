@@ -141,19 +141,19 @@ double PointFrameResidual::linearize(CalibHessian* HCalib)
 		d_C_y[3] = (d_C_y[3]+1)*SCALE_C;
 
 
-		d_xi_x[0] = new_idepth*HCalib->fxl();
-		d_xi_x[1] = 0;
-		d_xi_x[2] = -new_idepth*u*HCalib->fxl();
-		d_xi_x[3] = -u*v*HCalib->fxl();
-		d_xi_x[4] = (1+u*u)*HCalib->fxl();
-		d_xi_x[5] = -v*HCalib->fxl();
+		d_xi_x[0] = -u*v*HCalib->fxl();
+		d_xi_x[1] = (1+u*u)*HCalib->fxl();
+		d_xi_x[2] = -v*HCalib->fxl();
+		d_xi_x[3] = new_idepth*HCalib->fxl();
+		d_xi_x[4] = 0;
+		d_xi_x[5] = -new_idepth*u*HCalib->fxl();
 
-		d_xi_y[0] = 0;
-		d_xi_y[1] = new_idepth*HCalib->fyl();
-		d_xi_y[2] = -new_idepth*v*HCalib->fyl();
-		d_xi_y[3] = -(1+v*v)*HCalib->fyl();
-		d_xi_y[4] = u*v*HCalib->fyl();
-		d_xi_y[5] = u*HCalib->fyl();
+		d_xi_y[0] = -(1+v*v)*HCalib->fyl();
+		d_xi_y[1] = u*v*HCalib->fyl();
+		d_xi_y[2] = u*HCalib->fyl();
+		d_xi_y[3] = 0;
+		d_xi_y[4] = new_idepth*HCalib->fyl();
+		d_xi_y[5] = -new_idepth*v*HCalib->fyl();
 	}
 
 

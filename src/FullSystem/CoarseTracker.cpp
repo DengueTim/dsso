@@ -316,11 +316,7 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 		__m128 v = _mm_load_ps(buf_warped_v+i);
 		__m128 id = _mm_load_ps(buf_warped_idepth+i);
 
-
 		acc.updateSSE_eighted(
-				_mm_mul_ps(id,dx),
-				_mm_mul_ps(id,dy),
-				_mm_sub_ps(zero, _mm_mul_ps(id,_mm_add_ps(_mm_mul_ps(u,dx), _mm_mul_ps(v,dy)))),
 				_mm_sub_ps(zero, _mm_add_ps(
 						_mm_mul_ps(_mm_mul_ps(u,v),dx),
 						_mm_mul_ps(dy,_mm_add_ps(one, _mm_mul_ps(v,v))))),
@@ -328,6 +324,9 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 						_mm_mul_ps(_mm_mul_ps(u,v),dy),
 						_mm_mul_ps(dx,_mm_add_ps(one, _mm_mul_ps(u,u)))),
 				_mm_sub_ps(_mm_mul_ps(u,dy), _mm_mul_ps(v,dx)),
+				_mm_mul_ps(id,dx),
+				_mm_mul_ps(id,dy),
+				_mm_sub_ps(zero, _mm_mul_ps(id,_mm_add_ps(_mm_mul_ps(u,dx), _mm_mul_ps(v,dy)))),
 				_mm_mul_ps(a,_mm_sub_ps(b0, _mm_load_ps(buf_warped_refColor+i))),
 				minusOne,
 				_mm_load_ps(buf_warped_residual+i),
@@ -636,7 +635,7 @@ bool CoarseTracker::trackNewestCoarse(
 
             if(!std::isfinite(incScaled.sum())) incScaled.setZero();
 
-			SE3 refToNew_new = SE3::exp((Vec6)(incScaled.head<6>())) * refToNew_current;
+			SE3 refToNew_new = SE3::exp(flipTR6((Vec6)(incScaled.head<6>()))) * refToNew_current;
 			AffLight aff_g2l_new = aff_g2l_current;
 			aff_g2l_new.a += incScaled[6];
 			aff_g2l_new.b += incScaled[7];

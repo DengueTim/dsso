@@ -180,14 +180,14 @@ struct FrameHessian
 	{
 
 		this->state = state;
-		state_scaled.segment<3>(0) = SCALE_XI_TRANS * state.segment<3>(0);
-		state_scaled.segment<3>(3) = SCALE_XI_ROT * state.segment<3>(3);
+		state_scaled.segment<3>(0) = SCALE_XI_ROT * state.segment<3>(0);
+		state_scaled.segment<3>(3) = SCALE_XI_TRANS * state.segment<3>(3);
 		state_scaled[6] = SCALE_A * state[6];
 		state_scaled[7] = SCALE_B * state[7];
 		state_scaled[8] = SCALE_A * state[8];
 		state_scaled[9] = SCALE_B * state[9];
 
-		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
+		PRE_worldToCam = SE3::exp(flipTR6(w2c_leftEps())) * get_worldToCam_evalPT();
 		PRE_camToWorld = PRE_worldToCam.inverse();
 		//setCurrentNullspace();
 	};
@@ -195,8 +195,8 @@ struct FrameHessian
 	{
 
 		this->state_scaled = state_scaled;
-		state.segment<3>(0) = SCALE_XI_TRANS_INVERSE * state_scaled.segment<3>(0);
-		state.segment<3>(3) = SCALE_XI_ROT_INVERSE * state_scaled.segment<3>(3);
+		state.segment<3>(0) = SCALE_XI_ROT_INVERSE * state_scaled.segment<3>(0);
+		state.segment<3>(3) = SCALE_XI_TRANS_INVERSE * state_scaled.segment<3>(3);
 		state[6] = SCALE_A_INVERSE * state_scaled[6];
 		state[7] = SCALE_B_INVERSE * state_scaled[7];
 		state[8] = SCALE_A_INVERSE * state_scaled[8];
@@ -235,7 +235,7 @@ struct FrameHessian
 		for(int i=0;i<pyrLevelsUsed;i++)
 		{
 			delete[] dIp[i];
-			delete[]  absSquaredGrad[i];
+			delete[] absSquaredGrad[i];
 
 		}
 
@@ -264,8 +264,8 @@ struct FrameHessian
 		Vec10 p =  Vec10::Zero();
 		if(frameID==0)
 		{
-			p.head<3>() = Vec3::Constant(setting_initialTransPrior);
-			p.segment<3>(3) = Vec3::Constant(setting_initialRotPrior);
+			p.head<3>() = Vec3::Constant(setting_initialRotPrior);
+			p.segment<3>(3) = Vec3::Constant(setting_initialTransPrior);
 			if(setting_solverMode & SOLVER_REMOVE_POSEPRIOR) p.head<6>().setZero();
 
 			p[6] = setting_initialAffAPrior;

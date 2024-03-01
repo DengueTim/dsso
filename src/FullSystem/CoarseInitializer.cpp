@@ -173,7 +173,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 				inc = - (wM * (Hl.ldlt().solve(bl)));	//=-H^-1 * b.
 
 
-			SE3 refToNew_new = SE3::exp(inc.head<6>().cast<double>()) * refToNew_current;
+			SE3 refToNew_new = SE3::exp(flipTR6(inc.head<6>().cast<double>())) * refToNew_current;
 			AffLight refToNew_aff_new = refToNew_aff_current;
 			refToNew_aff_new.a += inc[6];
 			refToNew_aff_new.b += inc[7];
@@ -427,12 +427,12 @@ Vec3f CoarseInitializer::calcResAndGS(
 			if(hw < 1) hw = sqrtf(hw);
 			float dxInterp = hw*hitColor[1]*fxl;
 			float dyInterp = hw*hitColor[2]*fyl;
-			dp0[idx] = new_idepth*dxInterp;
-			dp1[idx] = new_idepth*dyInterp;
-			dp2[idx] = -new_idepth*(u*dxInterp + v*dyInterp);
-			dp3[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;
-			dp4[idx] = (1+u*u)*dxInterp + u*v*dyInterp;
-			dp5[idx] = -v*dxInterp + u*dyInterp;
+			dp0[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;
+			dp1[idx] = (1+u*u)*dxInterp + u*v*dyInterp;
+			dp2[idx] = -v*dxInterp + u*dyInterp;
+			dp3[idx] = new_idepth*dxInterp;
+			dp4[idx] = new_idepth*dyInterp;
+			dp5[idx] = -new_idepth*(u*dxInterp + v*dyInterp);
 			dp6[idx] = - hw*r2new_aff[0] * rlR;
 			dp7[idx] = - hw*1;
 			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;
@@ -568,15 +568,15 @@ Vec3f CoarseInitializer::calcResAndGS(
 	b_out_sc = acc9SC.H.topRightCorner<8,1>();// / acc9.num;
 
 
-
-	H_out(0,0) += alphaOpt*npts;
-	H_out(1,1) += alphaOpt*npts;
-	H_out(2,2) += alphaOpt*npts;
+	// add somethings to translation..
+	H_out(3,3) += alphaOpt*npts;
+	H_out(4,4) += alphaOpt*npts;
+	H_out(5,5) += alphaOpt*npts;
 
 	Vec3f tlog = refToNew.log().head<3>().cast<float>();
-	b_out[0] += tlog[0]*alphaOpt*npts;
-	b_out[1] += tlog[1]*alphaOpt*npts;
-	b_out[2] += tlog[2]*alphaOpt*npts;
+	b_out[3] += tlog[0]*alphaOpt*npts;
+	b_out[4] += tlog[1]*alphaOpt*npts;
+	b_out[5] += tlog[2]*alphaOpt*npts;
 
 
 

@@ -191,5 +191,27 @@ struct AffLight
 	}
 };
 
+
+/**
+   * \brief Swaps Translaion and Rotation sub-matrices.
+*/
+inline Vec6 flipTR6(Vec6 v) {
+	Vec6 r;
+	r.head<3>() = v.tail<3>();
+	r.tail<3>() = v.head<3>();
+	return r;
+}
+/**
+   * \brief Swaps Translaion and Rotation sub-matrices.
+*/
+inline Mat66 flipTR66(Mat66 m) {
+	Mat66 r;
+	r.block<3,3>(0,0) = m.block<3,3>(3,3);
+	r.block<3,3>(3,0) = m.block<3,3>(0,3);
+	r.block<3,3>(0,3) = m.block<3,3>(3,0);
+	r.block<3,3>(3,3) = m.block<3,3>(0,0);
+	return r;
+}
+
 }
 
