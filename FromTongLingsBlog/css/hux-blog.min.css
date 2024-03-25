@@ -2,15 +2,21 @@
 
     .post-container,
     .sidebar-container {
-        padding-right: 5%
+        padding-right: 5%;
     }
 }
 
 @media (min-width:768px) {
     .post-container {
+        padding-left: 5%;
         padding-right: 5%;
+        margin-left: 0;
         float: none;
     }
+}
+
+@media print {
+    .pagebreak { page-break-before: always; }
 }
 
 body {

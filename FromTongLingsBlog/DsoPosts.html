@@ -755,33 +755,71 @@
         \end{aligned}\]
 
         <p>where</p>
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Left Increment/Jacobian</th>
+                <th>Right Increment/Jacobian</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+            <td>
+                \[\begin{aligned}
+                \frac{\partial \mathbf{p}^c_j}{\partial \boldsymbol{\xi}_{ji}} &amp;= \frac{\partial (\mathbf{T}_{ji}\mathbf{p}^c_i)}{\partial \boldsymbol{\xi}_{ji}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{\exp{(\delta\boldsymbol{\xi}^{\wedge})}\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i -\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{(\mathbf{I} + \delta \boldsymbol{\xi}^{\wedge})\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i -\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}}\\
+                &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{\delta \boldsymbol{\xi}^{\wedge}\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}}\\
+                &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{(\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i)^{\odot}\delta \boldsymbol{\xi} }{\delta \boldsymbol{\xi}}\\
+                &amp;= (\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i)^{\odot} \\
+                &amp;= (\mathbf{p}^c_j)^{\odot} \\
+                &amp;= \begin{bmatrix}
+                1 &amp; 0 &amp; 0 &amp; 0 &amp; z^c_j &amp; -y^c_j\\
+                0 &amp; 1 &amp; 0 &amp; -z^c_j &amp; 0 &amp; x^c_j\\
+                0 &amp; 0 &amp; 1 &amp; y^c_j &amp; -x^c_j &amp; 0\\
+                0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0
+                \end{bmatrix}\\
+                \\
+                \frac{\partial \rho_{j}}{\partial \boldsymbol{\xi}_{ji}} &amp;= \frac{\partial \frac{1}{z^c_j}}{\partial \boldsymbol{\xi}_{ji}} \\
+                &amp;= \frac{\partial \frac{1}{z^c_j}}{\partial z^c_j}\frac{\partial z^c_j}{\partial \boldsymbol{\xi}_{ji}} \\
+                &amp;= -\frac{1}{(z^c_j)^2}\begin{bmatrix}
+                0 &amp; 0 &amp; 1 &amp; y^c_j &amp; -x^c_j &amp; 0
+                \end{bmatrix} \\
+                &amp;= \begin{bmatrix}
+                0 &amp; 0 &amp; -\rho^2_j &amp; -\rho_{j} y^n_j &amp; \rho_{j} x^n_j &amp; 0
+                \end{bmatrix}
+                \end{aligned}\]
+            </td>
+            <td>
+                \[\begin{aligned}
+                \frac{\partial \mathbf{p}^c_j}{\partial \boldsymbol{\xi}_{ji}} &amp;= \frac{\partial (\mathbf{T}_{ji}\mathbf{p}^c_i)}{\partial \boldsymbol{\xi}_{ji}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\exp{(\delta\boldsymbol{\xi}^{\wedge})}\mathbf{p}^c_i -\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}(\mathbf{I} + \delta \boldsymbol{\xi}^{\wedge})\mathbf{p}^c_i -\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}}\\
+                &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\delta \boldsymbol{\xi}^{\wedge}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}}\\
+                &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}(\mathbf{p}^c_i)^{\odot}\delta \boldsymbol{\xi} }{\delta \boldsymbol{\xi}}\\
+                &amp;= \exp{(\boldsymbol{\xi}_{ji}^{\wedge})}(\mathbf{p}^c_i)^{\odot} \\
+                &amp;= \exp{(\boldsymbol{\xi}_{ji}^{\wedge})}(\mathbf{p}^c_i)^{\odot}\mathcal{T}^{-1}_{ji}\mathcal{T}_{ji} \\
+                &amp;= (\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i)^{\odot}\mathcal{T}_{ji} \\
+                &amp;= (\mathbf{p}^c_j)^{\odot}\mathcal{T}_{ji} \\
+                &amp;= \begin{bmatrix}
+                1 &amp; 0 &amp; 0 &amp; 0 &amp; z^c_j &amp; -y^c_j\\
+                0 &amp; 1 &amp; 0 &amp; -z^c_j &amp; 0 &amp; x^c_j\\
+                0 &amp; 0 &amp; 1 &amp; y^c_j &amp; -x^c_j &amp; 0\\
+                0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0
+                \end{bmatrix}\begin{bmatrix}
+                r_{00} &amp; r_{01} &amp; r_{02} &amp; t^z  r_{10} - t^y r_{20} &amp; t^zr_{11}-t^yr_{21} &amp; t^zr_{12}-t^yr_{22} \\
+                r_{10} &amp; r_{11} &amp; r_{12} &amp; -t^z r_{00} + t^x r_{20} &amp; -t^zr_{01}+t^xr_{21} &amp; -t^zr_{02}+t^xr_{22} \\
+                r_{20} & r_{21} & r_{22} & t^y  r_{00} - t^x r_{10} & t^yr_{01}-t^xr_{11} & t^yr_{02}-t^xr_{12} \\
+                0 & 0 & 0 & r_{00} &amp; r_{01} &amp; r_{02} \\
+                0 & 0 & 0 & r_{10} &amp; r_{11} &amp; r_{12} \\
+                0 & 0 & 0 & r_{20} & r_{21} & r_{22} \\
+                \end{bmatrix} \\
+                \end{aligned}\]
+            </td>
+            </tr>
+            </tbody>
+        </table>
 
-        \[\begin{aligned}
-        \frac{\partial \mathbf{p}^c_j}{\partial \boldsymbol{\xi}_{ji}} &amp;= \frac{\partial (\mathbf{T}_{ji}\mathbf{p}^c_i)}{\partial \boldsymbol{\xi}_{ji}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{\exp{(\delta\boldsymbol{\xi}^{\wedge})}\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i -\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{(\mathbf{I} + \delta \boldsymbol{\xi}^{\wedge})\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i -\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}}\\
-        &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{\delta \boldsymbol{\xi}^{\wedge}\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i }{\delta \boldsymbol{\xi}}\\
-        &amp;= \lim_{\delta \boldsymbol{\xi} \rightarrow 0} \frac{(\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i)^{\odot}\delta \boldsymbol{\xi} }{\delta \boldsymbol{\xi}}\\
-        &amp;= (\exp{(\boldsymbol{\xi}_{ji}^{\wedge})}\mathbf{p}^c_i)^{\odot} \\
-        &amp;= (\mathbf{p}^c_j)^{\odot} \\
-        &amp;= \begin{bmatrix}
-        1 &amp; 0 &amp; 0 &amp; 0 &amp; z^c_j &amp; -y^c_j\\
-        0 &amp; 1 &amp; 0 &amp; -z^c_j &amp; 0 &amp; x^c_j\\
-        0 &amp; 0 &amp; 1 &amp; y^c_j &amp; -x^c_j &amp; 0\\
-        0 &amp; 0 &amp; 0 &amp; 0 &amp; 0 &amp; 0
-        \end{bmatrix}
-        \end{aligned}\]
-
-        \[\begin{aligned}
-        \frac{\partial \rho_{j}}{\partial \boldsymbol{\xi}_{ji}} &amp;= \frac{\partial \frac{1}{z^c_j}}{\partial \boldsymbol{\xi}_{ji}} \\
-        &amp;= \frac{\partial \frac{1}{z^c_j}}{\partial z^c_j}\frac{\partial z^c_j}{\partial \boldsymbol{\xi}_{ji}} \\
-        &amp;= -\frac{1}{(z^c_j)^2}\begin{bmatrix}
-        0 &amp; 0 &amp; 1 &amp; y^c_j &amp; -x^c_j &amp; 0
-        \end{bmatrix} \\
-        &amp;= \begin{bmatrix}
-        0 &amp; 0 &amp; -\rho^2_j &amp; -\rho_{j} y^n_j &amp; \rho_{j} x^n_j &amp; 0
-        \end{bmatrix}
-        \end{aligned}\]
 
         <p>Thus,</p>
 
@@ -843,27 +881,62 @@
 
         \[\frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{jw}} = \frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{ji}}\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}}\]
 
-        <p>As we have computed \(\frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{ji}}\) before, we just need to compute \(\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}}\) and \(\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}}\) here.</p>
+        <p>As we have computed \(\frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{ji}}\) before, we just need to compute \(\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}}\) and \(\frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}}\) here. Used in adHost and adTarget in the code...</p>
 
-        \[\begin{aligned}
-        \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}} &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \delta \boldsymbol{\xi}_{ji}}{ \delta \boldsymbol{\xi}_{iw}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{ji})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} (\exp{(\delta \boldsymbol{\xi}_{iw})}^{\wedge}\mathbf{T}_{iw})^{-1} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} \mathbf{T}_{iw}^{-1} \exp{(-\delta \boldsymbol{\xi}_{iw})}^{\wedge} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{ji} \exp{(-\delta \boldsymbol{\xi}_{iw})}^{\wedge} \mathbf{T}_{ji}^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\exp{(-\mathcal{T}_{ji}\delta \boldsymbol{\xi}_{iw})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{-\mathcal{T}_{ji}\delta \boldsymbol{\xi}_{iw}}{ \delta \boldsymbol{\xi}_{iw}} \\
-        &amp;= -\mathcal{T}_{ji}
-        \end{aligned}\]
+        <table class="table">
+            <thead>
+            <tr>
+                <th>Left Increment/Jacobian</th>
+                <th>Right Increment/Jacobian</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+            <td>
+                \[\begin{aligned}
+                \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}} &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \delta \boldsymbol{\xi}_{ji}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{ji})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} (\exp{(\delta \boldsymbol{\xi}_{iw})}^{\wedge}\mathbf{T}_{iw})^{-1} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} \mathbf{T}_{iw}^{-1} \exp{(-\delta \boldsymbol{\xi}_{iw})}^{\wedge} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{ji} \exp{(-\delta \boldsymbol{\xi}_{iw})}^{\wedge} \mathbf{T}_{ji}^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\exp{(-\mathcal{T}_{ji}\delta \boldsymbol{\xi}_{iw})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{-\mathcal{T}_{ji}\delta \boldsymbol{\xi}_{iw}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= -\mathcal{T}_{ji}
+                \end{aligned}\]
 
-        \[\begin{aligned}
-        \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}} &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \delta \boldsymbol{\xi}_{ji}}{ \delta \boldsymbol{\xi}_{jw}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{ji})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{jw})}^{\wedge}\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{jw})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
-        &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{\delta \boldsymbol{\xi}_{jw}}{ \delta \boldsymbol{\xi}_{jw}} \\
-        &amp;= \mathbf{I}
-        \end{aligned}\]
+                \[\begin{aligned}
+                \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}} &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \delta \boldsymbol{\xi}_{ji}}{ \delta \boldsymbol{\xi}_{jw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{ji})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{jw})}^{\wedge}\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{jw})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{\delta \boldsymbol{\xi}_{jw}}{ \delta \boldsymbol{\xi}_{jw}} \\
+                &amp;= \mathbf{I}
+                \end{aligned}\]
+            </td><td>
+                \[\begin{aligned}
+                \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{iw}} &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \delta \boldsymbol{\xi}_{ji}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{ji})}^{\wedge})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} (\mathbf{T}_{iw} \exp{(\delta \boldsymbol{\xi}_{iw}}^{\wedge}))^{-1} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} \exp{(-\delta \boldsymbol{\xi}_{iw}}^{\wedge}) \mathbf{T}_{iw}^{-1}  \mathbf{T}_{iw}\mathbf{T}_{jw}^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} \exp{(-\delta \boldsymbol{\xi}_{iw}}^{\wedge}) \mathbf{T}_{ji}^{-1})^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{ \ln{(\exp{(-\mathcal{T}_{jw}\delta \boldsymbol{\xi}_{iw}}^{\wedge}))^{\vee}}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{iw} \rightarrow 0} \frac{-\mathcal{T}_{jw}\delta \boldsymbol{\xi}_{iw}}{ \delta \boldsymbol{\xi}_{iw}} \\
+                &amp;= -\mathcal{T}_{jw}
+                \end{aligned}\]
+
+                \[\begin{aligned}
+                \frac{\partial \boldsymbol{\xi}_{ji}}{\partial \boldsymbol{\xi}_{jw}} &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \delta \boldsymbol{\xi}_{ji}}{ \delta \boldsymbol{\xi}_{jw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\delta \boldsymbol{\xi}_{ji}}^{\wedge}))^{\vee}}}{ \delta \boldsymbol{\xi}_{jw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} \exp{(\delta\boldsymbol{\xi}_{jw}}^{\wedge}) \mathbf{T}_{iw}^{-1} (\mathbf{T}_{jw}\mathbf{T}_{iw}^{-1})^{-1})^{\vee}}} {\delta\boldsymbol{\xi}_{jw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\mathbf{T}_{jw} \exp{(\delta\boldsymbol{\xi}_{jw}}^{\wedge}) \mathbf{T}_{jw}^{-1})^{\vee}}} {\delta\boldsymbol{\xi}_{jw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \ln{(\exp{(\mathcal{T}_{jw}\delta\boldsymbol{\xi}_{jw}}^{\wedge}) )^{\vee}}} {\delta\boldsymbol{\xi}_{jw}} \\
+                &amp;= \lim_{\delta \boldsymbol{\xi}_{jw} \rightarrow 0} \frac{ \mathcal{T}_{jw} \delta\boldsymbol{\xi}_{jw}} {\delta\boldsymbol{\xi}_{jw}} \\
+                &amp;= \mathcal{T}_{jw}
+                \end{aligned}\]
+            </td>
+            </tr>
+            </tbody>
+        </table>
 
         <h3 id="relative-photometric-parameters">Relative Photometric Parameters</h3>
 
@@ -914,7 +987,7 @@
         &amp;= \rho_{j} \left ( \rho^{-1}_{i} \mathbf{M} \mathbf{p}_i + \mathbf{t}_{ji}\right )
         \end{aligned}\]
 
-        <table  class="table">
+        <table class="table">
             <thead>
             <tr>
                 <th>Variable</th>
@@ -1262,72 +1335,72 @@
         \end{bmatrix}
         \end{aligned}\]
 
-        \[\mathbf{H}_{11} = \sum^N_{i = 1}\begin{bmatrix}
-        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial t^x}) &amp;
-        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial t^y}) &amp;
-        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial t^z}) &amp;
-        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
-        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \phi^y})&amp;
-        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \phi^z})&amp;
-        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial a})&amp;
-        (\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial b}) \\
-        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial t^x}) &amp;
-        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial t^y}) &amp;
-        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial t^z}) &amp;
-        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
-        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \phi^y})&amp;
-        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \phi^z})&amp;
-        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial a})&amp;
-        (\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial b}) \\
-        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial t^x}) &amp;
-        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial t^y}) &amp;
-        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial t^z}) &amp;
-        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
-        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \phi^y})&amp;
-        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \phi^z})&amp;
-        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial a})&amp;
-        (\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial b}) \\
-        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial t^x}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial t^y}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial t^z}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \phi^y})&amp;
-        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \phi^z})&amp;
-        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial a}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial b})\\
-        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial t^x}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial t^y}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial t^z}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \phi^y})&amp;
-        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \phi^z})&amp;
-        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial a}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial b})\\
-        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial t^x}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial t^y}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial t^z}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \phi^y})&amp;
-        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \phi^z})&amp;
-        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial a}) &amp;
-        (\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial b})\\
-        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial t^x}) &amp;
-        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial t^y}) &amp;
-        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial t^z}) &amp;
-        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
-        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \phi^y})&amp;
-        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \phi^z})&amp;
-        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial a}) &amp;
-        (\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial b})\\
-        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial t^x}) &amp;
-        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial t^y}) &amp;
-        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial t^z}) &amp;
-        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
-        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \phi^y})&amp;
-        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \phi^z})&amp;
-        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial a}) &amp;
-        (\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial b})
-        \end{bmatrix}\]
+\[\mathbf{H}_{11} = \sum^N_{i = 1}\begin{bmatrix}
+(\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial t^x}) &amp;
+(\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial t^y}) &amp;
+(\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial t^z}) &amp;
+(\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+(\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+(\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+(\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial a})&amp;
+(\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial b}) \\
+(\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial t^x}) &amp;
+(\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial t^y}) &amp;
+(\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial t^z}) &amp;
+(\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+(\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+(\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+(\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial a})&amp;
+(\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial b}) \\
+(\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial t^x}) &amp;
+(\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial t^y}) &amp;
+(\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial t^z}) &amp;
+(\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+(\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+(\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+(\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial a})&amp;
+(\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial b}) \\
+(\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial t^x}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial t^y}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial t^z}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+(\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+(\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial a}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial b})\\
+(\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial t^x}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial t^y}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial t^z}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+(\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+(\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial a}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial b})\\
+(\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial t^x}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial t^y}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial t^z}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+(\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+(\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial a}) &amp;
+(\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial b})\\
+(\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial t^x}) &amp;
+(\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial t^y}) &amp;
+(\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial t^z}) &amp;
+(\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+(\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+(\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+(\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial a}) &amp;
+(\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial b})\\
+(\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial t^x}) &amp;
+(\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial t^y}) &amp;
+(\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial t^z}) &amp;
+(\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \phi^x}) &amp;
+(\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \phi^y})&amp;
+(\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \phi^z})&amp;
+(\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial a}) &amp;
+(\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial b})
+\end{bmatrix}\]
 
         \[\mathbf{H}_{12} = \begin{bmatrix}
         (\frac{\partial r_{1}}{\partial t^x}\frac{\partial r_{1}}{\partial \rho_{1}}) &amp;
@@ -1462,67 +1535,67 @@
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][0]</code></td>
                 <td>\(\frac{\partial r_{i}}{\partial t^x}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
-                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+                <td>The \(\mathbf{i}\)-th point provides the itermediate value needed to calculate \(\mathbf{H}_{12}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][1]</code></td>
                 <td>\(\frac{\partial r_{i}}{\partial t^y}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
-                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+                <td>The \(\mathbf{i}\)-th point provides the itermediate value needed to calculate \(\mathbf{H}_{12}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][2]</code></td>
                 <td>\(\frac{\partial r_{i}}{\partial t^z}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
-                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+                <td>The \(\mathbf{i}\)-th point provides the itermediate value needed to calculate \(\mathbf{H}_{12}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][3]</code></td>
                 <td>\(\frac{\partial r_{i}}{\partial \phi^x}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
-                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+                <td>The \(\mathbf{i}\)-th point provides the itermediate value needed to calculate \(\mathbf{H}_{12}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][4]</code></td>
                 <td>\(\frac{\partial r_{i}}{\partial \phi^y}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
-                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+                <td>The \(\mathbf{i}\)-th point provides the itermediate value needed to calculate \(\mathbf{H}_{12}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][5]</code></td>
                 <td>\(\frac{\partial r_{i}}{\partial \phi^z}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
-                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+                <td>The \(\mathbf{i}\)-th point provides the itermediate value needed to calculate \(\mathbf{H}_{12}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][6]</code></td>
                 <td>\(\frac{\partial r_{i}}{\partial a}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
-                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+                <td>The \(\mathbf{i}\)-th point provides the itermediate value needed to calculate \(\mathbf{H}_{12}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][7]</code></td>
                 <td>\(\frac{\partial r_{i}}{\partial b}\frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
-                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{12}\)所需的中间量</td>
+                <td>The \(\mathbf{i}\)-th point provides the itermediate value needed to calculate \(\mathbf{H}_{12}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][8]</code></td>
                 <td>\(r_{i} \frac{\partial r_{i}}{\partial \rho_{i}}\)</td>
-                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{b}\)所需的中间量</td>
+                <td>The \(\mathbf{i}\)-th point provides the itermediate value needed to calculate \(\mathbf{b}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JbBuffer_new[i][9]</code></td>
                 <td>\((\frac{\partial r_{i}}{\partial \rho_{i}})^2\)</td>
-                <td>第<code class="language-plaintext highlighter-rouge">i</code>个点提供的计算\(\mathbf{H}_{22}\)以及\(\mathbf{H}_{22}^{-1}\)所需的中间量</td>
+                <td>The \(\mathbf{i}\)-th point provides the itermediate value needed to calculate \(\mathbf{H}_{22}\) and \(\mathbf{H}_{22}^{-1}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">Accumulator9 acc9</code></td>
                 <td> </td>
-                <td>计算\(\mathbf{H}_{11}\)和\(\mathbf{b}_{1}\)</td>
+                <td>Calculate \(\mathbf{H}_{11}\) and \(\mathbf{b}_{1}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">Accumulator9 acc9SC</code></td>
                 <td> </td>
-                <td>计算\(\mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{H}_{12}^{T}\)和\(\mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{b}_{2}\)</td>
+                <td>Calculate \(\mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{H}_{12}^{T}\) and \(\mathbf{H}_{12} \mathbf{H}_{22}^{-1} \mathbf{b}_{2}\)</td>
             </tr>
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">Accumulator11 E</code></td>
                 <td> </td>
-                <td>计算总的光度误差</td>
+                <td>Calculate the total photometric error</td>
             </tr>
             </tbody>
         </table>

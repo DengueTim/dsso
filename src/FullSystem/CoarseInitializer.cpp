@@ -173,7 +173,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 				inc = - (wM * (Hl.ldlt().solve(bl)));	//=-H^-1 * b.
 
 
-			SE3 refToNew_new = SE3::exp(flipTR6(inc.head<6>().cast<double>())) * refToNew_current;
+				SE3 refToNew_new = refToNew_current * SE3::exp(flipTR6(inc.head<6>().cast<double>()));
 			AffLight refToNew_aff_new = refToNew_aff_current;
 			refToNew_aff_new.a += inc[6];
 			refToNew_aff_new.b += inc[7];
@@ -326,6 +326,7 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
 }
 
 // calculates residual, Hessian and Hessian-block neede for re-substituting depth.
+//[[clang::optnone]]
 Vec3f CoarseInitializer::calcResAndGS(
 		int lvl, Mat88f &H_out, Vec8f &b_out,
 		Mat88f &H_out_sc, Vec8f &b_out_sc,
@@ -339,6 +340,11 @@ Vec3f CoarseInitializer::calcResAndGS(
 	Mat33f RKi = (refToNew.rotationMatrix() * Ki[lvl]).cast<float>();
 	Vec3f t = refToNew.translation().cast<float>();
 	Eigen::Vector2f r2new_aff = Eigen::Vector2f(exp(refToNew_aff.a), refToNew_aff.b);
+
+	// For "right" increment computation.
+	const Sophus::SE3GroupBase<Sophus::SE3Group<double, 0>>::Adjoint &adj = refToNew.Adj();
+	Mat36 pointODot = Mat36::Zero();
+	pointODot.topLeftCorner<3,3>() = Mat33::Identity();
 
 	float fxl = fx[lvl];
 	float fyl = fy[lvl];
@@ -388,6 +394,8 @@ Vec3f CoarseInitializer::calcResAndGS(
 			int dy = patternP[idx][1];
 
 
+			// pt is transformed point position in the target(j) normalized plane. p^n_j
+			// Although pt is renormalized to get u,v and new_idepth.
 			Vec3f pt = RKi * Vec3f(point->u+dx, point->v+dy, 1) + t*point->idepth_new;
 			float u = pt[0] / pt[2];
 			float v = pt[1] / pt[2];
@@ -413,13 +421,9 @@ Vec3f CoarseInitializer::calcResAndGS(
 				break;
 			}
 
-
 			float residual = hitColor[0] - r2new_aff[0] * rlR - r2new_aff[1];
 			float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
 			energy += hw *residual*residual*(2-hw);
-
-
-
 
 			float dxdd = (t[0]-t[2]*u)/pt[2];
 			float dydd = (t[1]-t[2]*v)/pt[2];
@@ -427,12 +431,32 @@ Vec3f CoarseInitializer::calcResAndGS(
 			if(hw < 1) hw = sqrtf(hw);
 			float dxInterp = hw*hitColor[1]*fxl;
 			float dyInterp = hw*hitColor[2]*fyl;
-			dp0[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;
-			dp1[idx] = (1+u*u)*dxInterp + u*v*dyInterp;
-			dp2[idx] = -v*dxInterp + u*dyInterp;
-			dp3[idx] = new_idepth*dxInterp;
-			dp4[idx] = new_idepth*dyInterp;
-			dp5[idx] = -new_idepth*(u*dxInterp + v*dyInterp);
+
+			// d PointJ / d Pose IJ using right update
+			pointODot(1,5) = u/new_idepth;
+			pointODot(2,4) = -u/new_idepth;
+			pointODot(2,3) = v/new_idepth;
+			pointODot(0,5) = -v/new_idepth;
+			pointODot(0,4) = 1/new_idepth;
+			pointODot(1,3) = -1/new_idepth;
+			Mat36 dPdT = pointODot * adj;
+			Mat16 dRdT(((dPdT.row(0) - u * dPdT.row(2)) * dxInterp + (dPdT.row(1) - v * dPdT.row(2)) * dyInterp) * new_idepth);
+
+			dp0[idx] = dRdT[3];
+			dp1[idx] = dRdT[4];
+			dp2[idx] = dRdT[5];
+			dp3[idx] = dRdT[0];
+			dp4[idx] = dRdT[1];
+			dp5[idx] = dRdT[2];
+
+			// Using left update.
+//			dp0[idx] = -u*v*dxInterp - (1+v*v)*dyInterp;
+//			dp1[idx] = (1+u*u)*dxInterp + u*v*dyInterp;
+//			dp2[idx] = -v*dxInterp + u*dyInterp;
+//			dp3[idx] = new_idepth*dxInterp;
+//			dp4[idx] = new_idepth*dyInterp;
+//			dp5[idx] = -new_idepth*(u*dxInterp + v*dyInterp);
+
 			dp6[idx] = - hw*r2new_aff[0] * rlR;
 			dp7[idx] = - hw*1;
 			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;
@@ -889,7 +913,6 @@ void CoarseInitializer::doStep(int lvl, float lambda, Vec8f inc)
 	for(int i=0;i<npts;i++)
 	{
 		if(!pts[i].isGood) continue;
-
 
 		float b = JbBuffer[i][8] + JbBuffer[i].head<8>().dot(inc);
 		float step = - b * JbBuffer[i][9] / (1+lambda);
