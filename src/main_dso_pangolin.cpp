@@ -413,10 +413,11 @@ int main( int argc, char** argv )
         fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper());
 
 
-
-
-    // to make MacOS happy: run this in dedicated thread -- and use this one to run the GUI.
+//#define RUN_ON_MAIN_THREAD 1
+#ifndef RUN_ON_MAIN_THREAD
+    //to make MacOS happy: run this in dedicated thread -- and use this one to run the GUI.
     std::thread runthread([&]() {
+#endif
         std::vector<int> idsToPlay;
         std::vector<double> timesToPlayAt;
         for(int i=lstart;i>= 0 && i< reader->getNumImages() && linc*i < linc*lend;i+=linc)
@@ -560,14 +561,14 @@ int main( int argc, char** argv )
             tmlog.flush();
             tmlog.close();
         }
-
+#ifndef RUN_ON_MAIN_THREAD
     });
-
 
     if(viewer != 0)
         viewer->run();
 
     runthread.join();
+#endif
 
 	for(IOWrap::Output3DWrapper* ow : fullSystem->outputWrapper)
 	{

@@ -49,7 +49,7 @@ namespace IOWrap
 class Output3DWrapper;
 }
 
-class PixelSelector;
+//template <class Image_Type> class PixelSelector;
 class PCSyntheticPoint;
 class CoarseTracker;
 struct FrameHessian;
@@ -266,7 +266,7 @@ private:
 	IndexThreadReduce<Vec10> treadReduce;
 
 	float* selectionMap;
-	PixelSelector* pixelSelector;
+	PixelSelector<FrameHessian>* pixelSelector;
 	CoarseDistanceMap* coarseDistanceMap;
 
 	std::vector<FrameHessian*> frameHessians;	// ONLY changed in marginalizeFrame and addFrame.

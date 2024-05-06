@@ -45,6 +45,124 @@
 namespace dso
 {
 
+Eigen::IOFormat MatlabFmt(8, 0, ", ", "\n", "[", "]");
+
+
+struct PointBlock {
+	Eigen::Matrix<float,patternNum,8> jp;
+	Eigen::Matrix<float,patternNum,1> jl;
+	Eigen::Matrix<float,patternNum,1> r;
+
+	Eigen::Matrix<float,patternNum,8> qTjp;
+	Eigen::Matrix<float,patternNum,1> R0;
+	Eigen::Matrix<float,patternNum,1> qTr;
+
+	Eigen::Matrix<float,patternNum+1,8> qTjpD;
+	Eigen::Matrix<float,patternNum+1,1> R0D;
+	Eigen::Matrix<float,patternNum+1,1> qTrD;
+
+	PointBlock() {
+		reset();
+	}
+
+	void reset(){
+		jp.setZero();
+		jl.setZero();
+		r.setZero();
+		qTjp.setZero();
+		R0.setZero();
+		qTr.setZero();
+		qTjpD.setZero();
+		R0D.setZero();
+		qTrD.setZero();
+	}
+
+	void addResidual(int index, float dTx, float dTy, float dTz, float dRa, float dRb, float dRc, float dAa, float dAb, float dD, float res) {
+		assert(jp.row(index).isZero());
+		jp.row(index) = Eigen::Matrix<float, 1, 8>(dTx, dTy, dTz, dRa, dRb, dRc, dAa, dAb);
+		jl[index] = dD;
+		r[index] = res;
+	}
+	
+	void qrMarginalise() {
+		assert(!jp.row(7).isZero());
+		Eigen::HouseholderQR<Eigen::Matrix<float,patternNum,1>> qr(jl);
+		Eigen::Matrix<float,patternNum,patternNum> Q = qr.householderQ();
+		const Eigen::Matrix<float, patternNum, patternNum> &qT = Q.transpose();
+		qTjp = qT * jp;
+		R0 = qr.matrixQR().triangularView<Eigen::Upper>();
+		qTr = qT * r;
+
+		assert(jl.isApprox(Q * R0));
+
+//		Eigen::Matrix<float,patternNum,10> lb;
+//		lb.leftCols<8>() = jp;
+//		lb.col(8) = jl;
+//		lb.col(9) = r;
+//		std::cerr << "\nlb:\n" << lb.format(MatlabFmt) << "\n";
+//
+//		std::cerr << "Q:\n" << Q.format(MatlabFmt) << "\n";
+//		std::cerr << "R0:\n" << R0.format(MatlabFmt) << "\n";
+//
+//		Eigen::Matrix<float,patternNum,10> lbQr;
+//		lbQr.leftCols<8>() = qTjp;
+//		lbQr.col(8) = R0;
+//		lbQr.col(9) = qTr;
+//		std::cerr << "\nlbQr:\n" << lbQr.format(MatlabFmt) << "\n";
+
+	}
+
+	void applyDamping(float lambda) {
+		qTjpD.topRows(patternNum) = qTjp;
+		qTjpD.bottomRows(1).setZero();
+		R0D.topRows(patternNum) = R0;
+		R0D[patternNum] = 1/(1+lambda);
+		qTrD.topRows(patternNum) = qTr;
+		qTrD.bottomRows(1).setZero();
+
+//		Eigen::Matrix<float,patternNum+1,10> lbQrD;
+//		lbQrD.leftCols<8>() = qTjpD;
+//		lbQrD.col(8) = R0D;
+//		lbQrD.col(9) = qTrD;
+//		std::cerr << "\nlbQrD:\n" << lbQrD.format(MatlabFmt) << "\n";
+
+		Eigen::Matrix<float,patternNum+1,8> t(qTjpD);
+		Eigen::Matrix<float,patternNum+1,1> r2(R0D);
+		Eigen::HouseholderQR<Eigen::Matrix<float,patternNum+1,1>> qr(R0D);
+		Eigen::Matrix<float,patternNum+1,patternNum+1> Q = qr.householderQ();
+		const Eigen::Matrix<float, patternNum+1, patternNum+1> &qT = Q.transpose();
+		auto d = qT * qTjpD;
+		qTjpD = d;
+		R0D = qr.matrixQR().triangularView<Eigen::Upper>();
+		auto t2 = qT * qTrD;
+		qTrD = t2;
+
+//		if (true ||!qTjpD.isApprox(t)) {
+//			std::cerr << "\nR0D pre QR:\n" << r2.format(MatlabFmt) << "\n";
+//
+//			std::cerr << "\nqTjpD:\n" << qTjpD.format(MatlabFmt) << "\n";
+//			std::cerr << "\nt:\n" << t.format(MatlabFmt) << "\n";
+//			std::cerr << "\nQ:\n" << Q.format(MatlabFmt) << "\n";
+//			abort();
+//		}
+	}
+
+	void addPoseContribution(Eigen::Matrix<float, 8, 8> &Hpp, Eigen::Matrix<float, 8, 1> &bp) {
+		const Eigen::Matrix<float, 8, 8> &q2TjpD = qTjpD.bottomRows<8>();
+		const Eigen::Matrix<float, 8, 1> &q2TrD = qTrD.bottomRows<8>();
+		Eigen::DenseBase<Eigen::Matrix<float, 8, 8, 0, 8, 8>>::ConstTransposeReturnType &q2TjpDT = q2TjpD.transpose();
+
+		Hpp += q2TjpDT * q2TjpD;
+		bp += q2TjpDT * q2TrD;
+	}
+
+	float getLandmarkIncFromPoseInt(Eigen::Matrix<float, 8, 1> poseInc) {
+		float x = (qTjpD.topRows(1) * poseInc)[0];
+		return -1/R0D[0] * (qTrD[0] + x);
+	}
+};
+
+
 CoarseInitializer::CoarseInitializer(int ww, int hh) : thisToNext_aff(0,0), thisToNext(SE3())
 {
 	for(int lvl=0; lvl<pyrLevelsUsed; lvl++)
@@ -56,13 +174,16 @@ CoarseInitializer::CoarseInitializer(int ww, int hh) : thisToNext_aff(0,0), this
 	JbBuffer = new Vec10f[ww*hh];
 	JbBuffer_new = new Vec10f[ww*hh];
 
+	pBlocks = new PointBlock[ww*hh];
+	pBlocksNew = new PointBlock[ww*hh];
+
 
 	frameID=-1;
 	fixAffine=true;
 	printDebug=false;
 
-	wM.diagonal()[0] = wM.diagonal()[1] = wM.diagonal()[2] = SCALE_XI_ROT;
-	wM.diagonal()[3] = wM.diagonal()[4] = wM.diagonal()[5] = SCALE_XI_TRANS;
+	wM.diagonal()[0] = wM.diagonal()[1] = wM.diagonal()[2] = SCALE_XI_TRANS;
+	wM.diagonal()[3] = wM.diagonal()[4] = wM.diagonal()[5] = SCALE_XI_ROT;
 	wM.diagonal()[6] = SCALE_A;
 	wM.diagonal()[7] = SCALE_B;
 }
@@ -73,6 +194,8 @@ CoarseInitializer::~CoarseInitializer()
 		if(points[lvl] != 0) delete[] points[lvl];
 	}
 
+	delete[] pBlocks;
+	delete[] pBlocksNew;
 	delete[] JbBuffer;
 	delete[] JbBuffer_new;
 }
@@ -86,8 +209,6 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
         ow->pushLiveFrame(newFrameHessian);
 
 	int maxIterations[] = {5,5,10,30,50};
-
-
 
 	alphaK = 2.5*2.5;//*freeDebugParam1*freeDebugParam1;
 	alphaW = 150*150;//*freeDebugParam2*freeDebugParam2;
@@ -114,6 +235,8 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	SE3 refToNew_current = thisToNext;
 	AffLight refToNew_aff_current = thisToNext_aff;
 
+	//refToNew_current = SE3::exp(Vec6(0.0,0.0,0.0001,0.0,0.0,0.0)) * refToNew_current;
+
 	if(firstFrame->ab_exposure>0 && newFrame->ab_exposure>0)
 		refToNew_aff_current = AffLight(logf(newFrame->ab_exposure /  firstFrame->ab_exposure),0); // coarse approximation.
 
@@ -121,18 +244,18 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 	Vec3f latestRes = Vec3f::Zero();
 	for(int lvl=pyrLevelsUsed-1; lvl>=0; lvl--)
 	{
+		if(lvl<pyrLevelsUsed-1) {
+			//abort();
+			propagateDown(lvl + 1);
+		}
 
-
-
-		if(lvl<pyrLevelsUsed-1)
-			propagateDown(lvl+1);
+		float lambda = 0.1;
 
 		Mat88f H,Hsc; Vec8f b,bsc;
 		resetPoints(lvl);
-		Vec3f resOld = calcResAndGS(lvl, H, b, Hsc, bsc, refToNew_current, refToNew_aff_current, false);
+		Vec3f resOld = calcResAndGS(lvl, H, b, Hsc, bsc, refToNew_current, refToNew_aff_current, lambda, false);
 		applyStep(lvl);
 
-		float lambda = 0.1;
 		float eps = 1e-4;
 		int fails=0;
 
@@ -154,24 +277,49 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 		int iteration=0;
 		while(true)
 		{
+			std::cerr << "\nlambda:" << lambda << "\n";
 			Mat88f Hl = H;
 			for(int i=0;i<8;i++) Hl(i,i) *= (1+lambda);
+			for(int i=0;i<8;i++) Hpp(i,i) *= (1+lambda);
 			Hl -= Hsc*(1/(1+lambda));
 			Vec8f bl = b - bsc*(1/(1+lambda));
 
 			Hl = wM * Hl * wM * (0.01f/(w[lvl]*h[lvl]));
 			bl = wM * bl * (0.01f/(w[lvl]*h[lvl]));
 
-
-			Vec8f inc;
+			Vec8f incSc;
+			Vec8f incQr;
 			if(fixAffine)
 			{
-				inc.head<6>() = - (wM.toDenseMatrix().topLeftCorner<6,6>() * (Hl.topLeftCorner<6,6>().ldlt().solve(bl.head<6>())));
-				inc.tail<2>().setZero();
-			}
-			else
-				inc = - (wM * (Hl.ldlt().solve(bl)));	//=-H^-1 * b.
+//				if (!Hl.isApprox(Hpp)) {
+//					std::cerr << "\nHpp, QR:\n" << Hpp.format(MatlabFmt);
+//					std::cerr << "\nHl, SC:\n" << Hl.format(MatlabFmt);
+//					std::cerr << "\nH QR/SC:\n" << (Hpp.array() / Hl.array()).format(MatlabFmt);
+//				}
+//
+//				if (!bl.isApprox(bp)) {
+//					std::cerr << "\nbp, QR:\n" << bp.format(MatlabFmt);
+//					std::cerr << "\nbl, SC:\n" << bl.format(MatlabFmt);
+//					std::cerr << "\nb QR/SC:\n" << (bp.array() / bl.array()).format(MatlabFmt);
+//				}
+				incSc.head<6>() = - (wM.toDenseMatrix().topLeftCorner<6,6>() * (Hl.topLeftCorner<6,6>().ldlt().solve(bl.head<6>())));
+				incSc.tail<2>().setZero();
+				
+								
+				incQr.head<6>() = - wM.toDenseMatrix().topLeftCorner<6,6>() * (Hpp.topLeftCorner<6,6>().ldlt().solve(bp.head<6>()));
+				incQr.tail<2>().setZero();
 
+//				if (!incQr.isApprox(incSc, 0.001)) {
+//					std::cerr << "\nincQr:\n" << incQr.format(MatlabFmt);
+//					std::cerr << "\nincSc:\n" << incSc.format(MatlabFmt);
+//					std::cerr << "\ninc QR/SC:\n" << (incQr.array() / incSc.array()).format(MatlabFmt);
+//					abort();
+//				}
+			} else {
+				incSc = - (wM * (Hl.ldlt().solve(bl)));	//=-H^-1 * b.
+			}
+
+			Vec8f inc(incQr);
 
 			SE3 refToNew_new = SE3::exp(inc.head<6>().cast<double>()) * refToNew_current;
 			AffLight refToNew_aff_new = refToNew_aff_current;
@@ -179,14 +327,14 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			refToNew_aff_new.b += inc[7];
 			doStep(lvl, lambda, inc);
 
-
 			Mat88f H_new, Hsc_new; Vec8f b_new, bsc_new;
-			Vec3f resNew = calcResAndGS(lvl, H_new, b_new, Hsc_new, bsc_new, refToNew_new, refToNew_aff_new, false);
+			Mat88f HppOld(Hpp);
+			Vec8f bpOld(bp);
+			Vec3f resNew = calcResAndGS(lvl, H_new, b_new, Hsc_new, bsc_new, refToNew_new, refToNew_aff_new, lambda, false);
 			Vec3f regEnergy = calcEC(lvl);
 
 			float eTotalNew = (resNew[0]+resNew[1]+regEnergy[1]);
 			float eTotalOld = (resOld[0]+resOld[1]+regEnergy[0]);
-
 
 			bool accept = eTotalOld > eTotalNew;
 
@@ -230,19 +378,13 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 				fails++;
 				lambda *= 4;
 				if(lambda > 10000) lambda = 10000;
+				Hpp = HppOld;
+				bp = bpOld;
 			}
-
-			bool quitOpt = false;
 
 			if(!(inc.norm() > eps) || iteration >= maxIterations[lvl] || fails >= 2)
-			{
-				Mat88f H,Hsc; Vec8f b,bsc;
+				 break;
 
-				quitOpt = true;
-			}
-
-
-			if(quitOpt) break;
 			iteration++;
 		}
 		latestRes = resOld;
@@ -325,11 +467,15 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
         ow->pushDepthImage(&iRImg);
 }
 
-// calculates residual, Hessian and Hessian-block neede for re-substituting depth.
+
+/**
+ * Calculates residual, Hessian and Hessian-block needed for re-substituting depth. Returns accumulated photometric error/residual for points.
+ */
 Vec3f CoarseInitializer::calcResAndGS(
 		int lvl, Mat88f &H_out, Vec8f &b_out,
 		Mat88f &H_out_sc, Vec8f &b_out_sc,
 		const SE3 &refToNew, AffLight refToNew_aff,
+		float lambda,
 		bool plot)
 {
 	int wl = w[lvl], hl = h[lvl];
@@ -350,12 +496,15 @@ Vec3f CoarseInitializer::calcResAndGS(
 	acc9.initialize();
 	E.initialize();
 
+	Hpp.setZero();
+	bp.setZero();
+
+	std::cerr << "\nrefToNew:\n" << refToNew.matrix().format(MatlabFmt) << "\n";
 
 	int npts = numPoints[lvl];
 	Pnt* ptsl = points[lvl];
 	for(int i=0;i<npts;i++)
 	{
-
 		Pnt* point = ptsl+i;
 
 		point->maxstep = 1e10;
@@ -378,6 +527,7 @@ Vec3f CoarseInitializer::calcResAndGS(
         VecNRf dd;
         VecNRf r;
 		JbBuffer_new[i].setZero();
+		pBlocksNew[i].reset();
 
 		// sum over all residuals.
 		bool isGood = true;
@@ -416,10 +566,8 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 			float residual = hitColor[0] - r2new_aff[0] * rlR - r2new_aff[1];
 			float hw = fabs(residual) < setting_huberTH ? 1 : setting_huberTH / fabs(residual);
+			hw = 1;
 			energy += hw *residual*residual*(2-hw);
-
-
-
 
 			float dxdd = (t[0]-t[2]*u)/pt[2];
 			float dydd = (t[1]-t[2]*v)/pt[2];
@@ -435,7 +583,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			dp5[idx] = -v*dxInterp + u*dyInterp;
 			dp6[idx] = - hw*r2new_aff[0] * rlR;
 			dp7[idx] = - hw*1;
-			dd[idx] = dxInterp * dxdd  + dyInterp * dydd;
+			dd[idx] = dxInterp * dxdd + dyInterp * dydd;
 			r[idx] = hw*residual;
 
 			float maxstep = 1.0f / Vec2f(dxdd*fxl, dydd*fyl).norm();
@@ -469,39 +617,40 @@ Vec3f CoarseInitializer::calcResAndGS(
 		point->energy_new[0] = energy;
 
 		// update Hessian matrix.
-		for(int i=0;i+3<patternNum;i+=4)
+		for(int idx=0;idx+3<patternNum;idx+=4) {
 			acc9.updateSSE(
-					_mm_load_ps(((float*)(&dp0))+i),
-					_mm_load_ps(((float*)(&dp1))+i),
-					_mm_load_ps(((float*)(&dp2))+i),
-					_mm_load_ps(((float*)(&dp3))+i),
-					_mm_load_ps(((float*)(&dp4))+i),
-					_mm_load_ps(((float*)(&dp5))+i),
-					_mm_load_ps(((float*)(&dp6))+i),
-					_mm_load_ps(((float*)(&dp7))+i),
-					_mm_load_ps(((float*)(&r))+i));
+				_mm_load_ps(((float *)(&dp0)) + idx),
+				_mm_load_ps(((float *)(&dp1)) + idx),
+				_mm_load_ps(((float *)(&dp2)) + idx),
+				_mm_load_ps(((float *)(&dp3)) + idx),
+				_mm_load_ps(((float *)(&dp4)) + idx),
+				_mm_load_ps(((float *)(&dp5)) + idx),
+				_mm_load_ps(((float *)(&dp6)) + idx),
+				_mm_load_ps(((float *)(&dp7)) + idx),
+				_mm_load_ps(((float *)(&r)) + idx));
+		}
 
 
-		for(int i=((patternNum>>2)<<2); i < patternNum; i++)
+		for(int idx=((patternNum>>2)<<2); idx < patternNum; idx++)
 			acc9.updateSingle(
-					(float)dp0[i],(float)dp1[i],(float)dp2[i],(float)dp3[i],
-					(float)dp4[i],(float)dp5[i],(float)dp6[i],(float)dp7[i],
-					(float)r[i]);
+					(float)dp0[idx],(float)dp1[idx],(float)dp2[idx],(float)dp3[idx],
+					(float)dp4[idx],(float)dp5[idx],(float)dp6[idx],(float)dp7[idx],
+					(float)r[idx]);
 
+		for(int idx=0; idx<patternNum; idx++) {
+			pBlocksNew[i].addResidual(idx,dp0[idx],dp1[idx],dp2[idx],dp3[idx],dp4[idx],dp5[idx],dp6[idx],dp7[idx],dd[idx],r[idx]);
+		}
 
+		pBlocksNew[i].qrMarginalise();
+		pBlocksNew[i].applyDamping(lambda);
+		pBlocksNew[i].addPoseContribution(Hpp, bp);
+
+		//break;
 	}
 
-	E.finish();
 	acc9.finish();
 
-
-
-
-
-
-	// calculate alpha energy, and decide if we cap it.
-	Accumulator11 EAlpha;
-	EAlpha.initialize();
+	// Update depth regularisation energy and accumulate.
 	for(int i=0;i<npts;i++)
 	{
 		Pnt* point = ptsl+i;
@@ -515,8 +664,9 @@ Vec3f CoarseInitializer::calcResAndGS(
 			E.updateSingle((float)(point->energy_new[1]));
 		}
 	}
-	EAlpha.finish();
-	float alphaEnergy = alphaW*(EAlpha.A + refToNew.translation().squaredNorm() * npts);
+
+	// calculate alpha energy, and decide if we cap it.
+	float alphaEnergy = alphaW*(refToNew.translation().squaredNorm() * npts);
 
 	//printf("AE = %f * %f + %f\n", alphaW, EAlpha.A, refToNew.translation().squaredNorm() * npts);
 
@@ -543,13 +693,12 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 		point->lastHessian_new = JbBuffer_new[i][9];
 
-		JbBuffer_new[i][8] += alphaOpt*(point->idepth_new - 1);
-		JbBuffer_new[i][9] += alphaOpt;
-
-		if(alphaOpt==0)
-		{
+		if(alphaOpt==0) {
 			JbBuffer_new[i][8] += couplingWeight*(point->idepth_new - point->iR);
 			JbBuffer_new[i][9] += couplingWeight;
+		} else {
+			JbBuffer_new[i][8] += alphaOpt*(point->idepth_new - 1);
+			JbBuffer_new[i][9] += alphaOpt;
 		}
 
 		JbBuffer_new[i][9] = 1/(1+JbBuffer_new[i][9]);
@@ -567,20 +716,16 @@ Vec3f CoarseInitializer::calcResAndGS(
 	H_out_sc = acc9SC.H.topLeftCorner<8,8>();// / acc9.num;
 	b_out_sc = acc9SC.H.topRightCorner<8,1>();// / acc9.num;
 
+//	H_out(0,0) += alphaOpt*npts;
+//	H_out(1,1) += alphaOpt*npts;
+//	H_out(2,2) += alphaOpt*npts;
+//
+//	Vec3f tlog = refToNew.log().head<3>().cast<float>();
+//	b_out[0] += tlog[0]*alphaOpt*npts;
+//	b_out[1] += tlog[1]*alphaOpt*npts;
+//	b_out[2] += tlog[2]*alphaOpt*npts;
 
-
-	H_out(0,0) += alphaOpt*npts;
-	H_out(1,1) += alphaOpt*npts;
-	H_out(2,2) += alphaOpt*npts;
-
-	Vec3f tlog = refToNew.log().head<3>().cast<float>();
-	b_out[0] += tlog[0]*alphaOpt*npts;
-	b_out[1] += tlog[1]*alphaOpt*npts;
-	b_out[2] += tlog[2]*alphaOpt*npts;
-
-
-
-
+	E.finish();
 
 	return Vec3f(E.A, alphaEnergy ,E.num);
 }
@@ -629,6 +774,11 @@ Vec3f CoarseInitializer::calcEC(int lvl)
 	//printf("ER: %f %f %f!\n", couplingWeight*E.A1m[0], couplingWeight*E.A1m[1], (float)E.num.numIn1m);
 	return Vec3f(couplingWeight*E.A1m[0], couplingWeight*E.A1m[1], E.num);
 }
+
+/**
+ * Update iR (inverse depth local average/regularisation.)
+ * @param lvl
+ */
 void CoarseInitializer::optReg(int lvl)
 {
 	int npts = numPoints[lvl];
@@ -770,7 +920,7 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 	makeK(HCalib);
 	firstFrame = newFrameHessian;
 
-	PixelSelector sel(w[0],h[0]);
+	PixelSelector<FrameHessian> sel(w[0],h[0]);
 
 	float* statusMap = new float[w[0]*h[0]];
 	bool* statusMapB = new bool[w[0]*h[0]];
@@ -811,23 +961,20 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 				pl[nl].lastHessian_new=0;
 				pl[nl].my_type= (lvl!=0) ? 1 : statusMap[x+y*wl];
 
-				Eigen::Vector3f* cpt = firstFrame->dIp[lvl] + x + y*w[lvl];
-				float sumGrad2=0;
-				for(int idx=0;idx<patternNum;idx++)
-				{
-					int dx = patternP[idx][0];
-					int dy = patternP[idx][1];
-					float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm();
-					sumGrad2 += absgrad;
-				}
-
+//				Eigen::Vector3f* cpt = firstFrame->dIp[lvl] + x + y*w[lvl];
+//				float sumGrad2=0;
+//				for(int idx=0;idx<patternNum;idx++)
+//				{
+//					int dx = patternP[idx][0];
+//					int dy = patternP[idx][1];
+//					float absgrad = cpt[dx + dy*w[lvl]].tail<2>().squaredNorm();
+//					sumGrad2 += absgrad;
+//				}
+//
 //				float gth = setting_outlierTH * (sqrtf(sumGrad2)+setting_outlierTHSumComponent);
 //				pl[nl].outlierTH = patternNum*gth*gth;
-//
 
 				pl[nl].outlierTH = patternNum*setting_outlierTH;
-
-
 
 				nl++;
 				assert(nl <= npts);
@@ -845,10 +992,6 @@ void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHe
 	thisToNext=SE3();
 	snapped = false;
 	frameID = snappedAt = 0;
-
-	for(int i=0;i<pyrLevelsUsed;i++)
-		dGrads[i].setZero();
-
 }
 
 void CoarseInitializer::resetPoints(int lvl)
@@ -879,6 +1022,13 @@ void CoarseInitializer::resetPoints(int lvl)
 		}
 	}
 }
+
+/**
+ * Updates good points idepth_new values using inc.
+ * @param lvl
+ * @param lambda
+ * @param inc
+ */
 void CoarseInitializer::doStep(int lvl, float lambda, Vec8f inc)
 {
 
@@ -891,9 +1041,9 @@ void CoarseInitializer::doStep(int lvl, float lambda, Vec8f inc)
 		if(!pts[i].isGood) continue;
 
 
-		float b = JbBuffer[i][8] + JbBuffer[i].head<8>().dot(inc);
-		float step = - b * JbBuffer[i][9] / (1+lambda);
-
+//		float b = JbBuffer[i][8] + JbBuffer[i].head<8>().dot(inc);
+//		float step = - b * JbBuffer[i][9] / (1+lambda);
+		float step = pBlocks[i].getLandmarkIncFromPoseInt(inc);
 
 		float maxstep = maxPixelStep*pts[i].maxstep;
 		if(maxstep > idMaxStep) maxstep=idMaxStep;
@@ -908,6 +1058,10 @@ void CoarseInitializer::doStep(int lvl, float lambda, Vec8f inc)
 	}
 
 }
+/**
+ * Apply _new values to values.
+ * @param lvl
+ */
 void CoarseInitializer::applyStep(int lvl)
 {
 	Pnt* pts = points[lvl];
@@ -925,6 +1079,7 @@ void CoarseInitializer::applyStep(int lvl)
 		pts[i].lastHessian = pts[i].lastHessian_new;
 	}
 	std::swap<Vec10f*>(JbBuffer, JbBuffer_new);
+	std::swap<PointBlock*>(pBlocks, pBlocksNew);
 }
 
 void CoarseInitializer::makeK(CalibHessian* HCalib)

@@ -31,15 +31,13 @@ namespace dso
 
 enum PixelSelectorStatus {PIXSEL_VOID=0, PIXSEL_1, PIXSEL_2, PIXSEL_3};
 
-
-class FrameHessian;
-
+template <class Image_Type>
 class PixelSelector
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 	int makeMaps(
-			const FrameHessian* const fh,
+			const Image_Type* const fh,
 			float* map_out, float density, int recursionsLeft=1, bool plot=false, float thFactor=1);
 
 	PixelSelector(int w, int h);
@@ -48,21 +46,21 @@ public:
 
 
 	bool allowFast;
-	void makeHists(const FrameHessian* const fh);
+	void makeHists(const Image_Type* const fh);
 private:
 
-	Eigen::Vector3i select(const FrameHessian* const fh,
+	Eigen::Vector3i select(const Image_Type* const fh,
 			float* map_out, int pot, float thFactor=1);
 
 
 	unsigned char* randomPattern;
+	unsigned int* randomIndexes;
 
 
-	int* gradHist;
 	float* ths;
 	float* thsSmoothed;
 	int thsStep;
-	const FrameHessian* gradHistFrame;
+	const Image_Type* gradHistFrame;
 };
 
 

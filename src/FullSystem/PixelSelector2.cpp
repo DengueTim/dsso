@@ -23,22 +23,14 @@
 
 
 #include "FullSystem/PixelSelector2.h"
- 
-// 
-
-
-
 #include "util/NumType.h"
 #include "IOWrapper/ImageDisplay.h"
 #include "util/globalCalib.h"
-#include "FullSystem/HessianBlocks.h"
-#include "util/globalFuncs.h"
 
 namespace dso
 {
 
-
-PixelSelector::PixelSelector(int w, int h)
+template<class Image_Type> PixelSelector<Image_Type>::PixelSelector(int w, int h)
 {
 	randomPattern = new unsigned char[w*h];
 	std::srand(3141592);	// want to be deterministic.
@@ -47,7 +39,6 @@ PixelSelector::PixelSelector(int w, int h)
 	currentPotential=3;
 
 
-	gradHist = new int[100*(1+w/32)*(1+h/32)];
 	ths = new float[(w/32)*(h/32)+100];
 	thsSmoothed = new float[(w/32)*(h/32)+100];
 
@@ -55,27 +46,26 @@ PixelSelector::PixelSelector(int w, int h)
 	gradHistFrame=0;
 }
 
-PixelSelector::~PixelSelector()
+template<class Image_Type> PixelSelector<Image_Type>::~PixelSelector()
 {
 	delete[] randomPattern;
-	delete[] gradHist;
 	delete[] ths;
 	delete[] thsSmoothed;
 }
 
-int computeHistQuantil(int* hist, float below)
+int computeHistQuantil(int* hist, int bins, float below)
 {
 	int th = hist[0]*below+0.5f;
-	for(int i=0;i<90;i++)
+	for(int i=0;i<bins;i++)
 	{
 		th -= hist[i+1];
 		if(th<0) return i;
 	}
-	return 90;
+	return bins-1;
 }
 
 
-void PixelSelector::makeHists(const FrameHessian* const fh)
+template<class Image_Type> void PixelSelector<Image_Type>::makeHists(const Image_Type* const fh)
 {
 	gradHistFrame = fh;
 	float * mapmax0 = fh->absSquaredGrad[0];
@@ -90,8 +80,7 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 	for(int y=0;y<h32;y++)
 		for(int x=0;x<w32;x++)
 		{
-			float* map0 = mapmax0+32*x+32*y*w;
-			int* hist0 = gradHist;// + 50*(x+y*w32);
+			int hist0[50];
 			memset(hist0,0,sizeof(int)*50);
 
 			for(int j=0;j<32;j++) for(int i=0;i<32;i++)
@@ -99,13 +88,13 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 				int it = i+32*x;
 				int jt = j+32*y;
 				if(it>w-2 || jt>h-2 || it<1 || jt<1) continue;
-				int g = sqrtf(map0[i+j*w]);
+				int g = sqrtf(mapmax0[it+jt*w]);
 				if(g>48) g=48;
 				hist0[g+1]++;
 				hist0[0]++;
 			}
 
-			ths[x+y*w32] = computeHistQuantil(hist0,setting_minGradHistCut) + setting_minGradHistAdd;
+			ths[x+y*w32] = computeHistQuantil(hist0, 50, setting_minGradHistCut) + setting_minGradHistAdd;
 		}
 
 	for(int y=0;y<h32;y++)
@@ -139,8 +128,8 @@ void PixelSelector::makeHists(const FrameHessian* const fh)
 
 
 }
-int PixelSelector::makeMaps(
-		const FrameHessian* const fh,
+template<class Image_Type> int PixelSelector<Image_Type>::makeMaps(
+		const Image_Type* const fh,
 		float* map_out, float density, int recursionsLeft, bool plot, float thFactor)
 {
 	float numHave=0;
@@ -149,85 +138,58 @@ int PixelSelector::makeMaps(
 	int idealPotential = currentPotential;
 
 
-//	if(setting_pixelSelectionUseFast>0 && allowFast)
-//	{
-//		memset(map_out, 0, sizeof(float)*wG[0]*hG[0]);
-//		std::vector<cv::KeyPoint> pts;
-//		cv::Mat img8u(hG[0],wG[0],CV_8U);
-//		for(int i=0;i<wG[0]*hG[0];i++)
-//		{
-//			float v = fh->dI[i][0]*0.8;
-//			img8u.at<uchar>(i) = (!std::isfinite(v) || v>255) ? 255 : v;
-//		}
-//		cv::FAST(img8u, pts, setting_pixelSelectionUseFast, true);
-//		for(unsigned int i=0;i<pts.size();i++)
-//		{
-//			int x = pts[i].pt.x+0.5;
-//			int y = pts[i].pt.y+0.5;
-//			map_out[x+y*wG[0]]=1;
-//			numHave++;
-//		}
-//
-//		printf("FAST selection: got %f / %f!\n", numHave, numWant);
-//		quotia = numWant / numHave;
-//	}
-//	else
+	// the number of selected pixels behaves approximately as
+	// K / (pot+1)^2, where K is a scene-dependent constant.
+	// we will allow sub-selecting pixels by up to a quotia of 0.25, otherwise we will re-select.
+
+	if(fh != gradHistFrame) makeHists(fh);
+
+	// select!
+	Eigen::Vector3i n = this->select(fh, map_out,currentPotential, thFactor);
+
+	// sub-select!
+	numHave = n[0]+n[1]+n[2];
+	quotia = numWant / numHave;
+
+	// by default we want to over-sample by 40% just to be sure.
+	float K = numHave * (currentPotential+1) * (currentPotential+1);
+	idealPotential = sqrtf(K/numWant)-1;	// round down.
+	if(idealPotential<1) idealPotential=1;
+
+	if( recursionsLeft>0 && quotia > 1.25 && currentPotential>1)
 	{
+		//re-sample to get more points!
+		// potential needs to be smaller
+		if(idealPotential>=currentPotential)
+			idealPotential = currentPotential-1;
 
+//		printf("PixelSelector: have %.2f%%, need %.2f%%. RESAMPLE with pot %d -> %d.\n",
+//				100*numHave/(float)(wG[0]*hG[0]),
+//				100*numWant/(float)(wG[0]*hG[0]),
+//				currentPotential,
+//				idealPotential);
+		currentPotential = idealPotential;
+		return makeMaps(fh,map_out, density, recursionsLeft-1, plot,thFactor);
+	}
+	else if(recursionsLeft>0 && quotia < 0.25)
+	{
+		// re-sample to get less points!
 
+		if(idealPotential<=currentPotential)
+			idealPotential = currentPotential+1;
 
+//		printf("PixelSelector: have %.2f%%, need %.2f%%. RESAMPLE with pot %d -> %d.\n",
+//				100*numHave/(float)(wG[0]*hG[0]),
+//				100*numWant/(float)(wG[0]*hG[0]),
+//				currentPotential,
+//				idealPotential);
+		currentPotential = idealPotential;
+		return makeMaps(fh,map_out, density, recursionsLeft-1, plot,thFactor);
 
-		// the number of selected pixels behaves approximately as
-		// K / (pot+1)^2, where K is a scene-dependent constant.
-		// we will allow sub-selecting pixels by up to a quotia of 0.25, otherwise we will re-select.
-
-		if(fh != gradHistFrame) makeHists(fh);
-
-		// select!
-		Eigen::Vector3i n = this->select(fh, map_out,currentPotential, thFactor);
-
-		// sub-select!
-		numHave = n[0]+n[1]+n[2];
-		quotia = numWant / numHave;
-
-		// by default we want to over-sample by 40% just to be sure.
-		float K = numHave * (currentPotential+1) * (currentPotential+1);
-		idealPotential = sqrtf(K/numWant)-1;	// round down.
-		if(idealPotential<1) idealPotential=1;
-
-		if( recursionsLeft>0 && quotia > 1.25 && currentPotential>1)
-		{
-			//re-sample to get more points!
-			// potential needs to be smaller
-			if(idealPotential>=currentPotential)
-				idealPotential = currentPotential-1;
-
-	//		printf("PixelSelector: have %.2f%%, need %.2f%%. RESAMPLE with pot %d -> %d.\n",
-	//				100*numHave/(float)(wG[0]*hG[0]),
-	//				100*numWant/(float)(wG[0]*hG[0]),
-	//				currentPotential,
-	//				idealPotential);
-			currentPotential = idealPotential;
-			return makeMaps(fh,map_out, density, recursionsLeft-1, plot,thFactor);
-		}
-		else if(recursionsLeft>0 && quotia < 0.25)
-		{
-			// re-sample to get less points!
-
-			if(idealPotential<=currentPotential)
-				idealPotential = currentPotential+1;
-
-	//		printf("PixelSelector: have %.2f%%, need %.2f%%. RESAMPLE with pot %d -> %d.\n",
-	//				100*numHave/(float)(wG[0]*hG[0]),
-	//				100*numWant/(float)(wG[0]*hG[0]),
-	//				currentPotential,
-	//				idealPotential);
-			currentPotential = idealPotential;
-			return makeMaps(fh,map_out, density, recursionsLeft-1, plot,thFactor);
-
-		}
 	}
 
+
+	// If there are still more points than needed, randomly thin out map_out.
 	int numHaveSub = numHave;
 	if(quotia < 0.95)
 	{
@@ -257,42 +219,43 @@ int PixelSelector::makeMaps(
 	currentPotential = idealPotential;
 
 
-	if(plot)
-	{
-		int w = wG[0];
-		int h = hG[0];
-
-
-		MinimalImageB3 img(w,h);
-
-		for(int i=0;i<w*h;i++)
-		{
-			float c = fh->dI[i][0]*0.7;
-			if(c>255) c=255;
-			img.at(i) = Vec3b(c,c,c);
-		}
-		IOWrap::displayImage("Selector Image", &img);
-
-		for(int y=0; y<h;y++)
-			for(int x=0;x<w;x++)
-			{
-				int i=x+y*w;
-				if(map_out[i] == 1)
-					img.setPixelCirc(x,y,Vec3b(0,255,0));
-				else if(map_out[i] == 2)
-					img.setPixelCirc(x,y,Vec3b(255,0,0));
-				else if(map_out[i] == 4)
-					img.setPixelCirc(x,y,Vec3b(0,0,255));
-			}
-		IOWrap::displayImage("Selector Pixels", &img);
-	}
+//	if(plot)
+//	{
+//		int w = wG[0];
+//		int h = hG[0];
+//
+//
+//		MinimalImageB3 img(w,h);
+//
+//		for(int i=0;i<w*h;i++)
+//		{
+//			float c = fh->dI[i][0]*0.7;
+//			if(c>255) c=255;
+//			img.at(i) = Vec3b(c,c,c);
+//		}
+//		IOWrap::displayImage("Selector Image", &img);
+//
+//		for(int y=0; y<h;y++)
+//			for(int x=0;x<w;x++)
+//			{
+//				int i=x+y*w;
+//				if(map_out[i] == 1)
+//					img.setPixelCirc(x,y,Vec3b(0,255,0));
+//				else if(map_out[i] == 2)
+//					img.setPixelCirc(x,y,Vec3b(128,0,0));
+//				else if(map_out[i] == 4)
+//					img.setPixelCirc(x,y,Vec3b(0,0,255));
+//			}
+//		IOWrap::displayImage("Selector Pixels", &img);
+//		IOWrap::waitKey(0);
+//	}
 
 	return numHaveSub;
 }
 
 
 
-Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
+template<class Image_Type> Eigen::Vector3i PixelSelector<Image_Type>::select(const Image_Type* const fh,
 		float* map_out, int pot, float thFactor)
 {
 
@@ -362,12 +325,11 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 				{
 					assert(x1+x234 < w);
 					assert(y1+y234 < h);
-					int idx = x1+x234 + w*(y1+y234);
 					int xf = x1+x234;
 					int yf = y1+y234;
-
 					if(xf<4 || xf>=w-5 || yf<4 || yf>h-4) continue;
 
+					int idx = xf + w*(yf);
 
 					float pixelTH0 = thsSmoothed[(xf>>5) + (yf>>5) * thsStep];
 					float pixelTH1 = pixelTH0*dw1;
@@ -436,7 +398,6 @@ Eigen::Vector3i PixelSelector::select(const FrameHessian* const fh,
 
 	return Eigen::Vector3i(n2,n3,n4);
 }
-
 
 }
 

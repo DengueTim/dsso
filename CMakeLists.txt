@@ -55,7 +55,8 @@ set(dso_SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/FullSystem/CoarseInitializer.cpp
   ${PROJECT_SOURCE_DIR}/src/FullSystem/ImmaturePoint.cpp
   ${PROJECT_SOURCE_DIR}/src/FullSystem/HessianBlocks.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/PixelSelector2.cpp
+ # ${PROJECT_SOURCE_DIR}/src/FullSystem/PixelSelector3.cpp
+  ${PROJECT_SOURCE_DIR}/src/FullSystem/TemplatedTypes.cpp
   ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/EnergyFunctional.cpp
   ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/AccumulatedTopHessian.cpp
   ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/AccumulatedSCHessian.cpp
@@ -103,7 +104,7 @@ else ()
 	message("    this means there will be no image display, and image read / load functionality.")
 	set(dso_opencv_SOURCE_FILES 
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageDisplay_dummy.cpp
-	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageRW_dummy.cpp)
+	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageRW_dummy.cpp src/FullSystem/TemplatedTypes.cpp)
 	set(HAS_OPENCV 0)
 endif ()
 

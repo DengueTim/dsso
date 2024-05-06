@@ -136,7 +136,7 @@ FullSystem::FullSystem()
 	coarseTracker = new CoarseTracker(wG[0], hG[0]);
 	coarseTracker_forNewKF = new CoarseTracker(wG[0], hG[0]);
 	coarseInitializer = new CoarseInitializer(wG[0], hG[0]);
-	pixelSelector = new PixelSelector(wG[0], hG[0]);
+	pixelSelector = new PixelSelector<FrameHessian>(wG[0], hG[0]);
 
 	statistics_lastNumOptIts=0;
 	statistics_numDroppedPoints=0;
@@ -1287,7 +1287,7 @@ void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
 {
 	pixelSelector->allowFast = true;
 	//int numPointsTotal = makePixelStatus(newFrame->dI, selectionMap, wG[0], hG[0], setting_desiredDensity);
-	int numPointsTotal = pixelSelector->makeMaps(newFrame, selectionMap,setting_desiredImmatureDensity);
+	int numPointsTotal = pixelSelector->makeMaps(newFrame, selectionMap,setting_desiredImmatureDensity,1, false);
 
 	newFrame->pointHessians.reserve(numPointsTotal*1.2f);
 	//fh->pointHessiansInactive.reserve(numPointsTotal*1.2f);
