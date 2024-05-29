@@ -39,7 +39,8 @@ namespace dso
 {
 struct CalibHessian;
 struct FrameHessian;
-struct PointBlock;
+template <typename Scalar> struct PointBlock;
+template <typename Scalar> struct StepState;
 
 struct Pnt
 {
@@ -128,14 +129,11 @@ private:
 	Vec10f* JbBuffer;			// 0-7: sum(dd * dp). 8: sum(res*dd). 9: 1/(1+sum(dd*dd))=inverse hessian entry.
 	Vec10f* JbBuffer_new;
 
-	PointBlock* pBlocks;
-	PointBlock* pBlocksNew;
+	PointBlock<double>* pBlocks;
+	PointBlock<double>* pBlocksNew;
 
 	Accumulator9 acc9;
 	Accumulator9 acc9SC;
-
-	Mat88f Hpp;
-	Vec8f bp;
 
 	float alphaK;
 	float alphaW;
@@ -144,10 +142,8 @@ private:
 
 	Vec3f calcResAndGS(
 			int lvl,
-			Mat88f &H_out, Vec8f &b_out,
-			Mat88f &H_out_sc, Vec8f &b_out_sc,
+			StepState<double> &ss,
 			const SE3 &refToNew, AffLight refToNew_aff,
-			float lambda,
 			bool plot);
 	Vec3f calcEC(int lvl); // returns OLD NERGY, NEW ENERGY, NUM TERMS.
 	void optReg(int lvl);

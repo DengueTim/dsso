@@ -3,7 +3,7 @@
 //
 
 #include "PixelSelector2.h"
-#include "PixelSelector3.cpp"
+#include "PixelSelector2.cpp"
 #include "HessianBlocks.h"
 
 namespace dso
