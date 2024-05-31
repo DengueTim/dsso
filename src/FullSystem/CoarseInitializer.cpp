@@ -139,10 +139,14 @@ struct PointBlock {
 			qTr = r;
 		} else {
 			HllSqrt = sqrt(Hll);
-			jl /= HllSqrt;
-			Eigen::HouseholderQR<Eigen::Matrix<Scalar,patternNum,1>> qr(jl);
+			Eigen::HouseholderQR<Eigen::Matrix<Scalar,patternNum,1>> qr(jl / HllSqrt);
 			Eigen::Matrix<Scalar,patternNum,patternNum> Q = qr.householderQ();
 			R0 = qr.matrixQR().template triangularView<Eigen::Upper>();
+			R0(0) *= HllSqrt;
+
+			assert(R0.tail(patternNum - 1).isZero());
+			assert ((R0(0) * R0(0)) - Hll < 0.000001);
+
 //			if (R0(0) < 0) {
 //				// Does the sign matter?
 //				R0(0) = -R0(0);
@@ -151,13 +155,7 @@ struct PointBlock {
 
 			const Eigen::Matrix<Scalar, patternNum, patternNum> qT = Q.transpose();
 			qTjp = qT * jp;
-			assert(jl.isApprox(Q * R0));
 			qTr = qT * r;
-
-
-			assert(R0.tail(patternNum - 1).isZero());
-			R0(0) *= HllSqrt;
-			assert ((R0(0) * R0(0)) - Hll < 0.000001);
 		}
 
 //		Eigen::Matrix<float,patternNum,10> lb;
@@ -188,10 +186,6 @@ struct PointBlock {
 		qTjpD.bottomRows(1).setZero();
 		R0D.topRows(patternNum) = R0;
 		R0D[patternNum] = sqrt(dampingAdd);
-		//R0D *= (1+lambda);
-//		if (HllSqrt != 0) {
-//			R0D[patternNum] /= HllSqrt;
-//		}
 
 		qTrD.topRows(patternNum) = qTr;
 		qTrD.bottomRows(1).setZero();
@@ -202,10 +196,6 @@ struct PointBlock {
 		qTjpD = qT * qTjpD;
 		R0D = qr.matrixQR().template triangularView<Eigen::Upper>();
 		qTrD = qT * qTrD;
-
-//		if (HllSqrt != 0) {
-//			R0D *= HllSqrt;
-//		}
 	}
 
 	void addPoseContribution(StepState<Scalar> &ss, float alphaW) {
@@ -217,7 +207,7 @@ struct PointBlock {
 		const Eigen::Matrix<Scalar, 8, 1> jpTq1D = qTjpD.template topRows<1>().transpose();
 
 		ss.QH += jpTq2D * q2TjpD;
-		ss.Qb += jpTq2D * q2TrD - jpTq1D * 1 / R0D[0] * alphaW;
+		ss.Qb += jpTq2D * q2TrD - (jpTq1D / R0D[0]) * alphaW;
 
 		ss.QHpp += (jp.transpose() * jp);
 		ss.Qbpp += (jp.transpose() * r);
@@ -239,8 +229,7 @@ struct PointBlock {
 
 		const Eigen::Matrix<float, 1, 8> q1TjpD = qTjpD.template topRows<1>().template cast<float>();
 		const Eigen::Matrix<float, 8, 1> jpTq1D = q1TjpD.transpose();
-		auto jlTrue = jl * HllSqrt;
-		const Eigen::Matrix<float, 8, 1> Hpl = (jp.transpose() * jlTrue).template cast<float>();
+		const Eigen::Matrix<float, 8, 1> Hpl = (jp.transpose() * jl).template cast<float>();
 		const Eigen::Matrix<float, 8, 1> HplHlli = Hpl * 1/(HllDampingAdd_ + Hll);
 
 		auto A = HplHlli * Hpl.transpose();
@@ -254,7 +243,7 @@ struct PointBlock {
 		}
 
 
-		auto C = HplHlli * (jlTrue.transpose() * r + alphaW);
+		auto C = HplHlli * (jl.transpose() * r + alphaW);
 		auto D = jpTq1D * qTrD(0); // Todo include alphaW here.
 		ss.Sbsc += C.template cast<double>();
 //		if (!C.isApprox(D)) {
@@ -266,23 +255,19 @@ struct PointBlock {
 	}
 
 	float getLandmarkIncFromPoseInc(Eigen::Matrix<float, 8, 1> poseInc) {
-//		if (Hll == 0) {
-//			return 0;
-//		}
 		float x = (qTjpD.topRows(1).template cast<float>() * poseInc)[0];
-//		return -jlScale/R0D[0] * (qTrD[0] + x);
 		x = -1/R0D[0] * (qTrD[0] + x);
 		if (Hll == 0) {
 			assert (x == 0);
 		}
+		x -= alphaW_ / (R0D[0] * R0D[0]);
 		return x;
 	}
 
 	float getScLandmarkIncFromPoseInc(Eigen::Matrix<float, 8, 1> poseInc) {
-		auto jlTrue = jl * HllSqrt;
-		const Eigen::Matrix<float, 8, 1> Hlp = (jp.transpose() * jlTrue).template cast<float>().transpose();
+		const Eigen::Matrix<float, 8, 1> Hlp = (jp.transpose() * jl).template cast<float>().transpose();
 
-		float b = (jlTrue.transpose() * r + alphaW_) + Hlp.dot(poseInc);
+		float b = (jl.transpose() * r + alphaW_) + Hlp.dot(poseInc);
 		float stepSc = - b * 1/(HllDampingAdd_ + Hll);
 
 		return stepSc;
@@ -852,6 +837,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 	float alphaEnergy = alphaW*(refToNew.translation().squaredNorm());
 	if(alphaEnergy > alphaK) {
 		alphaEnergy = alphaK;
+		//std::cerr << "alphaEnergy > alphaK\n";
 	}
 
 	acc9SC.initialize();
@@ -1256,16 +1242,17 @@ void CoarseInitializer::doStep(int lvl, float lambda, Vec8f inc)
 		float b = JbBuffer[i][8] + JbBuffer[i].head<8>().dot(inc);
 		float stepSc = - b * JbBuffer[i][9] / (1+lambda);
 		float stepSc2 = pBlocks[i].getScLandmarkIncFromPoseInc(inc) / (1+lambda);
-		float stepQr = pBlocks[i].getLandmarkIncFromPoseInc(inc);
+		float stepQr = pBlocks[i].getLandmarkIncFromPoseInc(inc) / (1+lambda);
 
 		assert (stepSc2 !=0 || stepSc == 0);
-		if (abs(stepSc - stepSc2) > 0.001) {
-		//if (stepSc == 0 && stepQr != 0) {
-			std::cerr << "Depth step SC=" << stepSc << " QR=" << stepSc2 << "\n";
+		float step = stepQr;
+
+		if (abs(stepSc - step) > 0.001) {
+			//if (stepSc == 0 && stepQr != 0) {
+			std::cerr << "Depth step SC=" << stepSc << " new=" << step << "\n";
 			abort();
 		}
 
-		float step = stepQr;
 
 		float maxstep = maxPixelStep*pts[i].maxstep;
 		if(maxstep > idMaxStep) maxstep=idMaxStep;
