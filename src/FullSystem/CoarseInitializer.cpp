@@ -124,10 +124,6 @@ struct PointBlock {
 		r[index] = res;
 	}
 
-	void computeDiagHppAndAddTo(Vec8f &diagHpp) {
-		diagHpp += jp.colwise().squaredNorm().template cast<float>();
-	}
-	
 	void qrMarginalise() {
 		assert(!jp.row(7).isZero());
 		Hll = jl.template cast<Scalar>().squaredNorm();
@@ -207,7 +203,7 @@ struct PointBlock {
 		const Eigen::Matrix<Scalar, 8, 1> jpTq1D = qTjpD.template topRows<1>().transpose();
 
 		ss.QH += jpTq2D * q2TjpD;
-		ss.Qb += jpTq2D * q2TrD - (jpTq1D / R0D[0]) * alphaW;
+		ss.Qb += jpTq2D * q2TrD - jpTq1D * (alphaW / R0D[0]);
 
 		ss.QHpp += (jp.transpose() * jp);
 		ss.Qbpp += (jp.transpose() * r);
@@ -841,8 +837,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 	}
 
 	acc9SC.initialize();
-	Vec8f diagHpp;
-	diagHpp.setZero();
 
 	for(int i=0;i<npts;i++)
 	{
@@ -865,7 +859,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 			HllDampingAdd += alphaW;
 		}
 
-		pBlocksNew[i].computeDiagHppAndAddTo(diagHpp);
 		pBlocksNew[i].qrMarginalise();
 		pBlocksNew[i].applyJlDamping(HllDampingAdd);
 		pBlocksNew[i].addPoseContribution(ss, alphaWPnt);
@@ -885,12 +878,6 @@ Vec3f CoarseInitializer::calcResAndGS(
 	ss.b = acc9.H.topRightCorner<8,1>();// / acc9.num;
 	ss.Hsc = acc9SC.H.topLeftCorner<8,8>();// / acc9.num;
 	ss.bsc = acc9SC.H.topRightCorner<8,1>();// / acc9.num;
-
-	if (!ss.H.diagonal().isApprox(diagHpp, 0.0001)) {
-		std::cerr << "!H_out.diagonal().isApprox(diagHpp)\n" << ss.H.diagonal().transpose().format(MatlabFmt) << "\n" << diagHpp.transpose().format(MatlabFmt) << "\n";
-		abort();
-	}
-
 
 	if (alphaEnergy != alphaK) {
 		ss.H(0, 0) += alphaW * npts;
