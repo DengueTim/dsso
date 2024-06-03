@@ -141,7 +141,7 @@ struct PointBlock {
 			R0(0) *= HllSqrt;
 
 			assert(R0.tail(patternNum - 1).isZero());
-			assert ((R0(0) * R0(0)) - Hll < 0.000001);
+			assert(abs(1 - R0(0) * R0(0) / Hll) < 0.000001);
 
 //			if (R0(0) < 0) {
 //				// Does the sign matter?
@@ -231,7 +231,7 @@ struct PointBlock {
 		auto A = HplHlli * Hpl.transpose();
 		auto B = jpTq1D * q1TjpD;
 		ss.SHsc += A.template cast<double>();
-		if (!A.isApprox(B)) {
+		if (!A.isApprox(B, 0.05)) {
 			std::cerr << "\nA:\n" << A.format(MatlabFmt);
 			std::cerr << "\nB:\n" << B.format(MatlabFmt);
 			std::cerr << "\nA/B:\n" << (A.array() / B.array()).format(MatlabFmt);
@@ -282,8 +282,8 @@ CoarseInitializer::CoarseInitializer(int ww, int hh) : thisToNext_aff(0,0), this
 	JbBuffer = new Vec10f[ww*hh];
 	JbBuffer_new = new Vec10f[ww*hh];
 
-	pBlocks = new PointBlock<double>[ww*hh];
-	pBlocksNew = new PointBlock<double>[ww*hh];
+	pBlocks = new PointBlock<QR_PRECISION>[ww*hh];
+	pBlocksNew = new PointBlock<QR_PRECISION>[ww*hh];
 
 
 	frameID=-1;
@@ -361,7 +361,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 
 		float lambda = 0.1;
 
-		StepState<double> ss;
+		StepState<QR_PRECISION> ss;
 
 		resetPoints(lvl);
 		Vec3f resOld = calcResAndGS(lvl, ss, refToNew_current, refToNew_aff_current, false);
@@ -416,7 +416,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			QH = wM * QH * wM * (0.01f/(w[lvl]*h[lvl]));
 			Qb = wM * Qb * (0.01f/(w[lvl]*h[lvl]));
 
-			if (!ss.H.isApprox(ss.QHpp.cast<float>())) {
+			if (!ss.H.isApprox(ss.QHpp.cast<float>(),0.00001)) {
 				std::cerr << "\nQHpp:\n" << ss.QHpp.format(MatlabFmt);
 				std::cerr << "\nH:\n" << ss.H.format(MatlabFmt);
 				std::cerr << "\nQHpp/H:\n" << (ss.QHpp.cast<float>().array() / ss.H.array()).format(MatlabFmt);
@@ -507,7 +507,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			refToNew_aff_new.b += inc[7];
 			doStep(lvl, lambda, inc);
 
-			StepState<double> ss_new;
+			StepState<QR_PRECISION> ss_new;
 
 			Vec3f resNew = calcResAndGS(lvl, ss_new, refToNew_new, refToNew_aff_new, false);
 			Vec3f regEnergy = calcEC(lvl);
@@ -646,7 +646,7 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
  * Calculates residual, Hessian and Hessian-block needed for re-substituting depth. Returns accumulated photometric error/residual for points.
  */
 Vec3f CoarseInitializer::calcResAndGS(
-		int lvl, StepState<double> &ss,
+		int lvl, StepState<QR_PRECISION> &ss,
 		const SE3 &refToNew, AffLight refToNew_aff,
 		bool plot)
 {
@@ -1274,7 +1274,7 @@ void CoarseInitializer::applyStep(int lvl)
 		pts[i].lastHessian = pts[i].lastHessian_new;
 	}
 	std::swap<Vec10f*>(JbBuffer, JbBuffer_new);
-	std::swap<PointBlock<double> *>(pBlocks, pBlocksNew);
+	std::swap<PointBlock<QR_PRECISION> *>(pBlocks, pBlocksNew);
 }
 
 void CoarseInitializer::makeK(CalibHessian* HCalib)

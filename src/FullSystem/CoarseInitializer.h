@@ -32,7 +32,7 @@
 #include <math.h>
 
 
-
+#define QR_PRECISION float
 
 
 namespace dso
@@ -129,8 +129,8 @@ private:
 	Vec10f* JbBuffer;			// 0-7: sum(dd * dp). 8: sum(res*dd). 9: 1/(1+sum(dd*dd))=inverse hessian entry.
 	Vec10f* JbBuffer_new;
 
-	PointBlock<double>* pBlocks;
-	PointBlock<double>* pBlocksNew;
+	PointBlock<QR_PRECISION>* pBlocks;
+	PointBlock<QR_PRECISION>* pBlocksNew;
 
 	Accumulator9 acc9;
 	Accumulator9 acc9SC;
@@ -142,7 +142,7 @@ private:
 
 	Vec3f calcResAndGS(
 			int lvl,
-			StepState<double> &ss,
+			StepState<QR_PRECISION> &ss,
 			const SE3 &refToNew, AffLight refToNew_aff,
 			bool plot);
 	Vec3f calcEC(int lvl); // returns OLD NERGY, NEW ENERGY, NUM TERMS.
