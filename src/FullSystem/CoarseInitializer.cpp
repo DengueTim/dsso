@@ -84,22 +84,17 @@ struct StepState {
 
 template <typename Scalar>
 struct PointBlock {
-	Eigen::Matrix<Scalar,patternNum,8> jp;
-	Eigen::Matrix<Scalar,patternNum,1> jl;
-	Eigen::Matrix<Scalar,patternNum,1> r;
+	Eigen::Matrix<Scalar,patternNum+1,8> jp;
+	Eigen::Matrix<Scalar,patternNum+1,1> jl;
+	Eigen::Matrix<Scalar,patternNum+1,1> r;
 
 	Scalar Hll;
-	Scalar HllSqrt;
 
-	Eigen::Matrix<Scalar,patternNum,8> qTjp;
-	Eigen::Matrix<Scalar,patternNum,1> R0;
-	Eigen::Matrix<Scalar,patternNum,1> qTr;
+	Eigen::Matrix<Scalar,patternNum+1,8> qTjp;
+	Eigen::Matrix<Scalar,patternNum+1,1> R0;
+	Eigen::Matrix<Scalar,patternNum+1,1> qTr;
 
-	Eigen::Matrix<Scalar,patternNum+1,8> qTjpD;
-	Eigen::Matrix<Scalar,patternNum+1,1> R0D;
-	Eigen::Matrix<Scalar,patternNum+1,1> qTrD;
-
-	float HllDampingAdd_, alphaW_;
+	float HllDamping_, alphaW_;
 
 	PointBlock() {
 		reset();
@@ -112,9 +107,6 @@ struct PointBlock {
 		qTjp.setZero();
 		R0.setZero();
 		qTr.setZero();
-		qTjpD.setZero();
-		R0D.setZero();
-		qTrD.setZero();
 	}
 
 	void addResidual(int index, float dTx, float dTy, float dTz, float dRa, float dRb, float dRc, float dAa, float dAb, float dD, float res) {
@@ -124,86 +116,71 @@ struct PointBlock {
 		r[index] = res;
 	}
 
-	void qrMarginalise() {
+	void qrMarginalise(float HllDamping) {
 		assert(!jp.row(7).isZero());
-		Hll = jl.template cast<Scalar>().squaredNorm();
-		if (Hll == 0) {
-			// No information from point depth. Q == I
-			HllSqrt = 0;
-			qTjp = jp;
-			R0 = jl;
-			qTr = r;
-		} else {
-			HllSqrt = sqrt(Hll);
-			Eigen::HouseholderQR<Eigen::Matrix<Scalar,patternNum,1>> qr(jl / HllSqrt);
-			Eigen::Matrix<Scalar,patternNum,patternNum> Q = qr.householderQ();
-			R0 = qr.matrixQR().template triangularView<Eigen::Upper>();
-			R0(0) *= HllSqrt;
+		assert(HllDamping != 0);
+		HllDamping_ = HllDamping;
 
-			assert(R0.tail(patternNum - 1).isZero());
-			assert(abs(1 - R0(0) * R0(0) / Hll) < 0.000001);
+		// Precision! This is big compared to the derivatives.
+//		Scalar a = sqrt(jl.squaredNorm());
+//		Scalar b = sqrt(HllDamping);
+//		if (a/b < 0.01 || b/a < 0.01) {
+//			std::cerr << "precision:" << a << "/" << b << "\n";
+//		}
 
-//			if (R0(0) < 0) {
-//				// Does the sign matter?
-//				R0(0) = -R0(0);
-//				Q = -Q;
-//			}
+		jl[8] = sqrt(HllDamping);
+		Hll = jl.squaredNorm();
+		Scalar normaliser = sqrt(Hll);
 
-			const Eigen::Matrix<Scalar, patternNum, patternNum> qT = Q.transpose();
-			qTjp = qT * jp;
-			qTr = qT * r;
+		R0 = jl;
+		qTjp = jp;
+		qTr = r;
+		Eigen::Matrix<Scalar,patternNum+1,patternNum+1> Qgr;
+		Qgr.setIdentity();
+		Eigen::JacobiRotation<Scalar> gr;
+		for (int i = patternNum; i > 0; i--) {
+			gr.makeGivens(R0(i-1), R0(i));
+			R0.applyOnTheLeft(i, i-1, gr);
+			qTjp.applyOnTheLeft(i, i-1, gr);
+			qTr.applyOnTheLeft(i, i-1, gr);
 		}
 
-//		Eigen::Matrix<float,patternNum,10> lb;
-//		lb.leftCols<8>() = jp;
-//		lb.col(8) = jl;
-//		lb.col(9) = r;
-//		std::cerr << "\nlb=\n" << lb.format(MatlabFmt) << "\n";
+//		Eigen::HouseholderQR<Eigen::Matrix<Scalar,patternNum+1,1>> qr(jl / normaliser);
+//		Eigen::Matrix<Scalar,patternNum+1,patternNum+1> Q = qr.householderQ();
+//		R0 = qr.matrixQR().template cast<Scalar>().template triangularView<Eigen::Upper>();
+//		R0(0) *= normaliser;
+//
+//		const Eigen::Matrix<Scalar, patternNum+1, patternNum+1> qT = Q.template cast<Scalar>().transpose();
+//		qTjp = qT * jp;
+//		qTr = qT * r;
 
 //		std::cerr << "Q=" << Q.format(MatlabFmt) << "\n";
-//		std::cerr << "qT=" << qT.format(MatlabFmt) << "\n";
-//		std::cerr << "R0=" << R0.format(MatlabFmt) << "\n";
-//		std::cerr << "jp=" << jp.format(MatlabFmt) << "\n";
+//		std::cerr << "Qgr=" << Qgr.format(MatlabFmt) << "\n";
 //		std::cerr << "jl=" << jl.format(MatlabFmt) << "\n";
-//		std::cerr << "qTjp=" << qTjp.format(MatlabFmt) << "\n";
+//		std::cerr << "R0=" << R0 << "\n";
+//		std::cerr << "normaliser=" << normaliser << "\n";
 //
-//		Eigen::Matrix<float,patternNum,10> lbQr;
-//		lbQr.leftCols<8>() = qTjp;
-//		lbQr.col(8) = R0;
-//		lbQr.col(9) = qTr;
-//		std::cerr << "\nlbQr:\n" << lbQr.format(MatlabFmt) << "\n";
-
-	}
-
-	void applyJlDamping(float dampingAdd) {
-		HllDampingAdd_ = dampingAdd;
-
-		qTjpD.topRows(patternNum) = qTjp;
-		qTjpD.bottomRows(1).setZero();
-		R0D.topRows(patternNum) = R0;
-		R0D[patternNum] = sqrt(dampingAdd);
-
-		qTrD.topRows(patternNum) = qTr;
-		qTrD.bottomRows(1).setZero();
-
-		Eigen::HouseholderQR<Eigen::Matrix<Scalar,patternNum+1,1>> qr(R0D);
-		Eigen::Matrix<Scalar,patternNum+1,patternNum+1> Q = qr.householderQ();
-		const Eigen::Matrix<Scalar, patternNum+1, patternNum+1> &qT = Q.transpose();
-		qTjpD = qT * qTjpD;
-		R0D = qr.matrixQR().template triangularView<Eigen::Upper>();
-		qTrD = qT * qTrD;
+//		assert(R0.tail(patternNum).isZero());
+		//Scalar expected = sqrt(HllDamping + Hll);
+		Scalar expected = sqrt(Hll);
+		if (!(abs(1 - abs(R0(0)) / expected) < 0.0001)) {
+			std::cerr << "abs R0:" << abs(R0(0)) << " expected:" << expected << "\n";
+			std::cerr << "jl:" << jl.format(MatlabFmt) << "\n";
+			std::cerr << "normaliser:" << normaliser << "\n";
+		}
+		assert(abs(1 - abs(R0(0)) / expected) < 0.0001);
 	}
 
 	void addPoseContribution(StepState<Scalar> &ss, float alphaW) {
-		const Eigen::Matrix<Scalar, 8, 8> q2TjpD = qTjpD.template bottomRows<8>();
-		const Eigen::Matrix<Scalar, 8, 8> jpTq2D = q2TjpD.transpose();
+		const Eigen::Matrix<Scalar, 8, 8> q2Tjp = qTjp.template bottomRows<8>();
+		const Eigen::Matrix<Scalar, 8, 8> jpTq2 = q2Tjp.transpose();
 
-		const Eigen::Matrix<Scalar, 8, 1> q2TrD = qTrD.template bottomRows<8>();
+		const Eigen::Matrix<Scalar, 8, 1> q2Tr = qTr.template bottomRows<8>();
 
-		const Eigen::Matrix<Scalar, 8, 1> jpTq1D = qTjpD.template topRows<1>().transpose();
+		const Eigen::Matrix<Scalar, 8, 1> jpTq1 = qTjp.template topRows<1>().transpose();
 
-		ss.QH += jpTq2D * q2TjpD;
-		ss.Qb += jpTq2D * q2TrD - jpTq1D * (alphaW / R0D[0]);
+		ss.QH += jpTq2 * q2Tjp;
+		ss.Qb += jpTq2 * q2Tr - jpTq1 * (alphaW / R0[0]);
 
 		ss.QHpp += (jp.transpose() * jp);
 		ss.Qbpp += (jp.transpose() * r);
@@ -223,24 +200,32 @@ struct PointBlock {
 		ss.SHpp += (jp.transpose() * jp).template cast<double>();
 		ss.Sbp += (jp.transpose() * r).template cast<double>();
 
-		const Eigen::Matrix<float, 1, 8> q1TjpD = qTjpD.template topRows<1>().template cast<float>();
-		const Eigen::Matrix<float, 8, 1> jpTq1D = q1TjpD.transpose();
-		const Eigen::Matrix<float, 8, 1> Hpl = (jp.transpose() * jl).template cast<float>();
-		const Eigen::Matrix<float, 8, 1> HplHlli = Hpl * 1/(HllDampingAdd_ + Hll);
+//		if (!(abs(Hll - (HllDamping_ + jl.topRows(8).squaredNorm())) < 0.005)) {
+//			std::cerr << "Hll:" << Hll << "\n";
+//			std::cerr << "xxx:" << (HllDamping_ + jl.topRows(8).squaredNorm()) << "\n";
+//			std::cerr << "d:" << (Hll - (HllDamping_ + jl.topRows(8).squaredNorm())) << "\n";
+//		}
+//		const Eigen::Matrix<double, 1, 8> q1Tjp = qTjp.template topRows<1>().template cast<double>();
+//		const Eigen::Matrix<double, 8, 1> jpTq1 = q1Tjp.transpose();
+		const Eigen::Matrix<double, 8, 1> Hpl = jp.template topRows<8>().transpose().template cast<double>() * jl.template topRows<8>().template cast<double>();
+		const Eigen::Matrix<double, 8, 1> HplHlli = Hpl * 1/(Hll);
 
 		auto A = HplHlli * Hpl.transpose();
-		auto B = jpTq1D * q1TjpD;
-		ss.SHsc += A.template cast<double>();
-		if (!A.isApprox(B, 0.05)) {
-			std::cerr << "\nA:\n" << A.format(MatlabFmt);
-			std::cerr << "\nB:\n" << B.format(MatlabFmt);
-			std::cerr << "\nA/B:\n" << (A.array() / B.array()).format(MatlabFmt);
-			abort();
-		}
+//		auto B = jpTq1 * q1Tjp;
+		ss.SHsc += A.cast<double>();
+//		if (!A.isApprox(B, 0.0001)) {
+//			std::cerr << "\nA:\n" << A.format(MatlabFmt);
+//			std::cerr << "\nB:\n" << B.format(MatlabFmt);
+//			std::cerr << "\nA/B:\n" << (A.array() / B.array()).format(MatlabFmt);
+//			std::cerr << "Hll:" << Hll << "\n";
+//			std::cerr << "jl:" << jl.format(MatlabFmt) << "\n";
+//
+//			abort();
+//		}
 
 
 		auto C = HplHlli * (jl.transpose() * r + alphaW);
-		auto D = jpTq1D * qTrD(0); // Todo include alphaW here.
+//		auto D = jpTq1 * qTr(0); // Todo include alphaW here.
 		ss.Sbsc += C.template cast<double>();
 //		if (!C.isApprox(D)) {
 //			std::cerr << "\nC:\n" << C.format(MatlabFmt);
@@ -251,20 +236,20 @@ struct PointBlock {
 	}
 
 	float getLandmarkIncFromPoseInc(Eigen::Matrix<float, 8, 1> poseInc) {
-		float x = (qTjpD.topRows(1).template cast<float>() * poseInc)[0];
-		x = -1/R0D[0] * (qTrD[0] + x);
+		Scalar x = (qTjp.topRows(1) * poseInc.template cast<QR_PRECISION>())[0];
+		x = -1/R0[0] * (qTr[0] + x);
 		if (Hll == 0) {
 			assert (x == 0);
 		}
-		x -= alphaW_ / (R0D[0] * R0D[0]);
-		return x;
+		x -= alphaW_ / (R0[0] * R0[0]);
+		return float(x);
 	}
 
 	float getScLandmarkIncFromPoseInc(Eigen::Matrix<float, 8, 1> poseInc) {
-		const Eigen::Matrix<float, 8, 1> Hlp = (jp.transpose() * jl).template cast<float>().transpose();
+		const Eigen::Matrix<float, 8, 1> Hlp = (jp.template cast<double>().transpose() * jl.template cast<double>()).transpose().template cast<float>();
 
 		float b = (jl.transpose() * r + alphaW_) + Hlp.dot(poseInc);
-		float stepSc = - b * 1/(HllDampingAdd_ + Hll);
+		float stepSc = - b * 1/Hll;
 
 		return stepSc;
 	}
@@ -389,17 +374,17 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 		while(true)
 		{
 			std::cerr << "\nlambda:" << lambda << "\n";
-			Mat88f H = ss.H;
-			Mat88f H2 = ss.SHpp.cast<float>();
+			//Mat88f H = ss.H;
+			//Mat88f H2 = ss.SHpp.cast<float>();
 			Mat88f QH = ss.QH.cast<float>();
 			// Pose damping, add diag(Hpp) * lambda to Hpp
-			for(int i=0;i<8;i++) H(i,i) *= (1+lambda);
-			for(int i=0;i<8;i++) H2(i,i) *= (1+lambda);
+			//for(int i=0;i<8;i++) H(i,i) *= (1+lambda);
+			//for(int i=0;i<8;i++) H2(i,i) *= (1+lambda);
 			for(int i=0;i<8;i++) QH(i,i) += ss.QHpp(i,i) * lambda;
 			// point damping.
 
-			H -= ss.Hsc*(1/(1+lambda));
-			H2 -= ss.SHsc.cast<float>()*(1/(1+lambda));
+			//H -= ss.Hsc*(1/(1+lambda));
+			//H2 -= ss.SHsc.cast<float>()*(1/(1+lambda));
 			Mat88f QHsc = (ss.QHpp - ss.QH).cast<float>();
 			QH += QHsc*(lambda/(1+lambda));
 			Vec8f b = ss.b - ss.bsc*(1/(1+lambda));
@@ -407,11 +392,11 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			Vec8f Qbsc = (ss.Qbpp - ss.Qb).cast<float>();
 			Vec8f Qb = ss.Qb.cast<float>() + Qbsc*(lambda/(1+lambda));
 
-			H = wM * H * wM * (0.01f/(w[lvl]*h[lvl]));
-			b = wM * b * (0.01f/(w[lvl]*h[lvl]));
+			//H = wM * H * wM * (0.01f/(w[lvl]*h[lvl]));
+			//b = wM * b * (0.01f/(w[lvl]*h[lvl]));
 
-			H2 = wM * H2 * wM * (0.01f/(w[lvl]*h[lvl]));
-			b2 = wM * b2 * (0.01f/(w[lvl]*h[lvl]));
+			//H2 = wM * H2 * wM * (0.01f/(w[lvl]*h[lvl]));
+			//b2 = wM * b2 * (0.01f/(w[lvl]*h[lvl]));
 
 			QH = wM * QH * wM * (0.01f/(w[lvl]*h[lvl]));
 			Qb = wM * Qb * (0.01f/(w[lvl]*h[lvl]));
@@ -433,60 +418,60 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 //				abort();
 //			}
 
-			Vec8f incSc;
-			Vec8f incSc2;
+//			Vec8f incSc;
+//			Vec8f incSc2;
 			Vec8f incQr;
 			if(fixAffine)
 			{
-				if (!H.isApprox(H2)) {
-					std::cerr << "\nH2:\n" << H2.format(MatlabFmt);
-					std::cerr << "\nH:\n" << H.format(MatlabFmt);
-					std::cerr << "\nH2/H:\n" << (H2.array() / H.array()).format(MatlabFmt);
-				}
-				if (!b.isApprox(b2)) {
-					std::cerr << "\nb2:\n" << b2.format(MatlabFmt);
-					std::cerr << "\nb:\n" << b.format(MatlabFmt);
-					std::cerr << "\nb2/b:\n" << (b2.array() / b.array()).format(MatlabFmt);
-				}
-
-				if (!H.isApprox(QH)) {
-					std::cerr << "\nQH:\n" << QH.format(MatlabFmt);
-					std::cerr << "\nH:\n" << H.format(MatlabFmt);
-					std::cerr << "\nQH/H:\n" << (QH.array() / H.array()).format(MatlabFmt);
-				}
-
-				if (!b.isApprox(Qb)) {
-					std::cerr << "\nQb:\n" << Qb.format(MatlabFmt);
-					std::cerr << "\nb:\n" << b.format(MatlabFmt);
-					std::cerr << "\nQb/b:\n" << (Qb.array() / b.array()).format(MatlabFmt);
-				}
-
-				if (!ss.b.isApprox(ss.Sbp.cast<float>())) {
-					std::cerr << "\nSbp, SC:\n" << ss.Sbp.format(MatlabFmt);
-					std::cerr << "\nb, SC:\n" << ss.b.format(MatlabFmt);
-					std::cerr << "\nb Sbp/b:\n" << (ss.Sbp.cast<float>().array() / ss.b.array()).format(MatlabFmt);
-				}
-
-				if (!ss.bsc.isApprox(ss.Sbsc.cast<float>())) {
-					std::cerr << "\nSbl, SC:\n" << ss.Sbsc.format(MatlabFmt);
-					std::cerr << "\nbsc, SC:\n" << ss.bsc.format(MatlabFmt);
-					std::cerr << "\nb Sbl/bsc:\n" << (ss.Sbsc.cast<float>().array() / ss.bsc.array()).format(MatlabFmt);
-				}
-
-				incSc.head<6>() = - (wM.toDenseMatrix().topLeftCorner<6,6>() * (H.topLeftCorner<6,6>().ldlt().solve(b.head<6>())));
-				incSc.tail<2>().setZero();
-
-				incSc2.head<6>() = - (wM.toDenseMatrix().topLeftCorner<6,6>() * (H2.topLeftCorner<6,6>().ldlt().solve(b2.head<6>())));
-				incSc2.tail<2>().setZero();
+//				if (!H.isApprox(H2)) {
+//					std::cerr << "\nH2:\n" << H2.format(MatlabFmt);
+//					std::cerr << "\nH:\n" << H.format(MatlabFmt);
+//					std::cerr << "\nH2/H:\n" << (H2.array() / H.array()).format(MatlabFmt);
+//				}
+//				if (!b.isApprox(b2)) {
+//					std::cerr << "\nb2:\n" << b2.format(MatlabFmt);
+//					std::cerr << "\nb:\n" << b.format(MatlabFmt);
+//					std::cerr << "\nb2/b:\n" << (b2.array() / b.array()).format(MatlabFmt);
+//				}
+//
+//				if (!H.isApprox(QH)) {
+//					std::cerr << "\nQH:\n" << QH.format(MatlabFmt);
+//					std::cerr << "\nH:\n" << H.format(MatlabFmt);
+//					std::cerr << "\nQH/H:\n" << (QH.array() / H.array()).format(MatlabFmt);
+//				}
+//
+//				if (!b.isApprox(Qb)) {
+//					std::cerr << "\nQb:\n" << Qb.format(MatlabFmt);
+//					std::cerr << "\nb:\n" << b.format(MatlabFmt);
+//					std::cerr << "\nQb/b:\n" << (Qb.array() / b.array()).format(MatlabFmt);
+//				}
+//
+//				if (!ss.b.isApprox(ss.Sbp.cast<float>())) {
+//					std::cerr << "\nSbp, SC:\n" << ss.Sbp.format(MatlabFmt);
+//					std::cerr << "\nb, SC:\n" << ss.b.format(MatlabFmt);
+//					std::cerr << "\nb Sbp/b:\n" << (ss.Sbp.cast<float>().array() / ss.b.array()).format(MatlabFmt);
+//				}
+//
+//				if (!ss.bsc.isApprox(ss.Sbsc.cast<float>())) {
+//					std::cerr << "\nSbl, SC:\n" << ss.Sbsc.format(MatlabFmt);
+//					std::cerr << "\nbsc, SC:\n" << ss.bsc.format(MatlabFmt);
+//					std::cerr << "\nb Sbl/bsc:\n" << (ss.Sbsc.cast<float>().array() / ss.bsc.array()).format(MatlabFmt);
+//				}
+//
+//				incSc.head<6>() = - (wM.toDenseMatrix().topLeftCorner<6,6>() * (H.topLeftCorner<6,6>().ldlt().solve(b.head<6>())));
+//				incSc.tail<2>().setZero();
+//
+//				incSc2.head<6>() = - (wM.toDenseMatrix().topLeftCorner<6,6>() * (H2.topLeftCorner<6,6>().ldlt().solve(b2.head<6>())));
+//				incSc2.tail<2>().setZero();
 
 				incQr.head<6>() = - (wM.toDenseMatrix().topLeftCorner<6,6>() * (QH.topLeftCorner<6,6>().ldlt().solve(Qb.head<6>())));
 				incQr.tail<2>().setZero();
 
-				if (!incSc2.isApprox(incSc, 0.0001)) {
-					std::cerr << "\nincSc2:\n" << incSc2.format(MatlabFmt);
-					std::cerr << "\nincSc:\n" << incSc.format(MatlabFmt);
-					std::cerr << "\ninc SC2/SC:\n" << (incSc2.array() / incSc.array()).format(MatlabFmt);
-				}
+//				if (!incSc2.isApprox(incSc, 0.0001)) {
+//					std::cerr << "\nincSc2:\n" << incSc2.format(MatlabFmt);
+//					std::cerr << "\nincSc:\n" << incSc.format(MatlabFmt);
+//					std::cerr << "\ninc SC2/SC:\n" << (incSc2.array() / incSc.array()).format(MatlabFmt);
+//				}
 //				if (!incQr.isApprox(incSc, 0.0001)) {
 //					std::cerr << "\nincQr:\n" << incQr.format(MatlabFmt);
 //					std::cerr << "\nincSc:\n" << incSc.format(MatlabFmt);
@@ -496,7 +481,8 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 //					abort();
 //				}
 			} else {
-				incSc = - (wM * (H.ldlt().solve(b)));	//=-H^-1 * b.
+				//incSc = - (wM * (H.ldlt().solve(b)));	//=-H^-1 * b.
+				incQr = - (wM * (QH.ldlt().solve(Qb)));	//=-H^-1 * b.
 			}
 
 			Vec8f inc(incQr);
@@ -859,10 +845,9 @@ Vec3f CoarseInitializer::calcResAndGS(
 			HllDampingAdd += alphaW;
 		}
 
-		pBlocksNew[i].qrMarginalise();
-		pBlocksNew[i].applyJlDamping(HllDampingAdd);
+		pBlocksNew[i].qrMarginalise(HllDampingAdd);
 		pBlocksNew[i].addPoseContribution(ss, alphaWPnt);
-		pBlocksNew[i].addPoseScContribution(ss, alphaWPnt);
+		//pBlocksNew[i].addPoseScContribution(ss, alphaWPnt);
 
 		JbBuffer_new[i][8] += alphaWPnt;
 		JbBuffer_new[i][9] = 1/(HllDampingAdd + JbBuffer_new[i][9]);
@@ -1226,19 +1211,19 @@ void CoarseInitializer::doStep(int lvl, float lambda, Vec8f inc)
 		if(!pts[i].isGood) continue;
 
 
-		float b = JbBuffer[i][8] + JbBuffer[i].head<8>().dot(inc);
-		float stepSc = - b * JbBuffer[i][9] / (1+lambda);
-		float stepSc2 = pBlocks[i].getScLandmarkIncFromPoseInc(inc) / (1+lambda);
+//		float b = JbBuffer[i][8] + JbBuffer[i].head<8>().dot(inc);
+//		float stepSc = - b * JbBuffer[i][9] / (1+lambda);
+//		float stepSc2 = pBlocks[i].getScLandmarkIncFromPoseInc(inc) / (1+lambda);
 		float stepQr = pBlocks[i].getLandmarkIncFromPoseInc(inc) / (1+lambda);
 
-		assert (stepSc2 !=0 || stepSc == 0);
+//		assert (stepSc2 !=0 || stepSc == 0);
 		float step = stepQr;
 
-		if (abs(stepSc - step) > 0.001) {
-			//if (stepSc == 0 && stepQr != 0) {
-			std::cerr << "Depth step SC=" << stepSc << " new=" << step << "\n";
-			abort();
-		}
+//		if (abs(stepSc - step) > 0.001) {
+//			//if (stepSc == 0 && stepQr != 0) {
+//			std::cerr << "Depth step SC=" << stepSc << " new=" << step << "\n";
+//			abort();
+//		}
 
 
 		float maxstep = maxPixelStep*pts[i].maxstep;

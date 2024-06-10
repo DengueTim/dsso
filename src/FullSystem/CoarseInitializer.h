@@ -34,7 +34,6 @@
 
 #define QR_PRECISION float
 
-
 namespace dso
 {
 struct CalibHessian;
