@@ -264,8 +264,8 @@ CoarseInitializer::CoarseInitializer(int ww, int hh) : thisToNext_aff(0,0), this
 		numPoints[lvl] = 0;
 	}
 
-	JbBuffer = new Vec10f[ww*hh];
-	JbBuffer_new = new Vec10f[ww*hh];
+//	JbBuffer = new Vec10f[ww*hh];
+//	JbBuffer_new = new Vec10f[ww*hh];
 
 	pBlocks = new PointBlock<QR_PRECISION>[ww*hh];
 	pBlocksNew = new PointBlock<QR_PRECISION>[ww*hh];
@@ -289,8 +289,8 @@ CoarseInitializer::~CoarseInitializer()
 
 	delete[] pBlocks;
 	delete[] pBlocksNew;
-	delete[] JbBuffer;
-	delete[] JbBuffer_new;
+//	delete[] JbBuffer;
+//	delete[] JbBuffer_new;
 }
 
 
@@ -401,12 +401,12 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			QH = wM * QH * wM * (0.01f/(w[lvl]*h[lvl]));
 			Qb = wM * Qb * (0.01f/(w[lvl]*h[lvl]));
 
-			if (!ss.H.isApprox(ss.QHpp.cast<float>(),0.00001)) {
-				std::cerr << "\nQHpp:\n" << ss.QHpp.format(MatlabFmt);
-				std::cerr << "\nH:\n" << ss.H.format(MatlabFmt);
-				std::cerr << "\nQHpp/H:\n" << (ss.QHpp.cast<float>().array() / ss.H.array()).format(MatlabFmt);
-				abort();
-			}
+//			if (!ss.H.isApprox(ss.QHpp.cast<float>(),0.00001)) {
+//				std::cerr << "\nQHpp:\n" << ss.QHpp.format(MatlabFmt);
+//				std::cerr << "\nH:\n" << ss.H.format(MatlabFmt);
+//				std::cerr << "\nQHpp/H:\n" << (ss.QHpp.cast<float>().array() / ss.H.array()).format(MatlabFmt);
+//				abort();
+//			}
 
 
 //			if (!ss.Hsc.isApprox(QHsc, 0.0001)) {
@@ -651,7 +651,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 
 	Accumulator11 E;
-	acc9.initialize();
+	//acc9.initialize();
 	E.initialize();
 
 	ss.reset();
@@ -683,7 +683,7 @@ Vec3f CoarseInitializer::calcResAndGS(
         VecNRf dp7;
         VecNRf dd;
         VecNRf r;
-		JbBuffer_new[i].setZero();
+//		JbBuffer_new[i].setZero();
 		pBlocksNew[i].reset();
 
 		// sum over all residuals.
@@ -746,16 +746,16 @@ Vec3f CoarseInitializer::calcResAndGS(
 			if(maxstep < point->maxstep) point->maxstep = maxstep;
 
 			// immediately compute dp*dd' and dd*dd' in JbBuffer1.
-			JbBuffer_new[i][0] += dp0[idx]*dd[idx];
-			JbBuffer_new[i][1] += dp1[idx]*dd[idx];
-			JbBuffer_new[i][2] += dp2[idx]*dd[idx];
-			JbBuffer_new[i][3] += dp3[idx]*dd[idx];
-			JbBuffer_new[i][4] += dp4[idx]*dd[idx];
-			JbBuffer_new[i][5] += dp5[idx]*dd[idx];
-			JbBuffer_new[i][6] += dp6[idx]*dd[idx];
-			JbBuffer_new[i][7] += dp7[idx]*dd[idx];
-			JbBuffer_new[i][8] += r[idx]*dd[idx];
-			JbBuffer_new[i][9] += dd[idx]*dd[idx];
+//			JbBuffer_new[i][0] += dp0[idx]*dd[idx];
+//			JbBuffer_new[i][1] += dp1[idx]*dd[idx];
+//			JbBuffer_new[i][2] += dp2[idx]*dd[idx];
+//			JbBuffer_new[i][3] += dp3[idx]*dd[idx];
+//			JbBuffer_new[i][4] += dp4[idx]*dd[idx];
+//			JbBuffer_new[i][5] += dp5[idx]*dd[idx];
+//			JbBuffer_new[i][6] += dp6[idx]*dd[idx];
+//			JbBuffer_new[i][7] += dp7[idx]*dd[idx];
+//			JbBuffer_new[i][8] += r[idx]*dd[idx];
+//			JbBuffer_new[i][9] += dd[idx]*dd[idx];
 		}
 
 		if(!isGood || energy > point->outlierTH*20)
@@ -772,33 +772,33 @@ Vec3f CoarseInitializer::calcResAndGS(
 		point->isGood_new = true;
 		point->energy_new[0] = energy;
 
-		// update Hessian matrix.
-		for(int idx=0;idx+3<patternNum;idx+=4) {
-			acc9.updateSSE(
-				_mm_load_ps(((float *)(&dp0)) + idx),
-				_mm_load_ps(((float *)(&dp1)) + idx),
-				_mm_load_ps(((float *)(&dp2)) + idx),
-				_mm_load_ps(((float *)(&dp3)) + idx),
-				_mm_load_ps(((float *)(&dp4)) + idx),
-				_mm_load_ps(((float *)(&dp5)) + idx),
-				_mm_load_ps(((float *)(&dp6)) + idx),
-				_mm_load_ps(((float *)(&dp7)) + idx),
-				_mm_load_ps(((float *)(&r)) + idx));
-		}
-
-
-		for(int idx=((patternNum>>2)<<2); idx < patternNum; idx++)
-			acc9.updateSingle(
-					(float)dp0[idx],(float)dp1[idx],(float)dp2[idx],(float)dp3[idx],
-					(float)dp4[idx],(float)dp5[idx],(float)dp6[idx],(float)dp7[idx],
-					(float)r[idx]);
+//		// update Hessian matrix.
+//		for(int idx=0;idx+3<patternNum;idx+=4) {
+//			acc9.updateSSE(
+//				_mm_load_ps(((float *)(&dp0)) + idx),
+//				_mm_load_ps(((float *)(&dp1)) + idx),
+//				_mm_load_ps(((float *)(&dp2)) + idx),
+//				_mm_load_ps(((float *)(&dp3)) + idx),
+//				_mm_load_ps(((float *)(&dp4)) + idx),
+//				_mm_load_ps(((float *)(&dp5)) + idx),
+//				_mm_load_ps(((float *)(&dp6)) + idx),
+//				_mm_load_ps(((float *)(&dp7)) + idx),
+//				_mm_load_ps(((float *)(&r)) + idx));
+//		}
+//
+//
+//		for(int idx=((patternNum>>2)<<2); idx < patternNum; idx++)
+//			acc9.updateSingle(
+//					(float)dp0[idx],(float)dp1[idx],(float)dp2[idx],(float)dp3[idx],
+//					(float)dp4[idx],(float)dp5[idx],(float)dp6[idx],(float)dp7[idx],
+//					(float)r[idx]);
 
 		for(int idx=0; idx<patternNum; idx++) {
 			pBlocksNew[i].addResidual(idx,dp0[idx],dp1[idx],dp2[idx],dp3[idx],dp4[idx],dp5[idx],dp6[idx],dp7[idx],dd[idx],r[idx]);
 		}
 	}
 
-	acc9.finish();
+	//acc9.finish();
 
 	// Update depth regularisation energy and accumulate.
 	for(int i=0;i<npts;i++)
@@ -822,7 +822,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 		//std::cerr << "alphaEnergy > alphaK\n";
 	}
 
-	acc9SC.initialize();
+//	acc9SC.initialize();
 
 	for(int i=0;i<npts;i++)
 	{
@@ -831,7 +831,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 			continue;
 		}
 
-		point->lastHessian_new = JbBuffer_new[i][9];
+//		point->lastHessian_new = JbBuffer_new[i][9];
 
 		float HllDampingAdd = EPS;
 		float alphaWPnt = 0;
@@ -847,30 +847,31 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 		pBlocksNew[i].qrMarginalise(HllDampingAdd);
 		pBlocksNew[i].addPoseContribution(ss, alphaWPnt);
+		point->lastHessian_new = pBlocksNew[i].Hll;
 		//pBlocksNew[i].addPoseScContribution(ss, alphaWPnt);
 
-		JbBuffer_new[i][8] += alphaWPnt;
-		JbBuffer_new[i][9] = 1/(HllDampingAdd + JbBuffer_new[i][9]);
-		acc9SC.updateSingleWeighted(
-				(float)JbBuffer_new[i][0],(float)JbBuffer_new[i][1],(float)JbBuffer_new[i][2],(float)JbBuffer_new[i][3],
-				(float)JbBuffer_new[i][4],(float)JbBuffer_new[i][5],(float)JbBuffer_new[i][6],(float)JbBuffer_new[i][7],
-				(float)JbBuffer_new[i][8],(float)JbBuffer_new[i][9]);
+//		JbBuffer_new[i][8] += alphaWPnt;
+//		JbBuffer_new[i][9] = 1/(HllDampingAdd + JbBuffer_new[i][9]);
+//		acc9SC.updateSingleWeighted(
+//				(float)JbBuffer_new[i][0],(float)JbBuffer_new[i][1],(float)JbBuffer_new[i][2],(float)JbBuffer_new[i][3],
+//				(float)JbBuffer_new[i][4],(float)JbBuffer_new[i][5],(float)JbBuffer_new[i][6],(float)JbBuffer_new[i][7],
+//				(float)JbBuffer_new[i][8],(float)JbBuffer_new[i][9]);
 	}
-	acc9SC.finish();
+//	acc9SC.finish();
 
 	//printf("nelements in H: %d, in E: %d, in Hsc: %d / 9!\n", (int)acc9.num, (int)E.num, (int)acc9SC.num*9);
-	ss.H = acc9.H.topLeftCorner<8,8>();// / acc9.num;
-	ss.b = acc9.H.topRightCorner<8,1>();// / acc9.num;
-	ss.Hsc = acc9SC.H.topLeftCorner<8,8>();// / acc9.num;
-	ss.bsc = acc9SC.H.topRightCorner<8,1>();// / acc9.num;
+//	ss.H = acc9.H.topLeftCorner<8,8>();// / acc9.num;
+//	ss.b = acc9.H.topRightCorner<8,1>();// / acc9.num;
+//	ss.Hsc = acc9SC.H.topLeftCorner<8,8>();// / acc9.num;
+//	ss.bsc = acc9SC.H.topRightCorner<8,1>();// / acc9.num;
 
 	if (alphaEnergy != alphaK) {
-		ss.H(0, 0) += alphaW * npts;
-		ss.H(1, 1) += alphaW * npts;
-		ss.H(2, 2) += alphaW * npts;
-		ss.SHpp(0, 0) += alphaW * npts;
-		ss.SHpp(1, 1) += alphaW * npts;
-		ss.SHpp(2, 2) += alphaW * npts;
+//		ss.H(0, 0) += alphaW * npts;
+//		ss.H(1, 1) += alphaW * npts;
+//		ss.H(2, 2) += alphaW * npts;
+//		ss.SHpp(0, 0) += alphaW * npts;
+//		ss.SHpp(1, 1) += alphaW * npts;
+//		ss.SHpp(2, 2) += alphaW * npts;
 
 		ss.QH(0, 0) += alphaW * npts;
 		ss.QH(1, 1) += alphaW * npts;
@@ -880,12 +881,12 @@ Vec3f CoarseInitializer::calcResAndGS(
 		ss.QHpp(2, 2) += alphaW * npts;
 
 		Vec3f tlog = refToNew.log().head<3>().cast<float>();
-		ss.b[0] += tlog[0] * alphaW * npts;
-		ss.b[1] += tlog[1] * alphaW * npts;
-		ss.b[2] += tlog[2] * alphaW * npts;
-		ss.Sbp[0] += tlog[0] * alphaW * npts;
-		ss.Sbp[1] += tlog[1] * alphaW * npts;
-		ss.Sbp[2] += tlog[2] * alphaW * npts;
+//		ss.b[0] += tlog[0] * alphaW * npts;
+//		ss.b[1] += tlog[1] * alphaW * npts;
+//		ss.b[2] += tlog[2] * alphaW * npts;
+//		ss.Sbp[0] += tlog[0] * alphaW * npts;
+//		ss.Sbp[1] += tlog[1] * alphaW * npts;
+//		ss.Sbp[2] += tlog[2] * alphaW * npts;
 
 		ss.Qb[0] += tlog[0] * alphaW * npts;
 		ss.Qb[1] += tlog[1] * alphaW * npts;
@@ -1258,7 +1259,7 @@ void CoarseInitializer::applyStep(int lvl)
 		pts[i].idepth = pts[i].idepth_new;
 		pts[i].lastHessian = pts[i].lastHessian_new;
 	}
-	std::swap<Vec10f*>(JbBuffer, JbBuffer_new);
+//	std::swap<Vec10f*>(JbBuffer, JbBuffer_new);
 	std::swap<PointBlock<QR_PRECISION> *>(pBlocks, pBlocksNew);
 }
 
