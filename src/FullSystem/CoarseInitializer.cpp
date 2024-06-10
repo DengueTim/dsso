@@ -387,8 +387,8 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 			//H2 -= ss.SHsc.cast<float>()*(1/(1+lambda));
 			Mat88f QHsc = (ss.QHpp - ss.QH).cast<float>();
 			QH += QHsc*(lambda/(1+lambda));
-			Vec8f b = ss.b - ss.bsc*(1/(1+lambda));
-			Vec8f b2 = ss.Sbp.cast<float>() - ss.Sbsc.cast<float>()*(1/(1+lambda));
+			//Vec8f b = ss.b - ss.bsc*(1/(1+lambda));
+			//Vec8f b2 = ss.Sbp.cast<float>() - ss.Sbsc.cast<float>()*(1/(1+lambda));
 			Vec8f Qbsc = (ss.Qbpp - ss.Qb).cast<float>();
 			Vec8f Qb = ss.Qb.cast<float>() + Qbsc*(lambda/(1+lambda));
 
