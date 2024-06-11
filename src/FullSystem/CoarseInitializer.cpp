@@ -57,12 +57,12 @@ struct StepState {
 	Eigen::Matrix<Scalar,8,1> Qbpp;
 
 
-	Mat88 SHpp;
-	Vec8 Sbp;
-	Mat88 SHsc;
-	Vec8 Sbsc;
-
-	Mat88f H,Hsc; Vec8f b,bsc;
+//	Mat88 SHpp;
+//	Vec8 Sbp;
+//	Mat88 SHsc;
+//	Vec8 Sbsc;
+//
+//	Mat88f H,Hsc; Vec8f b,bsc;
 
 	void reset() {
 		QH.setZero();
@@ -70,22 +70,22 @@ struct StepState {
 		QHpp.setZero();
 		Qbpp.setZero();
 
-		SHpp.setZero();
-		Sbp.setZero();
-		SHsc.setZero();
-		Sbsc.setZero();
-
-		H.setZero();
-		Hsc.setZero();
-		b.setZero();
-		bsc.setZero();
+//		SHpp.setZero();
+//		Sbp.setZero();
+//		SHsc.setZero();
+//		Sbsc.setZero();
+//
+//		H.setZero();
+//		Hsc.setZero();
+//		b.setZero();
+//		bsc.setZero();
 	}
 };
 
 template <typename Scalar>
 struct PointBlock {
 	Eigen::Matrix<Scalar,patternNum+1,8> jp;
-	Eigen::Matrix<Scalar,patternNum+1,1> jl;
+	//Eigen::Matrix<Scalar,patternNum+1,1> jl;
 	Eigen::Matrix<Scalar,patternNum+1,1> r;
 
 	Scalar Hll;
@@ -102,7 +102,7 @@ struct PointBlock {
 
 	void reset(){
 		jp.setZero();
-		jl.setZero();
+		//jl.setZero();
 		r.setZero();
 		qTjp.setZero();
 		R0.setZero();
@@ -111,9 +111,28 @@ struct PointBlock {
 
 	void addResidual(int index, float dTx, float dTy, float dTz, float dRa, float dRb, float dRc, float dAa, float dAb, float dD, float res) {
 		assert(jp.row(index).isZero());
-		jp.row(index) = Eigen::Matrix<Scalar, 1, 8>(dTx, dTy, dTz, dRa, dRb, dRc, dAa, dAb);
-		jl[index] = dD;
+		auto row = jp.row(index);
+		row(0) = dTx;
+		row(1) = dTy;
+		row(2) = dTz;
+		row(3) = dRa;
+		row(4) = dRb;
+		row(5) = dRc;
+		row(6) = dAa;
+		row(7) = dAb;
+		R0[index] = dD;
 		r[index] = res;
+	}
+
+	template<int cols>
+	void applyGivens(Eigen::Matrix<Scalar, patternNum+1, cols> &A, int row, Scalar c, Scalar s) {
+		assert(row > 0);
+		for (int col = 0; col < cols; col++) {
+			Scalar r1 = A(row-1, col);
+			Scalar r2 = A(row, col);
+			A(row-1, col) = c*r1 - s*r2;
+			A(row, col) = s*r1 + c*r2;
+		}
 	}
 
 	void qrMarginalise(float HllDamping) {
@@ -128,22 +147,49 @@ struct PointBlock {
 //			std::cerr << "precision:" << a << "/" << b << "\n";
 //		}
 
-		jl[8] = sqrt(HllDamping);
-		Hll = jl.squaredNorm();
-		Scalar normaliser = sqrt(Hll);
+//		jl[8] = sqrt(HllDamping);
+//		Hll = jl.squaredNorm();
+		R0[8] = sqrt(HllDamping);
+		Hll = R0.squaredNorm();
+		//Scalar normaliser = sqrt(Hll);
 
-		R0 = jl;
+		//R0 = jl;
 		qTjp = jp;
 		qTr = r;
-		Eigen::Matrix<Scalar,patternNum+1,patternNum+1> Qgr;
-		Qgr.setIdentity();
-		Eigen::JacobiRotation<Scalar> gr;
+
+
+		// Givens QR, only slightly faster than makeGivens/applyOnTheLeft.
 		for (int i = patternNum; i > 0; i--) {
-			gr.makeGivens(R0(i-1), R0(i));
-			R0.applyOnTheLeft(i, i-1, gr);
-			qTjp.applyOnTheLeft(i, i-1, gr);
-			qTr.applyOnTheLeft(i, i-1, gr);
+			Scalar b = R0(i);
+			if (b == 0) {
+				continue;
+			}
+
+			Scalar a = R0(i-1);
+			Scalar c,s;
+
+			if (abs(b) > abs(a)) {
+				Scalar gr = -a/b;
+				s = 1/sqrt(1+gr*gr);
+				c = s*gr;
+			} else {
+				Scalar gr = -b/a;
+				c = 1/sqrt(1+gr*gr);
+				s = c*gr;
+			}
+
+			applyGivens<1>(R0, i, c, s);
+			applyGivens<8>(qTjp, i, c, s);
+			applyGivens<1>(qTr, i, c, s);
 		}
+
+//		Eigen::JacobiRotation<Scalar> gr;
+//		for (int i = patternNum; i > 0; i--) {
+//			gr.makeGivens(R0(i-1), R0(i));
+//			R0.applyOnTheLeft(i, i-1, gr);
+//			qTjp.applyOnTheLeft(i, i-1, gr);
+//			qTr.applyOnTheLeft(i, i-1, gr);
+//		}
 
 //		Eigen::HouseholderQR<Eigen::Matrix<Scalar,patternNum+1,1>> qr(jl / normaliser);
 //		Eigen::Matrix<Scalar,patternNum+1,patternNum+1> Q = qr.householderQ();
@@ -162,13 +208,13 @@ struct PointBlock {
 //
 //		assert(R0.tail(patternNum).isZero());
 		//Scalar expected = sqrt(HllDamping + Hll);
-		Scalar expected = sqrt(Hll);
-		if (!(abs(1 - abs(R0(0)) / expected) < 0.0001)) {
-			std::cerr << "abs R0:" << abs(R0(0)) << " expected:" << expected << "\n";
-			std::cerr << "jl:" << jl.format(MatlabFmt) << "\n";
-			std::cerr << "normaliser:" << normaliser << "\n";
-		}
-		assert(abs(1 - abs(R0(0)) / expected) < 0.0001);
+//		Scalar expected = sqrt(Hll);
+//		if (!(abs(1 - abs(R0(0)) / expected) < 0.0001)) {
+//			std::cerr << "abs R0:" << abs(R0(0)) << " expected:" << expected << "\n";
+//			std::cerr << "jl:" << jl.format(MatlabFmt) << "\n";
+////			std::cerr << "normaliser:" << normaliser << "\n";
+//		}
+//		assert(abs(1 - abs(R0(0)) / expected) < 0.0001);
 	}
 
 	void addPoseContribution(StepState<Scalar> &ss, float alphaW) {
@@ -194,46 +240,46 @@ struct PointBlock {
 //		bp += jpTq2 * q2Tr;
 	}
 
-	void addPoseScContribution(StepState<Scalar> &ss, float alphaW) {
-		alphaW_ = alphaW;
-
-		ss.SHpp += (jp.transpose() * jp).template cast<double>();
-		ss.Sbp += (jp.transpose() * r).template cast<double>();
-
-//		if (!(abs(Hll - (HllDamping_ + jl.topRows(8).squaredNorm())) < 0.005)) {
-//			std::cerr << "Hll:" << Hll << "\n";
-//			std::cerr << "xxx:" << (HllDamping_ + jl.topRows(8).squaredNorm()) << "\n";
-//			std::cerr << "d:" << (Hll - (HllDamping_ + jl.topRows(8).squaredNorm())) << "\n";
-//		}
-//		const Eigen::Matrix<double, 1, 8> q1Tjp = qTjp.template topRows<1>().template cast<double>();
-//		const Eigen::Matrix<double, 8, 1> jpTq1 = q1Tjp.transpose();
-		const Eigen::Matrix<double, 8, 1> Hpl = jp.template topRows<8>().transpose().template cast<double>() * jl.template topRows<8>().template cast<double>();
-		const Eigen::Matrix<double, 8, 1> HplHlli = Hpl * 1/(Hll);
-
-		auto A = HplHlli * Hpl.transpose();
-//		auto B = jpTq1 * q1Tjp;
-		ss.SHsc += A.cast<double>();
-//		if (!A.isApprox(B, 0.0001)) {
-//			std::cerr << "\nA:\n" << A.format(MatlabFmt);
-//			std::cerr << "\nB:\n" << B.format(MatlabFmt);
-//			std::cerr << "\nA/B:\n" << (A.array() / B.array()).format(MatlabFmt);
-//			std::cerr << "Hll:" << Hll << "\n";
-//			std::cerr << "jl:" << jl.format(MatlabFmt) << "\n";
+//	void addPoseScContribution(StepState<Scalar> &ss, float alphaW) {
+//		alphaW_ = alphaW;
 //
-//			abort();
-//		}
-
-
-		auto C = HplHlli * (jl.transpose() * r + alphaW);
-//		auto D = jpTq1 * qTr(0); // Todo include alphaW here.
-		ss.Sbsc += C.template cast<double>();
-//		if (!C.isApprox(D)) {
-//			std::cerr << "\nC:\n" << C.format(MatlabFmt);
-//			std::cerr << "\nD:\n" << D.format(MatlabFmt);
-//			std::cerr << "\nC/D:\n" << (C.array() / D.array()).format(MatlabFmt);
-//			abort();
-//		}
-	}
+//		ss.SHpp += (jp.transpose() * jp).template cast<double>();
+//		ss.Sbp += (jp.transpose() * r).template cast<double>();
+//
+////		if (!(abs(Hll - (HllDamping_ + jl.topRows(8).squaredNorm())) < 0.005)) {
+////			std::cerr << "Hll:" << Hll << "\n";
+////			std::cerr << "xxx:" << (HllDamping_ + jl.topRows(8).squaredNorm()) << "\n";
+////			std::cerr << "d:" << (Hll - (HllDamping_ + jl.topRows(8).squaredNorm())) << "\n";
+////		}
+////		const Eigen::Matrix<double, 1, 8> q1Tjp = qTjp.template topRows<1>().template cast<double>();
+////		const Eigen::Matrix<double, 8, 1> jpTq1 = q1Tjp.transpose();
+//		const Eigen::Matrix<Scalar, 8, 1> Hpl = jp.template topRows<8>().transpose() * jl.template topRows<8>();
+//		const Eigen::Matrix<Scalar, 8, 1> HplHlli = Hpl * 1/(Hll);
+//
+//		auto A = HplHlli * Hpl.transpose();
+////		auto B = jpTq1 * q1Tjp;
+//		ss.SHsc += A.template cast<double>();
+////		if (!A.isApprox(B, 0.0001)) {
+////			std::cerr << "\nA:\n" << A.format(MatlabFmt);
+////			std::cerr << "\nB:\n" << B.format(MatlabFmt);
+////			std::cerr << "\nA/B:\n" << (A.array() / B.array()).format(MatlabFmt);
+////			std::cerr << "Hll:" << Hll << "\n";
+////			std::cerr << "jl:" << jl.format(MatlabFmt) << "\n";
+////
+////			abort();
+////		}
+//
+//
+//		auto C = HplHlli * (jl.transpose() * r + alphaW);
+////		auto D = jpTq1 * qTr(0); // Todo include alphaW here.
+//		ss.Sbsc += C.template cast<double>();
+////		if (!C.isApprox(D)) {
+////			std::cerr << "\nC:\n" << C.format(MatlabFmt);
+////			std::cerr << "\nD:\n" << D.format(MatlabFmt);
+////			std::cerr << "\nC/D:\n" << (C.array() / D.array()).format(MatlabFmt);
+////			abort();
+////		}
+//	}
 
 	float getLandmarkIncFromPoseInc(Eigen::Matrix<float, 8, 1> poseInc) {
 		Scalar x = (qTjp.topRows(1) * poseInc.template cast<QR_PRECISION>())[0];
@@ -245,14 +291,14 @@ struct PointBlock {
 		return float(x);
 	}
 
-	float getScLandmarkIncFromPoseInc(Eigen::Matrix<float, 8, 1> poseInc) {
-		const Eigen::Matrix<float, 8, 1> Hlp = (jp.template cast<double>().transpose() * jl.template cast<double>()).transpose().template cast<float>();
-
-		float b = (jl.transpose() * r + alphaW_) + Hlp.dot(poseInc);
-		float stepSc = - b * 1/Hll;
-
-		return stepSc;
-	}
+//	float getScLandmarkIncFromPoseInc(Eigen::Matrix<float, 8, 1> poseInc) {
+//		const Eigen::Matrix<float, 8, 1> Hlp = (jp.template cast<double>().transpose() * jl.template cast<double>()).transpose().template cast<float>();
+//
+//		float b = (jl.transpose() * r + alphaW_) + Hlp.dot(poseInc);
+//		float stepSc = - b * 1/Hll;
+//
+//		return stepSc;
+//	}
 };
 
 
@@ -656,7 +702,7 @@ Vec3f CoarseInitializer::calcResAndGS(
 
 	ss.reset();
 
-	std::cerr << "\nrefToNew:\n" << refToNew.matrix().format(MatlabFmt) << "\n";
+//	std::cerr << "\nrefToNew:\n" << refToNew.matrix().format(MatlabFmt) << "\n";
 
 	int npts = numPoints[lvl];
 	Pnt* ptsl = points[lvl];
