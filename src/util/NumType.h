@@ -181,5 +181,6 @@ struct AffLight {
 const Eigen::IOFormat MatFormatInit = Eigen::IOFormat(Eigen::StreamPrecision, Eigen::DontAlignCols, ", ", ", ", "", "", " << ",
 		";");
 
+const Eigen::IOFormat MatlabFmt(16, 0, ", ", "\n", "\t", ";", "[", "\n]");
 }
 

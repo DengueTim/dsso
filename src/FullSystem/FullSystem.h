@@ -38,7 +38,8 @@
 #include "util/IndexThreadReduce.h"
 #include "OptimizationBackend/EnergyFunctional.h"
 #include "FullSystem/PixelSelector2.h"
-#include "FullSystem/IMU.h"
+#include "util/ImuMeasurement.h"
+#include "IMU.h"
 
 #include <math.h>
 
@@ -153,7 +154,7 @@ private:
 	double linAllPointSinle(PointHessian *point, float outlierTHSlack, bool plot);
 
 	// mainPipelineFunctions
-	Vec4 trackNewCoarse(FrameHessian *fh);
+	Vec4 trackNewCoarse(FrameHessian *fh, const ImuMeasurements &imuMeasurements);
 	void traceNewCoarse(FrameHessian *fh);
 	void activatePoints();
 	void activatePointsMT();
@@ -272,7 +273,7 @@ private:
 
 	int lastRefStopID;
 
-    ImuIntegrator *imuIntegrator;
+	ImuIntegrator *imuIntegrator;
 };
 }
 

@@ -455,7 +455,7 @@ int main(int argc, char **argv) {
                 return;
             } else {
                 while (imuIt != imuItEnd && imuIt->timestamp < iae->timestamp) {
-                    imuMeasurements.push_back(*imuIt++);
+					imuMeasurements.push_back(*imuIt++);
                 }
             }
 

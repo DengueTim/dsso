@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 SET(PROJECT_NAME DSSO)
 
 # On Mac, use gnu gcc over clang. Compiles slower and has missing LD simbols!?

@@ -54,6 +54,8 @@
 
 #include "util/ImageAndExposure.h"
 
+#include "IMU.h"
+
 #include <cmath>
 
 namespace dso {
@@ -160,8 +162,8 @@ FullSystem::FullSystem(const Mat33 &leftK, const Mat33 &rightK, const SE3 &leftT
 	minIdJetVisTracker = -1;
 	maxIdJetVisTracker = -1;
 
-    ImuCalib defaultImuCalib;
-    imuIntegrator = new ImuIntegrator(defaultImuCalib);
+	ImuCalib defaultImuCalib;
+	imuIntegrator = new ImuIntegrator(defaultImuCalib);
 }
 
 FullSystem::~FullSystem() {
@@ -253,7 +255,7 @@ void FullSystem::printResult(std::string file) {
 	myfile.close();
 }
 
-Vec4 FullSystem::trackNewCoarse(FrameHessian *fh) {
+Vec4 FullSystem::trackNewCoarse(FrameHessian *fh, const ImuMeasurements &imuMeasurements) {
 
 	assert(allFrameHistory.size() > 0);
 	// set pose initialization.
@@ -735,8 +737,6 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasur
 	// =========================== make Images / derivatives etc. =========================
 	fh->ab_exposure = image->exposure_time;
 
-    imuIntegrator->integrateImuMeasurements(imuMeasurements);
-
 	if (coarseInitializer->frameID < 0) {
 		// first frame set. fh is kept by coarseInitializer.
 		fh->makeImages<true>(image->imageL, image->imageR, &Hcalib);
@@ -745,7 +745,8 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasur
 	} else if (!initialized) {
 		// Initializing...
 		fh->makeImages<false>(image->imageL, image->imageR, &Hcalib);
-		if (coarseInitializer->trackFrame(fh, outputWrapper)) {
+		imuIntegrator->integrateImuMeasurements(imuMeasurements);
+		if (coarseInitializer->trackFrame(fh, imuIntegrator->get(), outputWrapper)) {
 			// if SNAPPED
 			initializeFromInitializer(fh);
 			lock.unlock();
@@ -759,6 +760,7 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasur
 //		std::this_thread::sleep_for (std::chrono::milliseconds(100)); // Time to update UI..
 	} else {
 		fh->makeImages<false>(image->imageL, image->imageR, &Hcalib);
+		imuIntegrator->integrateImuMeasurements(imuMeasurements);
 		// do front-end operation.
 		// =========================== SWAP tracking reference?. =========================
 		if (coarseTracker_forNewKF->refFrameID > coarseTracker->refFrameID) {
@@ -768,7 +770,7 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasur
 			coarseTracker_forNewKF = tmp;
 		}
 
-		Vec4 tres = trackNewCoarse(fh);
+		Vec4 tres = trackNewCoarse(fh, imuMeasurements);
 		if (!std::isfinite((double) tres[0]) || !std::isfinite((double) tres[1]) || !std::isfinite((double) tres[2])
 				|| !std::isfinite((double) tres[3])) {
 			printf("Initial Tracking failed: LOST!\n");
@@ -794,8 +796,10 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasur
 
 		}
 
-		for (IOWrap::Output3DWrapper *ow : outputWrapper)
-			ow->publishCamPose(fh->shell, &Hcalib);
+		for (IOWrap::Output3DWrapper *ow : outputWrapper) {
+			Vec9 imu = imuIntegrator->getPerSecond();
+			ow->publishCamPose(fh->shell, &Hcalib, &imu);
+		}
 
 		lock.unlock();
 		deliverTrackedFrame(fh, needToMakeKF);

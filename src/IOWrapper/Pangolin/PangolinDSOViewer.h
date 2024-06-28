@@ -63,7 +63,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 			const std::map<uint64_t, Eigen::Vector2i, std::less<uint64_t>,
 					Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>> &connectivity) override;
 	virtual void publishKeyframes(std::vector<FrameHessian*> &frames, bool final, CalibHessian *HCalib) override;
-	virtual void publishCamPose(FrameShell *frame, CalibHessian *HCalib) override;
+	virtual void publishCamPose(FrameShell *frame, CalibHessian *HCalib, const Vec9 *imu) override;
 
 	virtual void pushLiveFrame(FrameHessian *image) override;
 	virtual void pushDepthImage(MinimalImageB3 *imageLeft, MinimalImageB3 *imageRight) override;

@@ -11,8 +11,8 @@ namespace dso {
     struct ImuMeasurement {
         const Eigen::Vector3d accLin;
         const Eigen::Vector3d accRot;
-        const double timestamp;
-        const double interval; // Time since last measurement
+        const double timestamp; // nano seconds since epoch.
+        const double interval; // Time since last measurement in nanoseconds.
 
         ImuMeasurement(const Eigen::Vector3d accLin, const Eigen::Vector3d accRot, const double timestamp,
                        const double interval) :

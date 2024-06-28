@@ -104,8 +104,8 @@ EFPoint::EFPoint(PointHessianBase *ph_, EFFrame *host_) :
 
 void EFResidual::fixLinearizationF(EnergyFunctional *ef) {
 	bool leftToRight = hostIDX == targetIDX;
-	const Vec6f &JpdxiX = leftToRight ? J->Jpdc[0].segment(CIPARS, 6) : J->Jpdxi[0];
-	const Vec6f &JpdxiY = leftToRight ? J->Jpdc[1].segment(CIPARS, 6) : J->Jpdxi[1];
+//	const Vec6f &JpdxiX = leftToRight ? J->Jpdc[0].segment(CIPARS, 6) : J->Jpdxi[0];
+//	const Vec6f &JpdxiY = leftToRight ? J->Jpdc[1].segment(CIPARS, 6) : J->Jpdxi[1];
 
 	float dd = point->deltaF;
 	Vec8f dp = ef->adHTdeltaF[hostIDX + ef->nFrames * targetIDX];

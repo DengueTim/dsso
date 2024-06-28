@@ -94,7 +94,7 @@ CoarseInitializer::~CoarseInitializer() {
 	delete[] JbBuffer_new;
 }
 
-bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps) {
+bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, const Vec9 &imu, std::vector<IOWrap::Output3DWrapper*> &wraps) {
 	newFrame = newFrameHessian;
 
 	for (IOWrap::Output3DWrapper *ow : wraps)

@@ -84,11 +84,12 @@ public:
 		}
 	}
 
-	virtual void publishCamPose(FrameShell *frame, CalibHessian *HCalib) override
+	virtual void publishCamPose(FrameShell *frame, CalibHessian *HCalib, const Vec9 *imu) override
 	{
 		printf("OUT: Current Frame %d (time %f, internal ID %d). CameraToWorld:\n", frame->incoming_id, frame->timestamp,
 				frame->id);
 		std::cout << frame->camToWorld.matrix3x4() << "\n";
+		std::cout << imu->format(MatlabFmt) << "\n";
 	}
 
 	virtual void pushLiveFrame(FrameHessian *image) override
