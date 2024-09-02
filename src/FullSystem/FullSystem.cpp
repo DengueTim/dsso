@@ -820,19 +820,17 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasur
 
 	// =========================== make Images / derivatives etc. =========================
 	fh->ab_exposure = image->exposure_time;
-    //fh->makeImages(image->image, &Hcalib);
+    fh->makeImages(image->image, &Hcalib);
 
 	imuIntegrator->integrateImuMeasurements(imuMeasurements);
 
-
 	if (coarseInitializer->frameID < 0) {
 		// first frame set. fh is kept by coarseInitializer.
-		fh->makeImages(image->image, &Hcalib);
+
 		coarseInitializer->setFirst(&Hcalib, fh);
 //		std::this_thread::sleep_for (std::chrono::milliseconds(100)); // Time to update UI..
 	} else if (!initialized) {
 		// Initializing...
-		fh->makeImages(image->image, &Hcalib);
 		if (coarseInitializer->trackFrame(fh, outputWrapper)) {
 			// if SNAPPED
 			initializeFromInitializer(fh);
@@ -982,7 +980,7 @@ void FullSystem::mappingLoop()
 					boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 					assert(fh->shell->trackingRef != 0);
 					fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-					fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
+					fh->setEvalPTAndStateZero(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
 				}
 				delete fh;
 			}
@@ -1027,7 +1025,7 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		assert(fh->shell->trackingRef != 0);
 		fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-		fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
+		fh->setEvalPTAndStateZero(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
 	}
 
 	traceNewCoarse(fh);
@@ -1041,7 +1039,7 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		assert(fh->shell->trackingRef != 0);
 		fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-		fh->setEvalPT_scaled(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
+		fh->setEvalPTAndStateZero(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
 	}
 
 	traceNewCoarse(fh);
@@ -1263,13 +1261,13 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		firstFrame->shell->camToWorld = SE3();
 		firstFrame->shell->aff_g2l = AffLight(0,0);
-		firstFrame->setEvalPT_scaled(firstFrame->shell->camToWorld.inverse(),firstFrame->shell->aff_g2l);
+		firstFrame->setEvalPTAndStateZero(firstFrame->shell->camToWorld.inverse(),firstFrame->shell->aff_g2l);
 		firstFrame->shell->trackingRef=0;
 		firstFrame->shell->camToTrackingRef = SE3();
 
 		newFrame->shell->camToWorld = firstToNew.inverse();
 		newFrame->shell->aff_g2l = AffLight(0,0);
-		newFrame->setEvalPT_scaled(newFrame->shell->camToWorld.inverse(),newFrame->shell->aff_g2l);
+		newFrame->setEvalPTAndStateZero(newFrame->shell->camToWorld.inverse(),newFrame->shell->aff_g2l);
 		newFrame->shell->trackingRef = firstFrame->shell;
 		newFrame->shell->camToTrackingRef = firstToNew.inverse();
 
@@ -1470,14 +1468,8 @@ void FullSystem::printFrameLifetimes()
 			<< " " << s->statistics_outlierResOnThis
 			<< " " << s->movedByOpt;
 
-
-
 		(*lg) << "\n";
 	}
-
-
-
-
 
 	lg->close();
 	delete lg;

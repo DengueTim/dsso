@@ -70,14 +70,30 @@ void PointHessian::release()
 	residuals.clear();
 }
 
+void FrameHessian::setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l_scaled) {
+	Vec10 initial_state = Vec10::Zero();
+	initial_state[6] = aff_g2l_scaled.a;
+	initial_state[7] = aff_g2l_scaled.b;
+	this->worldToCam_evalPT = worldToCam_evalPT;
 
-void FrameHessian::setStateZero(const Vec10 &state_zero)
-{
-	assert(state_zero.head<6>().squaredNorm() < 1e-20);
+	this->state_scaled = initial_state;
+	state.segment<3>(0) = SCALE_XI_TRANS_INVERSE * initial_state.segment<3>(0);
+	state.segment<3>(3) = SCALE_XI_ROT_INVERSE * initial_state.segment<3>(3);
+	state[6] = SCALE_A_INVERSE * initial_state[6];
+	state[7] = SCALE_B_INVERSE * initial_state[7];
+	state[8] = SCALE_A_INVERSE * initial_state[8];
+	state[9] = SCALE_B_INVERSE * initial_state[9];
 
-	this->state_zero = state_zero;
+	PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
+	PRE_camToWorld = PRE_worldToCam.inverse();
 
+	// Code below was setStateZero()
+	// void FrameHessian::setStateZero(const Vec10 &state_zero) {
+	assert(state.head<6>().squaredNorm() < 1e-20);
 
+	this->state_zero = state;
+
+	// Compute perturbations in the known unobservable parameter spaces...
 	for(int i=0;i<6;i++)
 	{
 		Vec6 eps; eps.setZero(); eps[i] = 1e-3;

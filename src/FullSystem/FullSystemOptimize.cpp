@@ -545,13 +545,7 @@ float FullSystem::optimize(int mnumOptIts)
 		if(canbreak && iteration >= setting_minOptIterations) break;
 	}
 
-
-
-	Vec10 newStateZero = Vec10::Zero();
-	newStateZero.segment<2>(6) = frameHessians.back()->get_state().segment<2>(6);
-
-	frameHessians.back()->setEvalPT(frameHessians.back()->PRE_worldToCam,
-			newStateZero);
+	frameHessians.back()->setEvalPTAndStateZero(frameHessians.back()->PRE_worldToCam, frameHessians.back()->aff_g2l());
 	EFDeltaValid=false;
 	EFAdjointsValid=false;
 	ef->setAdjointsF(&Hcalib);

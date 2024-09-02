@@ -714,6 +714,13 @@ void EnergyFunctional::removePoint(EFPoint* p)
 	delete p;
 }
 
+
+/**
+ * Orthogonalize given b and H to computed null-spaces.
+ * Stops the optimization drifting in the unobservable "directions" of scale, and absolute position/orientation.
+ * @param b
+ * @param H
+ */
 void EnergyFunctional::orthogonalize(VecX* b, MatXX* H)
 {
 //	VecX eigenvaluesPre = H.eigenvalues().real();
@@ -754,6 +761,7 @@ void EnergyFunctional::orthogonalize(VecX* b, MatXX* H)
 	for(int i=0;i<SNN.size();i++)
 		{ if(SNN[i] > setting_solverModeDelta*maxSv) SNN[i] = 1.0 / SNN[i]; else SNN[i] = 0; }
 
+	// Pseudo Inverse..
 	MatXX Npi = svdNN.matrixU() * SNN.asDiagonal() * svdNN.matrixV().transpose(); 	// [dim] x 9.
 	MatXX NNpiT = N*Npi.transpose(); 	// [dim] x [dim].
 	MatXX NNpiTS = 0.5*(NNpiT + NNpiT.transpose());	// = N * (N' * N)^-1 * N'.
@@ -784,78 +792,60 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 	VecX  bL_top, bA_top, bM_top, b_sc;
 
 	accumulateAF_MT(HA_top, bA_top,multiThreading);
-
-
 	accumulateLF_MT(HL_top, bL_top,multiThreading);
-
-
-
 	accumulateSCF_MT(H_sc, b_sc,multiThreading);
-
-
 
 	bM_top = (bM+ HM * getStitchedDeltaF());
 
+	const size_t dsoSize = CPARS + nFrames * 8;
+	/* Allocated and compute top left H with IMU factors.
+	 * 1 - scale
+	 * 2 - Gravity dir. like in ORB_SLAM3
+	 * 6 - IMU Accel & Gyro biases
+	 * 6 - DSO's Pose. Per frame
+	 * 3 - Velocity. Per frame
+	 * 2 - DSO's Aff. Per frame
+	 */
+	const size_t dsoImuSize = dsoSize + 1 + 2 + 6 + nFrames * 3;
+	MatXX HFinal_top = MatXX::Identity(dsoImuSize, dsoImuSize);
+	VecX bFinal_top = VecX::Zero(dsoImuSize);
+	//addImuFactors(HFinal_top, bFinal_top);
 
-
-
-
-
-
-	MatXX HFinal_top;
-	VecX bFinal_top;
-
-	if(setting_solverMode & SOLVER_ORTHOGONALIZE_SYSTEM)
-	{
+	if(setting_solverMode & SOLVER_ORTHOGONALIZE_SYSTEM) {
 		// have a look if prior is there.
 		bool haveFirstFrame = false;
 		for(EFFrame* f : frames) if(f->frameID==0) haveFirstFrame=true;
 
-
-
-
 		MatXX HT_act =  HL_top + HA_top - H_sc;
 		VecX bT_act =   bL_top + bA_top - b_sc;
-
 
 		if(!haveFirstFrame)
 			orthogonalize(&bT_act, &HT_act);
 
-		HFinal_top = HT_act + HM;
-		bFinal_top = bT_act + bM_top;
-
-
-
-
+		HFinal_top.block(0,0,dsoSize,dsoSize) = HT_act + HM;
+		bFinal_top.segment(0,dsoSize) = bT_act + bM_top;
 
 		lastHS = HFinal_top;
 		lastbS = bFinal_top;
 
-		for(int i=0;i<8*nFrames+CPARS;i++) HFinal_top(i,i) *= (1+lambda);
+		for(int i=0;i<dsoSize;i++) HFinal_top(i,i) *= (1+lambda);
+	} else {
+		HFinal_top.block(0,0,dsoSize,dsoSize) = HL_top + HM + HA_top;
+		bFinal_top.segment(0,dsoSize) = bL_top + bM_top + bA_top - b_sc;
 
-	}
-	else
-	{
-
-
-		HFinal_top = HL_top + HM + HA_top;
-		bFinal_top = bL_top + bM_top + bA_top - b_sc;
-
-		lastHS = HFinal_top - H_sc;
+		lastHS = HFinal_top;
+		lastHS.block(0,0,dsoSize, dsoSize) -= H_sc;
 		lastbS = bFinal_top;
 
-		for(int i=0;i<8*nFrames+CPARS;i++) HFinal_top(i,i) *= (1+lambda);
-		HFinal_top -= H_sc * (1.0f/(1+lambda));
+		for(int i=0;i<dsoSize;i++) HFinal_top(i,i) *= (1+lambda);
+		HFinal_top.block(0,0,dsoSize,dsoSize) -= H_sc * (1.0f/(1+lambda));
 	}
-
-
-
-
 
 
 	VecX x;
 	if(setting_solverMode & SOLVER_SVD)
 	{
+		abort(); // Code below not updated to handle IMU expanded H and b
 		VecX SVecI = HFinal_top.diagonal().cwiseSqrt().cwiseInverse();
 		MatXX HFinalScaled = SVecI.asDiagonal() * HFinal_top * SVecI.asDiagonal();
 		VecX bFinalScaled  = SVecI.asDiagonal() * bFinal_top;
@@ -882,7 +872,6 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 			else Ub[i] /= S[i];
 		}
 		x = SVecI.asDiagonal() * svd.matrixV() * Ub;
-
 	}
 	else
 	{
@@ -891,25 +880,82 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 		x = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFinal_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
 	}
 
-
+	// Don't forget the .eval() next time...
+	x = x.segment(0,dsoSize).eval();
 
 	if((setting_solverMode & SOLVER_ORTHOGONALIZE_X) || (iteration >= 2 && (setting_solverMode & SOLVER_ORTHOGONALIZE_X_LATER)))
 	{
-		VecX xOld = x;
 		orthogonalize(&x, 0);
 	}
 
-
 	lastX = x;
-
 
 	//resubstituteF(x, HCalib);
 	currentLambda= lambda;
 	resubstituteF_MT(x, HCalib,multiThreading);
 	currentLambda=0;
-
-
 }
+
+// WIP
+void EnergyFunctional::addImuFactors(MatXX &H, VecX &b) {
+	if (nFrames==1)
+		return;
+
+	for(int i=0 ; i<frames.size()-1 ; i++) {
+		int j = i+1;
+		// TODO. Preintegrate...
+
+		// Jacobian of residual errors for frame i to j:
+		//   Position 3
+		//   Rotation 3
+		//   Velocity 3
+		// VS state estimates:
+		//   Scale 1
+		//   Gravity dir. 2
+		//   Bias Acc & Gyro 6
+		//   Position, rotation, velocity for frames i and j. 9 + 9
+		// TODO. Only compute the upper half..
+		MatXX J = MatXX::Zero(9, 27);
+		VecX r = VecX::Zero(9);
+
+		J.block<2,2>(0,0) = MatXX::Zero(2,2);
+
+		MatXX H_ = J.transpose() * J;
+		VecX b_ = J.transpose() * r;
+
+		// Indexes in H_ * b_
+		int iPoseIdx_ = 9 + 9 * i;
+		int jPoseIdx_ = 9 + 9 * j;
+		int scaleIdx_ = 0;
+		int iVelIdx_ = iPoseIdx_ + 6;
+		int jVelIdx_ = jPoseIdx_ + 6;
+
+		// Aligns with DSO top left corner
+		int iPoseIdx = CPARS + 8 * i;
+		int jPoseIdx = CPARS + 8 * j;
+
+		// After DSO
+		int scaleIdx = CPARS + 8 * nFrames;
+
+		int iVelIdx = scaleIdx + 9 + 3 * i;
+		int jVelIdx = scaleIdx + 9 + 3 * j;
+
+		b.segment<6>(iPoseIdx) += b_.segment<6>(iPoseIdx_);
+		b.segment<6>(jPoseIdx) += b_.segment<6>(jPoseIdx_);
+		b.segment<9>(scaleIdx) += b_.segment<9>(scaleIdx_);
+		b.segment<3>(iVelIdx) += b_.segment<3>(iVelIdx_);
+		b.segment<3>(jVelIdx) += b_.segment<3>(jVelIdx_);
+
+		H.block<6,6>(iPoseIdx,iPoseIdx) += H_.block<6,6>(iPoseIdx_,iPoseIdx_);
+		H.block<6,6>(jPoseIdx,jPoseIdx) += H_.block<6,6>(jPoseIdx_,jPoseIdx_);
+		H.block<9,9>(scaleIdx,scaleIdx) += H_.block<9,9>(scaleIdx_,scaleIdx_);
+		H.block<3,3>(iVelIdx,iVelIdx) += H_.block<3,3>(iVelIdx_,iVelIdx_);
+		H.block<3,3>(jVelIdx,jVelIdx) += H_.block<3,3>(jVelIdx_,jVelIdx_);
+
+		// TODO.  off diagonal blocks....
+	}
+}
+
 void EnergyFunctional::makeIDX()
 {
 	for(unsigned int idx=0;idx<frames.size();idx++)

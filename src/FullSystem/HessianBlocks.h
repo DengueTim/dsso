@@ -148,6 +148,7 @@ struct FrameHessian
 	// variable info.
 	SE3 worldToCam_evalPT;
 	Vec10 state_zero;
+	// Confusingly(to non-mathematicians) the "scaled state" is the real world. The "state" is the estimate in the optimiser.
 	Vec10 state_scaled;
 	Vec10 state;	// [0-5: worldToCam-leftEps. 6-7: a,b]
 	Vec10 step;
@@ -175,7 +176,6 @@ struct FrameHessian
 
 
 
-	void setStateZero(const Vec10 &state_zero);
 	inline void setState(const Vec10 &state)
 	{
 
@@ -191,40 +191,8 @@ struct FrameHessian
 		PRE_camToWorld = PRE_worldToCam.inverse();
 		//setCurrentNullspace();
 	};
-	inline void setStateScaled(const Vec10 &state_scaled)
-	{
 
-		this->state_scaled = state_scaled;
-		state.segment<3>(0) = SCALE_XI_TRANS_INVERSE * state_scaled.segment<3>(0);
-		state.segment<3>(3) = SCALE_XI_ROT_INVERSE * state_scaled.segment<3>(3);
-		state[6] = SCALE_A_INVERSE * state_scaled[6];
-		state[7] = SCALE_B_INVERSE * state_scaled[7];
-		state[8] = SCALE_A_INVERSE * state_scaled[8];
-		state[9] = SCALE_B_INVERSE * state_scaled[9];
-
-		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
-		PRE_camToWorld = PRE_worldToCam.inverse();
-		//setCurrentNullspace();
-	};
-	inline void setEvalPT(const SE3 &worldToCam_evalPT, const Vec10 &state)
-	{
-
-		this->worldToCam_evalPT = worldToCam_evalPT;
-		setState(state);
-		setStateZero(state);
-	};
-
-
-
-	inline void setEvalPT_scaled(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l)
-	{
-		Vec10 initial_state = Vec10::Zero();
-		initial_state[6] = aff_g2l.a;
-		initial_state[7] = aff_g2l.b;
-		this->worldToCam_evalPT = worldToCam_evalPT;
-		setStateScaled(initial_state);
-		setStateZero(this->get_state());
-	};
+	void setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l_scaled);
 
 	void release();
 

@@ -191,5 +191,7 @@ struct AffLight
 	}
 };
 
+const Eigen::IOFormat MatlabFmt(16, 0, ", ", "\n", "\t", ";", "[", "\n]");
+
 }
 

@@ -134,6 +134,9 @@ private:
 	void calcLEnergyPt(int min, int max, Vec10* stats, int tid);
 
 	void orthogonalize(VecX* b, MatXX* H);
+
+	void addImuFactors(MatXX &H, VecX &b);
+
 	Mat18f* adHTdeltaF;
 
 	Mat88* adHost;
