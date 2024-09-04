@@ -474,7 +474,7 @@ float FullSystem::optimize(int mnumOptIts)
 
 	double lambda = 1e-1;
 	float stepsize=1;
-	VecX previousX = VecX::Constant(CPARS+ 8*frameHessians.size(), NAN);
+	VecX previousX = VecX::Constant(ICPARS+ IFPARS*frameHessians.size(), NAN);
 	for(int iteration=0;iteration<mnumOptIts;iteration++)
 	{
 		// solve!

@@ -262,7 +262,7 @@ void EnergyFunctional::accumulateSCF_MT(MatXX &H, VecX &b, bool MT)
 
 void EnergyFunctional::resubstituteF_MT(VecX x, CalibHessian* HCalib, bool MT)
 {
-	assert(x.size() == CPARS+nFrames*8);
+	assert(x.size() == ICPARS+nFrames*IFPARS);
 
 	VecXf xF = x.cast<float>();
 	HCalib->step = - x.head<CPARS>();
@@ -271,12 +271,12 @@ void EnergyFunctional::resubstituteF_MT(VecX x, CalibHessian* HCalib, bool MT)
 	VecCf cstep = xF.head<CPARS>();
 	for(EFFrame* h : frames)
 	{
-		h->data->step.head<8>() = - x.segment<8>(CPARS+8*h->idx);
+		h->data->step.head<8>() = - x.segment<FPARS>(ICPARS+IFPARS*h->idx);
 		h->data->step.tail<2>().setZero();
 
 		for(EFFrame* t : frames)
-			xAd[nFrames*h->idx + t->idx] = xF.segment<8>(CPARS+8*h->idx).transpose() *   adHostF[h->idx+nFrames*t->idx]
-			            + xF.segment<8>(CPARS+8*t->idx).transpose() * adTargetF[h->idx+nFrames*t->idx];
+			xAd[nFrames*h->idx + t->idx] = xF.segment<FPARS>(ICPARS+IFPARS*h->idx).transpose() *   adHostF[h->idx+nFrames*t->idx]
+			            + xF.segment<FPARS>(ICPARS+IFPARS*t->idx).transpose() * adTargetF[h->idx+nFrames*t->idx];
 	}
 
 	if(MT)
@@ -853,7 +853,7 @@ void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, doub
 	}
 
 
-	VecX xFull;
+	VecX x;
 	if(setting_solverMode & SOLVER_SVD)
 	{
 		abort(); // Code below not updated to handle IMU expanded H and b
@@ -882,30 +882,22 @@ void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, doub
 
 			else Ub[i] /= S[i];
 		}
-		xFull = SVecI.asDiagonal() * svd.matrixV() * Ub;
+		x = SVecI.asDiagonal() * svd.matrixV() * Ub;
 	}
 	else
 	{
 		VecX SVecI = (HFull_top.diagonal()+VecX::Constant(HFull_top.cols(), 10)).cwiseSqrt().cwiseInverse();
 		MatXX HFinalScaled = SVecI.asDiagonal() * HFull_top * SVecI.asDiagonal();
-		xFull = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFull_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
+		x = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFull_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
 	}
 
 	if((setting_solverMode & SOLVER_ORTHOGONALIZE_X) || (iteration >= 2 && (setting_solverMode & SOLVER_ORTHOGONALIZE_X_LATER)))
 	{
-		orthogonalize(&xFull, 0);
-	}
-
-	VecX x = VecX::Zero(dsoSize);
-	// Undo addBDso()..
-	x.head<CPARS>() = xFull.head<CPARS>();
-	for (int f = 0 ; f < nFrames ; f++) {
-		x.segment<FPARS>(CPARS + f * FPARS) = xFull.segment<FPARS>(ICPARS + f * IFPARS);
+		orthogonalize(&x, 0);
 	}
 
 	lastX = x;
 
-	//resubstituteF(x, HCalib);
 	currentLambda= lambda;
 	resubstituteF_MT(x, HCalib, multiThreading);
 	currentLambda=0;
