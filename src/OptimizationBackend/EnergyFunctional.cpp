@@ -176,8 +176,8 @@ void EnergyFunctional::setDeltaF(CalibHessian* HCalib)
 		for(int t=0;t<nFrames;t++)
 		{
 			int idx = h+t*nFrames;
-			adHTdeltaF[idx] = frames[h]->data->get_state_minus_stateZero().head<8>().cast<float>().transpose() * adHostF[idx]
-					        +frames[t]->data->get_state_minus_stateZero().head<8>().cast<float>().transpose() * adTargetF[idx];
+			adHTdeltaF[idx] = frames[h]->data->get_state_minus_stateZero().cast<float>().transpose() * adHostF[idx]
+					        +frames[t]->data->get_state_minus_stateZero().cast<float>().transpose() * adTargetF[idx];
 		}
 
 	cDeltaF = HCalib->value_minus_value_zero.cast<float>();
@@ -271,8 +271,7 @@ void EnergyFunctional::resubstituteF_MT(VecX x, CalibHessian* HCalib, bool MT)
 	VecCf cstep = xF.head<CPARS>();
 	for(EFFrame* h : frames)
 	{
-		h->data->step.head<8>() = - x.segment<FPARS>(ICPARS+IFPARS*h->idx);
-		h->data->step.tail<2>().setZero();
+		h->data->step = - x.segment<FPARS>(ICPARS+IFPARS*h->idx);
 
 		for(EFFrame* t : frames)
 			xAd[nFrames*h->idx + t->idx] = xF.segment<FPARS>(ICPARS+IFPARS*h->idx).transpose() *   adHostF[h->idx+nFrames*t->idx]

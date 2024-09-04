@@ -158,20 +158,20 @@ struct FrameHessian
 
 	// variable info.
 	SE3 worldToCam_evalPT;
-	Vec10 state_zero;
+	VecF state_zero;
 	// Confusingly(to non-mathematicians) the "scaled state" is the real world. The "state" is the estimate in the optimiser.
-	Vec10 state_scaled;
-	Vec10 state;	// [0-5: worldToCam-leftEps. 6-7: a,b]
-	Vec10 step;
-	Vec10 step_backup;
-	Vec10 state_backup;
+	VecF state_scaled;
+	VecF state;	// [0-5: worldToCam-leftEps. 6-7: a,b]
+	VecF step;
+	VecF step_backup;
+	VecF state_backup;
 
 
     EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return worldToCam_evalPT;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state_zero() const {return state_zero;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state() const {return state;}
-    EIGEN_STRONG_INLINE const Vec10 &get_state_scaled() const {return state_scaled;}
-    EIGEN_STRONG_INLINE const Vec10 get_state_minus_stateZero() const {return get_state() - get_state_zero();}
+    EIGEN_STRONG_INLINE const VecF &get_state_zero() const {return state_zero;}
+    EIGEN_STRONG_INLINE const VecF &get_state() const {return state;}
+    EIGEN_STRONG_INLINE const VecF &get_state_scaled() const {return state_scaled;}
+    EIGEN_STRONG_INLINE const VecF get_state_minus_stateZero() const {return get_state() - get_state_zero();}
 
 
 	// precalc values
@@ -187,7 +187,7 @@ struct FrameHessian
 
 
 
-	inline void setState(const Vec10 &state)
+	inline void setState(const VecF &state)
 	{
 
 		this->state = state;
@@ -195,8 +195,8 @@ struct FrameHessian
 		state_scaled.segment<3>(3) = SCALE_XI_ROT * state.segment<3>(3);
 		state_scaled[6] = SCALE_A * state[6];
 		state_scaled[7] = SCALE_B * state[7];
-		state_scaled[8] = SCALE_A * state[8];
-		state_scaled[9] = SCALE_B * state[9];
+//		state_scaled[8] = SCALE_A * state[8];
+//		state_scaled[9] = SCALE_B * state[9];
 
 		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
 		PRE_camToWorld = PRE_worldToCam.inverse();
@@ -238,9 +238,9 @@ struct FrameHessian
 
     void makeImages(float* color, CalibHessian* HCalib);
 
-	inline Vec10 getPrior()
+	inline VecF getPrior()
 	{
-		Vec10 p =  Vec10::Zero();
+		VecF p =  VecF::Zero();
 		if(frameID==0)
 		{
 			p.head<3>() = Vec3::Constant(setting_initialTransPrior);
@@ -262,15 +262,15 @@ struct FrameHessian
 			else
 				p[7] = setting_affineOptModeB;
 		}
-		p[8] = setting_initialAffAPrior;
-		p[9] = setting_initialAffBPrior;
+//		p[8] = setting_initialAffAPrior;
+//		p[9] = setting_initialAffBPrior;
 		return p;
 	}
 
 
-	inline Vec10 getPriorZero()
+	inline VecF getPriorZero()
 	{
-		return Vec10::Zero();
+		return VecF::Zero();
 	}
 
 };

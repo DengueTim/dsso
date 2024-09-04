@@ -96,6 +96,7 @@ typedef Eigen::Matrix<float,CPARS,1> VecCf;
 typedef Eigen::Matrix<double,IWPARS,1> VecIW;
 typedef Eigen::Matrix<double,IBPARS,1> VecIB;
 typedef Eigen::Matrix<double,IFPARS,1> VecIF;
+typedef Eigen::Matrix<double,FPARS,1> VecF;
 typedef Eigen::Matrix<double,13,1> Vec13;
 typedef Eigen::Matrix<double,10,1> Vec10;
 typedef Eigen::Matrix<double,9,1> Vec9;

@@ -51,9 +51,9 @@ void EFResidual::takeDataF()
 
 void EFFrame::takeData()
 {
-	prior = data->getPrior().head<8>();
-	delta = data->get_state_minus_stateZero().head<8>();
-	delta_prior =  (data->get_state() - data->getPriorZero()).head<8>();
+	prior = data->getPrior();
+	delta = data->get_state_minus_stateZero();
+	delta_prior =  (data->get_state() - data->getPriorZero());
 
 
 
