@@ -135,6 +135,9 @@ private:
 
 	void orthogonalize(VecX* b, MatXX* H);
 
+	void addBDso(VecX &dsoB, VecX &fullB);
+	void addHDso(MatXX &dsoH, MatXX &fullH);
+
 	void addImuFactors(MatXX &H, VecX &b);
 
 	Mat18f* adHTdeltaF;

@@ -63,6 +63,12 @@ class EFPoint;
 #define SCALE_W 1.0f
 #define SCALE_A 10.0f
 #define SCALE_B 1000.0f
+#define SCALE_VELOCITY 1.0f
+#define SCALE_SCALE 1.0f
+#define SCALE_ORIENTATION 1.0f
+#define SCALE_BIAS_ACC 1.0f
+#define SCALE_BIAS_GYRO 1.0f
+
 
 #define SCALE_IDEPTH_INVERSE (1.0f / SCALE_IDEPTH)
 #define SCALE_XI_ROT_INVERSE (1.0f / SCALE_XI_ROT)
@@ -72,6 +78,11 @@ class EFPoint;
 #define SCALE_W_INVERSE (1.0f / SCALE_W)
 #define SCALE_A_INVERSE (1.0f / SCALE_A)
 #define SCALE_B_INVERSE (1.0f / SCALE_B)
+#define SCALE_VELOCITY_INVERSE (1.0f / SCALE_VELOCITY)
+#define SCALE_SCALE_INVERSE (1.0f / SCALE_SCALE)
+#define SCALE_ORIENTATION_INVERSE (1.0f / SCALE_ORIENTATION)
+#define SCALE_BIAS_ACC_INVERSE (1.0f / SCALE_BIAS_ACC)
+#define SCALE_BIAS_GYRO_INVERSE (1.0f / SCALE_BIAS_GYRO)
 
 
 struct FrameFramePrecalc
@@ -465,8 +476,78 @@ struct PointHessian
 
 };
 
+struct ImuWorldHessian {
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
+	VecIW value_zero;
+	VecIW value_scaled;
+	VecIW value;
+	VecIW value_backup;
+	VecIW step;
+	VecIW step_backup;
 
+	inline ImuWorldHessian()
+	{
+		VecIW initial_value = VecIW::Zero();
+		initial_value[0] = 1.0f;
+
+		setValueScaled(initial_value);
+		value_zero = value;
+	};
+
+	inline void setValueScaled(const VecIW &value_scaled)
+	{
+		this->value_scaled = value_scaled;
+		value[0] = SCALE_SCALE_INVERSE * value_scaled[0];
+		value[1] = SCALE_ORIENTATION_INVERSE * value_scaled[1];
+		value[2] = SCALE_ORIENTATION_INVERSE * value_scaled[2];
+	};
+
+	inline void setValue(const VecIW &value) {
+		this->value = value;
+		value_scaled[0] = SCALE_SCALE * value[0];
+		value_scaled[1] = SCALE_ORIENTATION * value[1];
+		value_scaled[2] = SCALE_ORIENTATION * value[2];
+	}
+};
+
+struct ImuBiasHessian {
+	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
+	VecIB value_zero;
+	VecIB value_scaled;
+	VecIB value;
+	VecIB value_backup;
+	VecIB step;
+	VecIB step_backup;
+
+	inline ImuBiasHessian()
+	{
+		VecIB initial_value = VecIB::Zero();
+		setValueScaled(initial_value);
+		value_zero = value;
+	};
+
+	inline void setValueScaled(const VecIB &value_scaled)
+	{
+		this->value_scaled = value_scaled;
+		value[0] = SCALE_BIAS_ACC_INVERSE * value_scaled[0];
+		value[1] = SCALE_BIAS_ACC_INVERSE * value_scaled[1];
+		value[2] = SCALE_BIAS_ACC_INVERSE * value_scaled[2];
+		value[0] = SCALE_BIAS_GYRO_INVERSE * value_scaled[3];
+		value[1] = SCALE_BIAS_GYRO_INVERSE * value_scaled[4];
+		value[2] = SCALE_BIAS_GYRO_INVERSE * value_scaled[5];
+	};
+
+	inline void setValue(const VecIB &value) {
+		this->value = value;
+		value_scaled[0] = SCALE_BIAS_ACC * value[0];
+		value_scaled[1] = SCALE_BIAS_ACC * value[1];
+		value_scaled[2] = SCALE_BIAS_ACC * value[2];
+		value_scaled[0] = SCALE_BIAS_GYRO * value[3];
+		value_scaled[1] = SCALE_BIAS_GYRO * value[4];
+		value_scaled[2] = SCALE_BIAS_GYRO * value[5];
+	}
+};
 
 
 }

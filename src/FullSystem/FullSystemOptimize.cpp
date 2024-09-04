@@ -213,7 +213,7 @@ Vec3 FullSystem::linearizeAll(bool fixLinearization)
 
 
 // applies step to linearization point.
-bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float stepfacA,float stepfacD)
+bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float stepfacA,float stepfacD,float stepfacV)
 {
 //	float meanStepC=0,meanStepP=0,meanStepD=0;
 //	meanStepC += Hcalib.step.norm();
@@ -222,9 +222,10 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 	pstepfac.segment<3>(0).setConstant(stepfacT);
 	pstepfac.segment<3>(3).setConstant(stepfacR);
 	pstepfac.segment<4>(6).setConstant(stepfacA);
+	//pstepfac.segment<3>(10).setConstant(stepfacV);
 
 
-	float sumA=0, sumB=0, sumT=0, sumR=0, sumID=0, numID=0;
+	float sumA=0, sumB=0, sumT=0, sumR=0, sumV=0, sumID=0, numID=0;
 
 	float sumNID=0;
 
@@ -241,6 +242,7 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 			sumB += step[7]*step[7];
 			sumT += step.segment<3>(0).squaredNorm();
 			sumR += step.segment<3>(3).squaredNorm();
+			//sumV += step.segment<3>(10).squaredNorm();
 
 			for(PointHessian* ph : fh->pointHessians)
 			{
@@ -264,6 +266,7 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 			sumB += fh->step[7]*fh->step[7];
 			sumT += fh->step.segment<3>(0).squaredNorm();
 			sumR += fh->step.segment<3>(3).squaredNorm();
+			//sumV += fh->step.segment<3>(10).squaredNorm();
 
 			for(PointHessian* ph : fh->pointHessians)
 			{
@@ -281,16 +284,18 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 	sumB /= frameHessians.size();
 	sumR /= frameHessians.size();
 	sumT /= frameHessians.size();
+	sumV /= frameHessians.size();
 	sumID /= numID;
 	sumNID /= numID;
 
 
 
     if(!setting_debugout_runquiet)
-        printf("STEPS: A %.1f; B %.1f; R %.1f; T %.1f. \t",
+        printf("STEPS: A %.1f; B %.1f; R %.1f; V %.1f; T %.1f. \t",
                 sqrtf(sumA) / (0.0005*setting_thOptIterations),
                 sqrtf(sumB) / (0.00005*setting_thOptIterations),
                 sqrtf(sumR) / (0.00005*setting_thOptIterations),
+			    sqrtf(sumV) / (0.00005*setting_thOptIterations),
                 sqrtf(sumT)*sumNID / (0.00005*setting_thOptIterations));
 
 
@@ -302,6 +307,7 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 	return sqrtf(sumA) < 0.0005*setting_thOptIterations &&
 			sqrtf(sumB) < 0.00005*setting_thOptIterations &&
 			sqrtf(sumR) < 0.00005*setting_thOptIterations &&
+			sqrtf(sumV) < 0.00005*setting_thOptIterations &&
 			sqrtf(sumT)*sumNID < 0.00005*setting_thOptIterations;
 //
 //	printf("mean steps: %f %f %f!\n",
@@ -489,7 +495,7 @@ float FullSystem::optimize(int mnumOptIts)
 			if(stepsize <0.25) stepsize=0.25;
 		}
 
-		bool canbreak = doStepFromBackup(stepsize,stepsize,stepsize,stepsize,stepsize);
+		bool canbreak = doStepFromBackup(stepsize,stepsize,stepsize,stepsize,stepsize,stepsize);
 
 
 

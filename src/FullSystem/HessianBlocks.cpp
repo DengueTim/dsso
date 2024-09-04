@@ -83,6 +83,7 @@ void FrameHessian::setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const Aff
 	state[7] = SCALE_B_INVERSE * initial_state[7];
 	state[8] = SCALE_A_INVERSE * initial_state[8];
 	state[9] = SCALE_B_INVERSE * initial_state[9];
+	//state.segment<3>(10) = SCALE_VELOCITY_INVERSE * initial_state.segment<3>(10);
 
 	PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
 	PRE_camToWorld = PRE_worldToCam.inverse();

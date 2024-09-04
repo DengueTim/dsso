@@ -779,7 +779,7 @@ void EnergyFunctional::orthogonalize(VecX* b, MatXX* H)
 }
 
 
-void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* HCalib)
+void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* HCalib)
 {
 	if(setting_solverMode & SOLVER_USE_GN) lambda=0;
 	if(setting_solverMode & SOLVER_FIX_LAMBDA) lambda = 1e-5;
@@ -789,7 +789,7 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 	assert(EFIndicesValid);
 
 	MatXX HL_top, HA_top, H_sc;
-	VecX  bL_top, bA_top, bM_top, b_sc;
+	VecX  bL_top, bA_top, b_sc, bM_top;
 
 	accumulateAF_MT(HA_top, bA_top,multiThreading);
 	accumulateLF_MT(HL_top, bL_top,multiThreading);
@@ -797,58 +797,66 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 
 	bM_top = (bM+ HM * getStitchedDeltaF());
 
-	const size_t dsoSize = CPARS + nFrames * 8;
+	const size_t dsoSize = CPARS + nFrames * FPARS;
 	/* Allocated and compute top left H with IMU factors.
+	 * 4 - DSO's Calib
 	 * 1 - scale
 	 * 2 - Gravity dir. like in ORB_SLAM3
 	 * 6 - IMU Accel & Gyro biases
 	 * 6 - DSO's Pose. Per frame
-	 * 3 - Velocity. Per frame
 	 * 2 - DSO's Aff. Per frame
+	 * 3 - Velocity. Per frame
 	 */
-	const size_t dsoImuSize = dsoSize + 1 + 2 + 6 + nFrames * 3;
-	MatXX HFinal_top = MatXX::Identity(dsoImuSize, dsoImuSize);
-	VecX bFinal_top = VecX::Zero(dsoImuSize);
-	//addImuFactors(HFinal_top, bFinal_top);
+	const size_t fullSize = ICPARS + nFrames * IFPARS;
+	MatXX HFull_top = MatXX::Identity(fullSize, fullSize);
+	VecX bFull_top = VecX::Zero(fullSize);
+	//addImuFactors(HFull_top, bFull_top);
 
 	if(setting_solverMode & SOLVER_ORTHOGONALIZE_SYSTEM) {
 		// have a look if prior is there.
 		bool haveFirstFrame = false;
 		for(EFFrame* f : frames) if(f->frameID==0) haveFirstFrame=true;
 
-		MatXX HT_act =  HL_top + HA_top - H_sc;
-		VecX bT_act =   bL_top + bA_top - b_sc;
+		MatXX HDso =  HL_top + HA_top - H_sc;
+		VecX bDso =   bL_top + bA_top - b_sc;
 
 		if(!haveFirstFrame)
-			orthogonalize(&bT_act, &HT_act);
+			orthogonalize(&bDso, &HDso);
 
-		HFinal_top.block(0,0,dsoSize,dsoSize) = HT_act + HM;
-		bFinal_top.segment(0,dsoSize) = bT_act + bM_top;
+		HDso += HM;
+		addHDso(HFull_top, HDso);
+		bDso += bM_top;
+		addBDso(bFull_top, bDso);
 
-		lastHS = HFinal_top;
-		lastbS = bFinal_top;
+		lastHS = HFull_top;
+		lastbS = bFull_top;
 
-		for(int i=0;i<dsoSize;i++) HFinal_top(i,i) *= (1+lambda);
+		for(int i=0;i<dsoSize;i++) HFull_top(i, i) *= (1+lambda);
 	} else {
-		HFinal_top.block(0,0,dsoSize,dsoSize) = HL_top + HM + HA_top;
-		bFinal_top.segment(0,dsoSize) = bL_top + bM_top + bA_top - b_sc;
+		MatXX HDso = HL_top + HM + HA_top;
+		addHDso(HDso, HFull_top);
 
-		lastHS = HFinal_top;
-		lastHS.block(0,0,dsoSize, dsoSize) -= H_sc;
-		lastbS = bFinal_top;
+		VecX bDso = bL_top + bM_top + bA_top - b_sc;
+		addBDso(bDso, bFull_top);
 
-		for(int i=0;i<dsoSize;i++) HFinal_top(i,i) *= (1+lambda);
-		HFinal_top.block(0,0,dsoSize,dsoSize) -= H_sc * (1.0f/(1+lambda));
+		MatXX HFull_sc = MatXX::Zero(fullSize, fullSize);
+		addHDso(H_sc, HFull_sc);
+
+		lastHS = HFull_top - HFull_sc;
+		lastbS = bFull_top;
+
+		for(int i=0; i<fullSize; i++) HFull_top(i, i) *= (1+lambda);
+		HFull_top -= HFull_sc * (1.0f/(1+lambda));
 	}
 
 
-	VecX x;
+	VecX xFull;
 	if(setting_solverMode & SOLVER_SVD)
 	{
 		abort(); // Code below not updated to handle IMU expanded H and b
-		VecX SVecI = HFinal_top.diagonal().cwiseSqrt().cwiseInverse();
-		MatXX HFinalScaled = SVecI.asDiagonal() * HFinal_top * SVecI.asDiagonal();
-		VecX bFinalScaled  = SVecI.asDiagonal() * bFinal_top;
+		VecX SVecI = HFull_top.diagonal().cwiseSqrt().cwiseInverse();
+		MatXX HFinalScaled = SVecI.asDiagonal() * HFull_top * SVecI.asDiagonal();
+		VecX bFinalScaled  = SVecI.asDiagonal() * bFull_top;
 		Eigen::JacobiSVD<MatXX> svd(HFinalScaled, Eigen::ComputeThinU | Eigen::ComputeThinV);
 
 		VecX S = svd.singularValues();
@@ -871,17 +879,23 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 
 			else Ub[i] /= S[i];
 		}
-		x = SVecI.asDiagonal() * svd.matrixV() * Ub;
+		xFull = SVecI.asDiagonal() * svd.matrixV() * Ub;
 	}
 	else
 	{
-		VecX SVecI = (HFinal_top.diagonal()+VecX::Constant(HFinal_top.cols(), 10)).cwiseSqrt().cwiseInverse();
-		MatXX HFinalScaled = SVecI.asDiagonal() * HFinal_top * SVecI.asDiagonal();
-		x = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFinal_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
+		VecX SVecI = (HFull_top.diagonal()+VecX::Constant(HFull_top.cols(), 10)).cwiseSqrt().cwiseInverse();
+		MatXX HFinalScaled = SVecI.asDiagonal() * HFull_top * SVecI.asDiagonal();
+		xFull = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFull_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
 	}
 
 	// Don't forget the .eval() next time...
-	x = x.segment(0,dsoSize).eval();
+	//x.segment(0,dsoSize).eval();
+	VecX x = VecX::Zero(dsoSize);
+	// Undo addBDso()..
+	x.head<CPARS>() = xFull.head<CPARS>();
+	for (int f = 0 ; f < nFrames ; f++) {
+		x.segment<FPARS>(CPARS + f * FPARS) = xFull.segment<FPARS>(ICPARS + f * IFPARS);
+	}
 
 	if((setting_solverMode & SOLVER_ORTHOGONALIZE_X) || (iteration >= 2 && (setting_solverMode & SOLVER_ORTHOGONALIZE_X_LATER)))
 	{
@@ -892,8 +906,34 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 
 	//resubstituteF(x, HCalib);
 	currentLambda= lambda;
-	resubstituteF_MT(x, HCalib,multiThreading);
+	resubstituteF_MT(x, HCalib, multiThreading);
 	currentLambda=0;
+}
+
+void EnergyFunctional::addBDso(VecX &dsoB, VecX &fullB) {
+	fullB.head<CPARS>() = dsoB.head<CPARS>();
+	for (int f = 0 ; f < nFrames ; f++) {
+		fullB.segment<FPARS>(ICPARS + f * IFPARS) = dsoB.segment<FPARS>(CPARS + f * FPARS);
+	}
+}
+
+void EnergyFunctional::addHDso(MatXX &dsoH, MatXX &fullH) {
+	fullH.topLeftCorner<CPARS,CPARS>() = dsoH.topLeftCorner<CPARS,CPARS>();
+
+	for (int i = 0 ; i < nFrames ; i++) {
+		int di = CPARS + i * FPARS;
+		int fi = ICPARS + i * IFPARS;
+
+		fullH.block<CPARS,FPARS>(0,fi) = dsoH.block<CPARS,FPARS>(0,di);
+		fullH.block<FPARS,CPARS>(fi,0) = dsoH.block<FPARS,CPARS>(di,0);
+
+		for (int j = 0 ; j < nFrames ; j++) {
+			int dj = CPARS + j * FPARS;
+			int fj = ICPARS + j * IFPARS;
+
+			fullH.block<FPARS,FPARS>(fi,fj) = dsoH.block<FPARS,FPARS>(di,dj);
+		}
+	}
 }
 
 // WIP
