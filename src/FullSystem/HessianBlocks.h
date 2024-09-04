@@ -158,20 +158,20 @@ struct FrameHessian
 
 	// variable info.
 	SE3 worldToCam_evalPT;
-	VecF state_zero;
+	VecIF state_zero;
 	// Confusingly(to non-mathematicians) the "scaled state" is the real world. The "state" is the estimate in the optimiser.
-	VecF state_scaled;
-	VecF state;	// [0-5: worldToCam-leftEps. 6-7: a,b]
-	VecF step;
-	VecF step_backup;
-	VecF state_backup;
+	VecIF state_scaled;
+	VecIF state;	// [0-5: worldToCam-leftEps. 6-7: a,b]
+	VecIF step;
+	VecIF step_backup;
+	VecIF state_backup;
 
 
     EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return worldToCam_evalPT;}
-    EIGEN_STRONG_INLINE const VecF &get_state_zero() const {return state_zero;}
-    EIGEN_STRONG_INLINE const VecF &get_state() const {return state;}
-    EIGEN_STRONG_INLINE const VecF &get_state_scaled() const {return state_scaled;}
-    EIGEN_STRONG_INLINE const VecF get_state_minus_stateZero() const {return get_state() - get_state_zero();}
+    EIGEN_STRONG_INLINE const VecIF &get_state_zero() const {return state_zero;}
+    EIGEN_STRONG_INLINE const VecIF &get_state() const {return state;}
+    EIGEN_STRONG_INLINE const VecIF &get_state_scaled() const {return state_scaled;}
+    EIGEN_STRONG_INLINE const VecIF get_state_minus_stateZero() const {return get_state() - get_state_zero();}
 
 
 	// precalc values
@@ -187,7 +187,7 @@ struct FrameHessian
 
 
 
-	inline void setState(const VecF &state)
+	inline void setState(const VecIF &state)
 	{
 
 		this->state = state;
@@ -238,9 +238,9 @@ struct FrameHessian
 
     void makeImages(float* color, CalibHessian* HCalib);
 
-	inline VecF getPrior()
+	inline VecIF getPrior()
 	{
-		VecF p =  VecF::Zero();
+		VecIF p =  VecIF::Zero();
 		if(frameID==0)
 		{
 			p.head<3>() = Vec3::Constant(setting_initialTransPrior);
@@ -268,9 +268,9 @@ struct FrameHessian
 	}
 
 
-	inline VecF getPriorZero()
+	inline VecIF getPriorZero()
 	{
-		return VecF::Zero();
+		return VecIF::Zero();
 	}
 
 };

@@ -218,11 +218,11 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 //	float meanStepC=0,meanStepP=0,meanStepD=0;
 //	meanStepC += Hcalib.step.norm();
 
-	VecF pstepfac;
+	VecIF pstepfac;
 	pstepfac.segment<3>(0).setConstant(stepfacT);
 	pstepfac.segment<3>(3).setConstant(stepfacR);
 	pstepfac.segment<2>(6).setConstant(stepfacA);
-	//pstepfac.segment<3>(10).setConstant(stepfacV);
+	pstepfac.segment<3>(8).setConstant(stepfacV);
 
 
 	float sumA=0, sumB=0, sumT=0, sumR=0, sumV=0, sumID=0, numID=0;
@@ -234,7 +234,7 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 		Hcalib.setValue(Hcalib.value_backup + Hcalib.step);
 		for(FrameHessian* fh : frameHessians)
 		{
-			VecF step = fh->step;
+			VecIF step = fh->step;
 			step.head<6>() += 0.5f*(fh->step_backup.head<6>());
 
 			fh->setState(fh->state_backup + step);

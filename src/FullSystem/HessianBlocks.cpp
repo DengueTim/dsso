@@ -71,7 +71,7 @@ void PointHessian::release()
 }
 
 void FrameHessian::setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l_scaled) {
-	VecF initial_state = VecF::Zero();
+	VecIF initial_state = VecIF::Zero();
 	initial_state[6] = aff_g2l_scaled.a;
 	initial_state[7] = aff_g2l_scaled.b;
 	this->worldToCam_evalPT = worldToCam_evalPT;

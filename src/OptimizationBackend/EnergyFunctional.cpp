@@ -176,15 +176,15 @@ void EnergyFunctional::setDeltaF(CalibHessian* HCalib)
 		for(int t=0;t<nFrames;t++)
 		{
 			int idx = h+t*nFrames;
-			adHTdeltaF[idx] = frames[h]->data->get_state_minus_stateZero().cast<float>().transpose() * adHostF[idx]
-					        +frames[t]->data->get_state_minus_stateZero().cast<float>().transpose() * adTargetF[idx];
+			adHTdeltaF[idx] = frames[h]->data->get_state_minus_stateZero().head<FPARS>().cast<float>().transpose() * adHostF[idx]
+					        +frames[t]->data->get_state_minus_stateZero().head<FPARS>().cast<float>().transpose() * adTargetF[idx];
 		}
 
 	cDeltaF = HCalib->value_minus_value_zero.cast<float>();
 	for(EFFrame* f : frames)
 	{
-		f->delta = f->data->get_state_minus_stateZero().head<8>();
-		f->delta_prior = (f->data->get_state() - f->data->getPriorZero()).head<8>();
+		f->delta = f->data->get_state_minus_stateZero();
+		f->delta_prior = (f->data->get_state() - f->data->getPriorZero());
 
 		for(EFPoint* p : f->points)
 			p->deltaF = p->data->idepth-p->data->idepth_zero;
@@ -271,7 +271,7 @@ void EnergyFunctional::resubstituteF_MT(VecX x, CalibHessian* HCalib, bool MT)
 	VecCf cstep = xF.head<CPARS>();
 	for(EFFrame* h : frames)
 	{
-		h->data->step = - x.segment<FPARS>(ICPARS+IFPARS*h->idx);
+		h->data->step = - x.segment<IFPARS>(ICPARS+IFPARS*h->idx);
 
 		for(EFFrame* t : frames)
 			xAd[nFrames*h->idx + t->idx] = xF.segment<FPARS>(ICPARS+IFPARS*h->idx).transpose() *   adHostF[h->idx+nFrames*t->idx]
@@ -536,8 +536,8 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 
 
 //	// marginalize. First add prior here, instead of to active.
-    HM.bottomRightCorner<8,8>().diagonal() += fh->prior;
-    bM.tail<8>() += fh->prior.cwiseProduct(fh->delta_prior);
+    HM.bottomRightCorner<8,8>().diagonal() += fh->prior.head<FPARS>();
+    bM.tail<8>() += fh->prior.head<FPARS>().cwiseProduct(fh->delta_prior.head<FPARS>());
 
 
 
@@ -1014,7 +1014,7 @@ void EnergyFunctional::makeIDX()
 VecX EnergyFunctional::getStitchedDeltaF() const
 {
 	VecX d = VecX(CPARS+nFrames*8); d.head<CPARS>() = cDeltaF.cast<double>();
-	for(int h=0;h<nFrames;h++) d.segment<8>(CPARS+8*h) = frames[h]->delta;
+	for(int h=0;h<nFrames;h++) d.segment<8>(CPARS+8*h) = frames[h]->delta.head<FPARS>();
 	return d;
 }
 
