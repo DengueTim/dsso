@@ -667,7 +667,7 @@ std::vector<VecX> FullSystem::getNullspaces(
 	nullspaces_affB.clear();
 
 
-	int n=CPARS+frameHessians.size()*8;
+	int n=ICPARS+frameHessians.size()*IFPARS;
 	std::vector<VecX> nullspaces_x0_pre;
 	for(int i=0;i<6;i++)
 	{
@@ -675,9 +675,9 @@ std::vector<VecX> FullSystem::getNullspaces(
 		nullspace_x0.setZero();
 		for(FrameHessian* fh : frameHessians)
 		{
-			nullspace_x0.segment<6>(CPARS+fh->idx*8) = fh->nullspaces_pose.col(i);
-			nullspace_x0.segment<3>(CPARS+fh->idx*8) *= SCALE_XI_TRANS_INVERSE;
-			nullspace_x0.segment<3>(CPARS+fh->idx*8+3) *= SCALE_XI_ROT_INVERSE;
+			nullspace_x0.segment<6>(ICPARS+fh->idx*IFPARS) = fh->nullspaces_pose.col(i);
+			nullspace_x0.segment<3>(ICPARS+fh->idx*IFPARS) *= SCALE_XI_TRANS_INVERSE;
+			nullspace_x0.segment<3>(ICPARS+fh->idx*IFPARS+3) *= SCALE_XI_ROT_INVERSE;
 		}
 		nullspaces_x0_pre.push_back(nullspace_x0);
 		nullspaces_pose.push_back(nullspace_x0);
@@ -688,9 +688,9 @@ std::vector<VecX> FullSystem::getNullspaces(
 		nullspace_x0.setZero();
 		for(FrameHessian* fh : frameHessians)
 		{
-			nullspace_x0.segment<2>(CPARS+fh->idx*8+6) = fh->nullspaces_affine.col(i).head<2>();
-			nullspace_x0[CPARS+fh->idx*8+6] *= SCALE_A_INVERSE;
-			nullspace_x0[CPARS+fh->idx*8+7] *= SCALE_B_INVERSE;
+			nullspace_x0.segment<2>(ICPARS+fh->idx*IFPARS+6) = fh->nullspaces_affine.col(i).head<2>();
+			nullspace_x0[ICPARS+fh->idx*IFPARS+6] *= SCALE_A_INVERSE;
+			nullspace_x0[ICPARS+fh->idx*IFPARS+7] *= SCALE_B_INVERSE;
 		}
 		nullspaces_x0_pre.push_back(nullspace_x0);
 		if(i==0) nullspaces_affA.push_back(nullspace_x0);
@@ -701,9 +701,9 @@ std::vector<VecX> FullSystem::getNullspaces(
 	nullspace_x0.setZero();
 	for(FrameHessian* fh : frameHessians)
 	{
-		nullspace_x0.segment<6>(CPARS+fh->idx*8) = fh->nullspaces_scale;
-		nullspace_x0.segment<3>(CPARS+fh->idx*8) *= SCALE_XI_TRANS_INVERSE;
-		nullspace_x0.segment<3>(CPARS+fh->idx*8+3) *= SCALE_XI_ROT_INVERSE;
+		nullspace_x0.segment<6>(ICPARS+fh->idx*IFPARS) = fh->nullspaces_scale;
+		nullspace_x0.segment<3>(ICPARS+fh->idx*IFPARS) *= SCALE_XI_TRANS_INVERSE;
+		nullspace_x0.segment<3>(ICPARS+fh->idx*IFPARS+3) *= SCALE_XI_ROT_INVERSE;
 	}
 	nullspaces_x0_pre.push_back(nullspace_x0);
 	nullspaces_scale.push_back(nullspace_x0);

@@ -659,16 +659,19 @@ void EnergyFunctional::marginalizePointsF()
 		bool haveFirstFrame = false;
 		for(EFFrame* f : frames) if(f->frameID==0) haveFirstFrame=true;
 
-		if(!haveFirstFrame)
+		if(!haveFirstFrame) {
+			abort(); // Not updated for IMU
 			orthogonalize(&b, &H);
-
+		}
 	}
 
 	HM += setting_margWeightFac*H;
 	bM += setting_margWeightFac*b;
 
-	if(setting_solverMode & SOLVER_ORTHOGONALIZE_FULL)
+	if(setting_solverMode & SOLVER_ORTHOGONALIZE_FULL) {
+		abort(); // Not updated for IMU
 		orthogonalize(&bM, &HM);
+	}
 
 	EFIndicesValid = false;
 	makeIDX();
@@ -820,13 +823,13 @@ void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, doub
 		MatXX HDso =  HL_top + HA_top - H_sc;
 		VecX bDso =   bL_top + bA_top - b_sc;
 
-		if(!haveFirstFrame)
-			orthogonalize(&bDso, &HDso);
-
 		HDso += HM;
 		addHDso(HFull_top, HDso);
 		bDso += bM_top;
 		addBDso(bFull_top, bDso);
+
+		if(!haveFirstFrame)
+			orthogonalize(&bDso, &HDso);
 
 		lastHS = HFull_top;
 		lastbS = bFull_top;
@@ -888,18 +891,16 @@ void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, doub
 		xFull = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFull_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
 	}
 
-	// Don't forget the .eval() next time...
-	//x.segment(0,dsoSize).eval();
+	if((setting_solverMode & SOLVER_ORTHOGONALIZE_X) || (iteration >= 2 && (setting_solverMode & SOLVER_ORTHOGONALIZE_X_LATER)))
+	{
+		orthogonalize(&xFull, 0);
+	}
+
 	VecX x = VecX::Zero(dsoSize);
 	// Undo addBDso()..
 	x.head<CPARS>() = xFull.head<CPARS>();
 	for (int f = 0 ; f < nFrames ; f++) {
 		x.segment<FPARS>(CPARS + f * FPARS) = xFull.segment<FPARS>(ICPARS + f * IFPARS);
-	}
-
-	if((setting_solverMode & SOLVER_ORTHOGONALIZE_X) || (iteration >= 2 && (setting_solverMode & SOLVER_ORTHOGONALIZE_X_LATER)))
-	{
-		orthogonalize(&x, 0);
 	}
 
 	lastX = x;
