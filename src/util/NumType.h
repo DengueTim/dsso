@@ -87,6 +87,7 @@ typedef Eigen::Matrix<double,8,CPARS> Mat8C;
 typedef Eigen::Matrix<double,CPARS,8> MatC8;
 typedef Eigen::Matrix<float,8,CPARS> Mat8Cf;
 typedef Eigen::Matrix<float,CPARS,8> MatC8f;
+typedef Eigen::Matrix<double,IFPARS,IFPARS> MatIF;
 
 typedef Eigen::Matrix<double,8,8> Mat88;
 typedef Eigen::Matrix<double,7,7> Mat77;

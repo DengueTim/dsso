@@ -121,8 +121,8 @@ EnergyFunctional::EnergyFunctional()
 
 	nFrames = nResiduals = nPoints = 0;
 
-	HM = MatXX::Zero(CPARS,CPARS);
-	bM = VecX::Zero(CPARS);
+	HM = MatXX::Zero(ICPARS,ICPARS);
+	bM = VecX::Zero(ICPARS);
 
 
 	accSSE_top_L = new AccumulatedTopHessianSSE();
@@ -263,12 +263,14 @@ void EnergyFunctional::accumulateSCF_MT(MatXX &H, VecX &b, bool MT)
 void EnergyFunctional::resubstituteF_MT(VecX x, CalibHessian* HCalib, bool MT)
 {
 	assert(x.size() == ICPARS+nFrames*IFPARS);
+	assert(!x.hasNaN());
 
 	VecXf xF = x.cast<float>();
 	HCalib->step = - x.head<CPARS>();
 
 	Mat18f* xAd = new Mat18f[nFrames*nFrames];
 	VecCf cstep = xF.head<CPARS>();
+
 	for(EFFrame* h : frames)
 	{
 		h->data->step = - x.segment<IFPARS>(ICPARS+IFPARS*h->idx);
@@ -434,12 +436,12 @@ EFFrame* EnergyFunctional::insertFrame(FrameHessian* fh, CalibHessian* Hcalib)
 	nFrames++;
 	fh->efFrame = eff;
 
-	assert(HM.cols() == 8*nFrames+CPARS-8);
-	bM.conservativeResize(8*nFrames+CPARS);
-	HM.conservativeResize(8*nFrames+CPARS,8*nFrames+CPARS);
-	bM.tail<8>().setZero();
-	HM.rightCols<8>().setZero();
-	HM.bottomRows<8>().setZero();
+	assert(HM.cols() == IFPARS*nFrames+ICPARS-IFPARS);
+	bM.conservativeResize(IFPARS*nFrames+ICPARS);
+	HM.conservativeResize(IFPARS*nFrames+ICPARS,IFPARS*nFrames+ICPARS);
+	bM.tail<IFPARS>().setZero();
+	HM.rightCols<IFPARS>().setZero();
+	HM.bottomRows<IFPARS>().setZero();
 
 	EFIndicesValid = false;
 	EFAdjointsValid=false;
@@ -502,51 +504,42 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 	assert(EFIndicesValid);
 
 	assert((int)fh->points.size()==0);
-	int ndim = nFrames*8+CPARS-8;// new dimension
-	int odim = nFrames*8+CPARS;// old dimension
-
+	const int odim = ICPARS + IFPARS * nFrames;// old dimension
+	const int ndim = odim - IFPARS;// new dimension
 
 //	VecX eigenvaluesPre = HM.eigenvalues().real();
 //	std::sort(eigenvaluesPre.data(), eigenvaluesPre.data()+eigenvaluesPre.size());
 //
 
+	if((int)fh->idx != (int)frames.size()-1) {
+		const int io = ICPARS + IFPARS * fh->idx;	// index of frame to move to end
+		const int ntail = IFPARS*(nFrames-fh->idx-1);
+		assert((io+IFPARS+ntail) == odim);
 
-
-	if((int)fh->idx != (int)frames.size()-1)
-	{
-		int io = fh->idx*8+CPARS;	// index of frame to move to end
-		int ntail = 8*(nFrames-fh->idx-1);
-		assert((io+8+ntail) == nFrames*8+CPARS);
-
-		Vec8 bTmp = bM.segment<8>(io);
+		VecIF bTmp = bM.segment<IFPARS>(io);
 		VecX tailTMP = bM.tail(ntail);
 		bM.segment(io,ntail) = tailTMP;
-		bM.tail<8>() = bTmp;
+		bM.tail<IFPARS>() = bTmp;
 
-		MatXX HtmpCol = HM.block(0,io,odim,8);
+		MatXX HtmpCol = HM.block(0,io,odim,IFPARS);
 		MatXX rightColsTmp = HM.rightCols(ntail);
 		HM.block(0,io,odim,ntail) = rightColsTmp;
-		HM.rightCols(8) = HtmpCol;
+		HM.rightCols(IFPARS) = HtmpCol;
 
-		MatXX HtmpRow = HM.block(io,0,8,odim);
+		MatXX HtmpRow = HM.block(io,0,IFPARS,odim);
 		MatXX botRowsTmp = HM.bottomRows(ntail);
 		HM.block(io,0,ntail,odim) = botRowsTmp;
-		HM.bottomRows(8) = HtmpRow;
+		HM.bottomRows(IFPARS) = HtmpRow;
 	}
 
-
 //	// marginalize. First add prior here, instead of to active.
-    HM.bottomRightCorner<8,8>().diagonal() += fh->prior.head<FPARS>();
-    bM.tail<8>() += fh->prior.head<FPARS>().cwiseProduct(fh->delta_prior.head<FPARS>());
-
-
+    HM.bottomRightCorner<IFPARS,IFPARS>().diagonal() += fh->prior;
+    bM.tail<IFPARS>() += fh->prior.cwiseProduct(fh->delta_prior);
 
 //	std::cout << std::setprecision(16) << "HMPre:\n" << HM << "\n\n";
 
-
 	VecX SVec = (HM.diagonal().cwiseAbs()+VecX::Constant(HM.cols(), 10)).cwiseSqrt();
 	VecX SVecI = SVec.cwiseInverse();
-
 
 //	std::cout << std::setprecision(16) << "SVec: " << SVec.transpose() << "\n\n";
 //	std::cout << std::setprecision(16) << "SVecI: " << SVecI.transpose() << "\n\n";
@@ -556,15 +549,15 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 	VecX bMScaled =  SVecI.asDiagonal() * bM;
 
 	// invert bottom part!
-	Mat88 hpi = HMScaled.bottomRightCorner<8,8>();
+	MatIF hpi = HMScaled.bottomRightCorner<IFPARS,IFPARS>();
 	hpi = 0.5f*(hpi+hpi);
 	hpi = hpi.inverse();
 	hpi = 0.5f*(hpi+hpi);
 
 	// schur-complement!
-	MatXX bli = HMScaled.bottomLeftCorner(8,ndim).transpose() * hpi;
-	HMScaled.topLeftCorner(ndim,ndim).noalias() -= bli * HMScaled.bottomLeftCorner(8,ndim);
-	bMScaled.head(ndim).noalias() -= bli*bMScaled.tail<8>();
+	MatXX bli = HMScaled.bottomLeftCorner(IFPARS,ndim).transpose() * hpi;
+	HMScaled.topLeftCorner(ndim,ndim).noalias() -= bli * HMScaled.bottomLeftCorner(IFPARS,ndim);
+	bMScaled.head(ndim).noalias() -= bli*bMScaled.tail<IFPARS>();
 
 	//unscale!
 	HMScaled = SVec.asDiagonal() * HMScaled * SVec.asDiagonal();
@@ -584,10 +577,11 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 	nFrames--;
 	fh->data->efFrame=0;
 
-	assert((int)frames.size()*8+CPARS == (int)HM.rows());
-	assert((int)frames.size()*8+CPARS == (int)HM.cols());
-	assert((int)frames.size()*8+CPARS == (int)bM.size());
-	assert((int)frames.size() == (int)nFrames);
+	assert(ndim == frames.size()*IFPARS+ICPARS);
+	assert(ndim == HM.rows());
+	assert(ndim == HM.cols());
+	assert(ndim == bM.size());
+	assert(frames.size() == nFrames);
 
 
 
@@ -649,8 +643,15 @@ void EnergyFunctional::marginalizePointsF()
 
 	resInM+= accSSE_top_A->nres[0];
 
-	MatXX H =  M-Msc;
-    VecX b =  Mb-Mbsc;
+	MatXX HDso =  M-Msc;
+    VecX bDso =  Mb-Mbsc;
+
+	const size_t fullSize = ICPARS + nFrames * IFPARS;
+	MatXX H = MatXX::Identity(fullSize, fullSize);
+	VecX b = VecX::Zero(fullSize);
+
+	addHDso(HDso,H);
+	addBDso(bDso,b);
 
 	if(setting_solverMode & SOLVER_ORTHOGONALIZE_POINTMARG)
 	{
@@ -658,17 +659,14 @@ void EnergyFunctional::marginalizePointsF()
 		bool haveFirstFrame = false;
 		for(EFFrame* f : frames) if(f->frameID==0) haveFirstFrame=true;
 
-		if(!haveFirstFrame) {
-			abort(); // Not updated for IMU
+		if(!haveFirstFrame)
 			orthogonalize(&b, &H);
-		}
 	}
 
 	HM += setting_margWeightFac*H;
 	bM += setting_margWeightFac*b;
 
 	if(setting_solverMode & SOLVER_ORTHOGONALIZE_FULL) {
-		abort(); // Not updated for IMU
 		orthogonalize(&bM, &HM);
 	}
 
@@ -791,13 +789,12 @@ void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, doub
 	assert(EFIndicesValid);
 
 	MatXX HL_top, HA_top, H_sc;
-	VecX  bL_top, bA_top, b_sc, bM_top;
+	VecX  bL_top, bA_top, b_sc;
 
 	accumulateAF_MT(HA_top, bA_top,multiThreading);
 	accumulateLF_MT(HL_top, bL_top,multiThreading);
 	accumulateSCF_MT(H_sc, b_sc,multiThreading);
 
-	bM_top = (bM+ HM * getStitchedDeltaF());
 
 	const size_t dsoSize = CPARS + nFrames * FPARS;
 	/* Allocated and compute top left H with IMU factors.
@@ -814,6 +811,11 @@ void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, doub
 	VecX bFull_top = VecX::Zero(fullSize);
 	//addImuFactors(HFull_top, bFull_top);
 
+	assert(!HM.hasNaN());
+	assert(!bM.hasNaN());
+
+	MatXX bM_top = (bM+ HM * getStitchedDeltaF());
+
 	if(setting_solverMode & SOLVER_ORTHOGONALIZE_SYSTEM) {
 		// have a look if prior is there.
 		bool haveFirstFrame = false;
@@ -822,6 +824,7 @@ void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, doub
 		MatXX HDso =  HL_top + HA_top - H_sc;
 		VecX bDso =   bL_top + bA_top - b_sc;
 
+		abort(); //HM & bM_top have imu factors.
 		HDso += HM;
 		addHDso(HFull_top, HDso);
 		bDso += bM_top;
@@ -835,11 +838,14 @@ void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, doub
 
 		for(int i=0;i<dsoSize;i++) HFull_top(i, i) *= (1+lambda);
 	} else {
-		MatXX HDso = HL_top + HM + HA_top;
+		MatXX HDso = HL_top + HA_top;
 		addHDso(HDso, HFull_top);
+		HFull_top += HM;
 
-		VecX bDso = bL_top + bM_top + bA_top - b_sc;
+		VecX bDso = bL_top + bA_top - b_sc;
 		addBDso(bDso, bFull_top);
+
+		bFull_top += bM_top;
 
 		MatXX HFull_sc = MatXX::Zero(fullSize, fullSize);
 		addHDso(H_sc, HFull_sc);
@@ -851,6 +857,8 @@ void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, doub
 		HFull_top -= HFull_sc * (1.0f/(1+lambda));
 	}
 
+	assert(!HFull_top.hasNaN());
+	assert(!bFull_top.hasNaN());
 
 	VecX x;
 	if(setting_solverMode & SOLVER_SVD)
@@ -1013,11 +1021,10 @@ void EnergyFunctional::makeIDX()
 
 VecX EnergyFunctional::getStitchedDeltaF() const
 {
-	VecX d = VecX(CPARS+nFrames*8); d.head<CPARS>() = cDeltaF.cast<double>();
-	for(int h=0;h<nFrames;h++) d.segment<8>(CPARS+8*h) = frames[h]->delta.head<FPARS>();
+	VecX d = VecX(ICPARS+nFrames*IFPARS); d.head<CPARS>() = cDeltaF.cast<double>();
+	for(int h=0;h<nFrames;h++) d.segment<IFPARS>(ICPARS+IFPARS*h) = frames[h]->delta;
+	assert(!d.hasNaN());
 	return d;
 }
-
-
 
 }

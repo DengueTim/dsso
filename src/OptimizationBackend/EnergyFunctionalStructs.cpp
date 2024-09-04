@@ -53,6 +53,7 @@ void EFFrame::takeData()
 {
 	prior = data->getPrior();
 	delta = data->get_state_minus_stateZero();
+	assert(!delta.hasNaN());
 	delta_prior =  (data->get_state() - data->getPriorZero());
 
 

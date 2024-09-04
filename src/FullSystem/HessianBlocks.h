@@ -187,16 +187,16 @@ struct FrameHessian
 
 
 
-	inline void setState(const VecIF &state)
+	inline void setState(const VecIF &newState)
 	{
-
-		this->state = state;
+		state = newState;
 		state_scaled.segment<3>(0) = SCALE_XI_TRANS * state.segment<3>(0);
 		state_scaled.segment<3>(3) = SCALE_XI_ROT * state.segment<3>(3);
 		state_scaled[6] = SCALE_A * state[6];
 		state_scaled[7] = SCALE_B * state[7];
-//		state_scaled[8] = SCALE_A * state[8];
-//		state_scaled[9] = SCALE_B * state[9];
+		state_scaled[8] = 0;
+		state_scaled[9] = 0;
+		state_scaled[10] = 0;
 
 		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
 		PRE_camToWorld = PRE_worldToCam.inverse();
@@ -230,7 +230,12 @@ struct FrameHessian
 		efFrame = 0;
 		frameEnergyTH = 8*8*patternNum;
 
-
+		state_zero.setZero();
+		state_scaled.setZero();
+		state.setZero();
+		step.setZero();
+		step_backup.setZero();
+		state_backup.setZero();
 
 		debugImage=0;
 	};
