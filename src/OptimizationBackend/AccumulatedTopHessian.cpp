@@ -231,8 +231,10 @@ void AccumulatedTopHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional 
 		b.head<CPARS>() += EF->cPrior.cwiseProduct(EF->cDeltaF.cast<double>());
 		for(int h=0;h<nframes[tid];h++)
 		{
-            H.diagonal().segment<8>(CPARS+h*8) += EF->frames[h]->prior.head<FPARS>();
-            b.segment<8>(CPARS+h*8) += EF->frames[h]->prior.head<FPARS>().cwiseProduct(EF->frames[h]->delta_prior.head<FPARS>());
+			H.diagonal().segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>();
+			H.diagonal().segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>();
+			b.segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>().cwiseProduct(EF->frames[h]->delta_prior.head<6>());
+			b.segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>().cwiseProduct(EF->frames[h]->delta_prior.tail<2>());
 		}
 	}
 }
@@ -289,15 +291,14 @@ void AccumulatedTopHessianSSE::stitchDoubleInternal(
 
 
 	// only do this on one thread.
-	if(min==0 && usePrior)
-	{
+	if(min==0 && usePrior) {
 		H[tid].diagonal().head<CPARS>() += EF->cPrior;
 		b[tid].head<CPARS>() += EF->cPrior.cwiseProduct(EF->cDeltaF.cast<double>());
-		for(int h=0;h<nframes[tid];h++)
-		{
-            H[tid].diagonal().segment<8>(CPARS+h*8) += EF->frames[h]->prior.head<FPARS>();
-            b[tid].segment<8>(CPARS+h*8) += EF->frames[h]->prior.head<FPARS>().cwiseProduct(EF->frames[h]->delta_prior.head<FPARS>());
-
+		for(int h=0;h<nframes[tid];h++) {
+			H[tid].diagonal().segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>();
+			H[tid].diagonal().segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>();
+			b[tid].segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>().cwiseProduct(EF->frames[h]->delta_prior.head<6>());
+			b[tid].segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>().cwiseProduct(EF->frames[h]->delta_prior.tail<2>());
 		}
 	}
 }

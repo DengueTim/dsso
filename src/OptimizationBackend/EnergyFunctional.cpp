@@ -176,8 +176,13 @@ void EnergyFunctional::setDeltaF(CalibHessian* HCalib)
 		for(int t=0;t<nFrames;t++)
 		{
 			int idx = h+t*nFrames;
-			adHTdeltaF[idx] = frames[h]->data->get_state_minus_stateZero().head<FPARS>().cast<float>().transpose() * adHostF[idx]
-					        +frames[t]->data->get_state_minus_stateZero().head<FPARS>().cast<float>().transpose() * adTargetF[idx];
+			// Remove velocity..
+			VecIF hZero = frames[h]->data->get_state_minus_stateZero();
+			VecIF tZero = frames[t]->data->get_state_minus_stateZero();
+			hZero.segment<2>(6) = hZero.tail<2>();
+			tZero.segment<2>(6) = tZero.tail<2>();
+			adHTdeltaF[idx] = hZero.head<FPARS>().cast<float>().transpose() * adHostF[idx]
+					        +tZero.head<FPARS>().cast<float>().transpose() * adTargetF[idx];
 		}
 
 	cDeltaF = HCalib->value_minus_value_zero.cast<float>();
@@ -275,9 +280,16 @@ void EnergyFunctional::resubstituteF_MT(VecX x, CalibHessian* HCalib, bool MT)
 	{
 		h->data->step = - x.segment<IFPARS>(ICPARS+IFPARS*h->idx);
 
-		for(EFFrame* t : frames)
-			xAd[nFrames*h->idx + t->idx] = xF.segment<FPARS>(ICPARS+IFPARS*h->idx).transpose() *   adHostF[h->idx+nFrames*t->idx]
-			            + xF.segment<FPARS>(ICPARS+IFPARS*t->idx).transpose() * adTargetF[h->idx+nFrames*t->idx];
+		for(EFFrame* t : frames) {
+			Vec8f xh;
+			xh.head<6>() = xF.segment<6>(ICPARS+IFPARS*h->idx);
+			xh.tail<2>() = xF.segment<2>(ICPARS+IFPARS*h->idx+9);
+			Vec8f xt;
+			xt.head<6>() = xF.segment<6>(ICPARS+IFPARS*t->idx);
+			xt.tail<2>() = xF.segment<2>(ICPARS+IFPARS*t->idx+9);
+			xAd[nFrames * h->idx + t->idx] =
+				xt.transpose() * adHostF[h->idx + nFrames * t->idx] + xh.transpose() * adTargetF[h->idx + nFrames * t->idx];
+		}
 	}
 
 	if(MT)
@@ -402,8 +414,10 @@ double EnergyFunctional::calcLEnergyF_MT()
 	assert(EFIndicesValid);
 
 	double E = 0;
-	for(EFFrame* f : frames)
-        E += f->delta_prior.cwiseProduct(f->prior).dot(f->delta_prior);
+	for(EFFrame* f : frames) {
+		E += f->delta_prior.head<6>().cwiseProduct(f->prior.head<6>()).dot(f->delta_prior.head<6>());
+		E += f->delta_prior.tail<2>().cwiseProduct(f->prior.tail<2>()).dot(f->delta_prior.tail<2>());
+	}
 
 	E += cDeltaF.cwiseProduct(cPriorF).dot(cDeltaF);
 
@@ -779,7 +793,7 @@ void EnergyFunctional::orthogonalize(VecX* b, MatXX* H)
 }
 
 
-void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* HCalib)
+void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* HCalib)
 {
 	if(setting_solverMode & SOLVER_USE_GN) lambda=0;
 	if(setting_solverMode & SOLVER_FIX_LAMBDA) lambda = 1e-5;
@@ -913,7 +927,8 @@ void __attribute__((optnone)) EnergyFunctional::solveSystemF(int iteration, doub
 void EnergyFunctional::addBDso(VecX &dsoB, VecX &fullB) {
 	fullB.head<CPARS>() = dsoB.head<CPARS>();
 	for (int f = 0 ; f < nFrames ; f++) {
-		fullB.segment<FPARS>(ICPARS + f * IFPARS) = dsoB.segment<FPARS>(CPARS + f * FPARS);
+		fullB.segment<6>(ICPARS + f * IFPARS) = dsoB.segment<6>(CPARS + f * FPARS);
+		fullB.segment<2>(ICPARS + f * IFPARS + 9) = dsoB.segment<2>(CPARS + f * FPARS + 6);
 	}
 }
 
@@ -924,14 +939,19 @@ void EnergyFunctional::addHDso(MatXX &dsoH, MatXX &fullH) {
 		int di = CPARS + i * FPARS;
 		int fi = ICPARS + i * IFPARS;
 
-		fullH.block<CPARS,FPARS>(0,fi) = dsoH.block<CPARS,FPARS>(0,di);
-		fullH.block<FPARS,CPARS>(fi,0) = dsoH.block<FPARS,CPARS>(di,0);
+		fullH.block<CPARS,6>(0,fi) = dsoH.block<CPARS,6>(0,di);
+		fullH.block<CPARS,2>(0,fi+9) = dsoH.block<CPARS,2>(0,di+6);
+		fullH.block<6,CPARS>(fi,0) = dsoH.block<6,CPARS>(di,0);
+		fullH.block<2,CPARS>(fi+9,0) = dsoH.block<2,CPARS>(di+6,0);
 
 		for (int j = 0 ; j < nFrames ; j++) {
 			int dj = CPARS + j * FPARS;
 			int fj = ICPARS + j * IFPARS;
 
-			fullH.block<FPARS,FPARS>(fi,fj) = dsoH.block<FPARS,FPARS>(di,dj);
+			fullH.block<6,6>(fi,fj) = dsoH.block<6,6>(di,dj);
+			fullH.block<2,2>(fi+9,fj+9) = dsoH.block<2,2>(di+6,dj+6);
+			fullH.block<6,2>(fi,fj+9) = dsoH.block<6,2>(di,dj+6);
+			fullH.block<2,6>(fi+9,fj) = dsoH.block<2,6>(di+6,dj);
 		}
 	}
 }

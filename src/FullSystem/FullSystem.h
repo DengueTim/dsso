@@ -198,7 +198,7 @@ private:
 	// solce. eventually migrate to ef.
 	void solveSystem(int iteration, double lambda);
 	Vec3 linearizeAll(bool fixLinearization);
-	bool doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float stepfacA,float stepfacD,float stepfacV);
+	bool doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float stepfacV,float stepfacA,float stepfacD);
 	void backupState(bool backupLastStep);
 	void loadSateBackup();
 	double calcLEnergy();

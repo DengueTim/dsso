@@ -213,7 +213,7 @@ Vec3 FullSystem::linearizeAll(bool fixLinearization)
 
 
 // applies step to linearization point.
-bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float stepfacA,float stepfacD,float stepfacV)
+bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float stepfacV,float stepfacA,float stepfacD)
 {
 //	float meanStepC=0,meanStepP=0,meanStepD=0;
 //	meanStepC += Hcalib.step.norm();
@@ -221,8 +221,8 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 	VecIF pstepfac;
 	pstepfac.segment<3>(0).setConstant(stepfacT);
 	pstepfac.segment<3>(3).setConstant(stepfacR);
-	pstepfac.segment<2>(6).setConstant(stepfacA);
-	pstepfac.segment<3>(8).setConstant(stepfacV);
+	pstepfac.segment<3>(6).setConstant(0);//stepfacV);
+	pstepfac.segment<2>(9).setConstant(stepfacA);
 
 
 	float sumA=0, sumB=0, sumT=0, sumR=0, sumV=0, sumID=0, numID=0;
@@ -235,14 +235,14 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 		for(FrameHessian* fh : frameHessians)
 		{
 			VecIF step = fh->step;
-			step.head<6>() += 0.5f*(fh->step_backup.head<6>());
+			step.head<9>() += 0.5f*(fh->step_backup.head<9>());
 
 			fh->setState(fh->state_backup + step);
-			sumA += step[6]*step[6];
-			sumB += step[7]*step[7];
+			sumA += step[9]*step[9];
+			sumB += step[10]*step[10];
 			sumT += step.segment<3>(0).squaredNorm();
 			sumR += step.segment<3>(3).squaredNorm();
-			//sumV += step.segment<3>(10).squaredNorm();
+			sumV += step.segment<3>(6).squaredNorm();
 
 			for(PointHessian* ph : fh->pointHessians)
 			{
@@ -262,11 +262,11 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 		for(FrameHessian* fh : frameHessians)
 		{
 			fh->setState(fh->state_backup + pstepfac.cwiseProduct(fh->step));
-			sumA += fh->step[6]*fh->step[6];
-			sumB += fh->step[7]*fh->step[7];
+			sumA += fh->step[9]*fh->step[9];
+			sumB += fh->step[10]*fh->step[10];
 			sumT += fh->step.segment<3>(0).squaredNorm();
 			sumR += fh->step.segment<3>(3).squaredNorm();
-			//sumV += fh->step.segment<3>(10).squaredNorm();
+			sumV += fh->step.segment<3>(6).squaredNorm();
 
 			for(PointHessian* ph : fh->pointHessians)
 			{
@@ -688,9 +688,9 @@ std::vector<VecX> FullSystem::getNullspaces(
 		nullspace_x0.setZero();
 		for(FrameHessian* fh : frameHessians)
 		{
-			nullspace_x0.segment<2>(ICPARS+fh->idx*IFPARS+6) = fh->nullspaces_affine.col(i).head<2>();
-			nullspace_x0[ICPARS+fh->idx*IFPARS+6] *= SCALE_A_INVERSE;
-			nullspace_x0[ICPARS+fh->idx*IFPARS+7] *= SCALE_B_INVERSE;
+			nullspace_x0.segment<2>(ICPARS+fh->idx*IFPARS+9) = fh->nullspaces_affine.col(i).head<2>();
+			nullspace_x0[ICPARS+fh->idx*IFPARS+9] *= SCALE_A_INVERSE;
+			nullspace_x0[ICPARS+fh->idx*IFPARS+10] *= SCALE_B_INVERSE;
 		}
 		nullspaces_x0_pre.push_back(nullspace_x0);
 		if(i==0) nullspaces_affA.push_back(nullspace_x0);

@@ -72,18 +72,16 @@ void PointHessian::release()
 
 void FrameHessian::setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l_scaled) {
 	VecIF initial_state = VecIF::Zero();
-	initial_state[6] = aff_g2l_scaled.a;
-	initial_state[7] = aff_g2l_scaled.b;
+	initial_state[9] = aff_g2l_scaled.a;
+	initial_state[10] = aff_g2l_scaled.b;
 	this->worldToCam_evalPT = worldToCam_evalPT;
 
 	state_scaled = initial_state;
 	state.segment<3>(0) = SCALE_XI_TRANS_INVERSE * initial_state.segment<3>(0);
 	state.segment<3>(3) = SCALE_XI_ROT_INVERSE * initial_state.segment<3>(3);
-	state[6] = SCALE_A_INVERSE * initial_state[6];
-	state[7] = SCALE_B_INVERSE * initial_state[7];
-	state[8] = 0;
-	state[9] = 0;
-	state[10] = 0;
+	state.segment<3>(6) = SCALE_VELOCITY_INVERSE * initial_state.segment<3>(6);
+	state[9] = SCALE_A_INVERSE * initial_state[9];
+	state[10] = SCALE_B_INVERSE * initial_state[10];
 
 	PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
 	PRE_camToWorld = PRE_worldToCam.inverse();

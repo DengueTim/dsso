@@ -65,6 +65,7 @@ extern float setting_kfGlobalWeight;
 extern float setting_idepthFixPrior;
 extern float setting_idepthFixPriorMargFac;
 extern float setting_initialRotPrior;
+extern float setting_initialVelPrior;
 extern float setting_initialTransPrior;
 extern float setting_initialAffBPrior;
 extern float setting_initialAffAPrior;

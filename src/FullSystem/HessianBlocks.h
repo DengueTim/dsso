@@ -161,17 +161,16 @@ struct FrameHessian
 	VecIF state_zero;
 	// Confusingly(to non-mathematicians) the "scaled state" is the real world. The "state" is the estimate in the optimiser.
 	VecIF state_scaled;
-	VecIF state;	// [0-5: worldToCam-leftEps. 6-7: a,b]
+	VecIF state;	// [0-5: worldToCam-leftEps. 6-8 velocity, 9-10: a,b]
 	VecIF step;
 	VecIF step_backup;
 	VecIF state_backup;
 
 
     EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return worldToCam_evalPT;}
-    EIGEN_STRONG_INLINE const VecIF &get_state_zero() const {return state_zero;}
     EIGEN_STRONG_INLINE const VecIF &get_state() const {return state;}
     EIGEN_STRONG_INLINE const VecIF &get_state_scaled() const {return state_scaled;}
-    EIGEN_STRONG_INLINE const VecIF get_state_minus_stateZero() const {return get_state() - get_state_zero();}
+    EIGEN_STRONG_INLINE const VecIF get_state_minus_stateZero() const {return state - state_zero;}
 
 
 	// precalc values
@@ -181,9 +180,9 @@ struct FrameHessian
 	MinimalImageB3* debugImage;
 
 
-    inline Vec6 w2c_leftEps() const {return get_state_scaled().head<6>();}
-    inline AffLight aff_g2l() const {return AffLight(get_state_scaled()[6], get_state_scaled()[7]);}
-    inline AffLight aff_g2l_0() const {return AffLight(get_state_zero()[6]*SCALE_A, get_state_zero()[7]*SCALE_B);}
+    inline Vec6 w2c_leftEps() const {return state_scaled.head<6>();}
+    inline AffLight aff_g2l() const {return AffLight(state_scaled[9], state_scaled[10]);}
+    inline AffLight aff_g2l_0() const {return AffLight(state_zero[9]*SCALE_A, state_zero[10]*SCALE_B);}
 
 
 
@@ -192,11 +191,9 @@ struct FrameHessian
 		state = newState;
 		state_scaled.segment<3>(0) = SCALE_XI_TRANS * state.segment<3>(0);
 		state_scaled.segment<3>(3) = SCALE_XI_ROT * state.segment<3>(3);
-		state_scaled[6] = SCALE_A * state[6];
-		state_scaled[7] = SCALE_B * state[7];
-		state_scaled[8] = 0;
-		state_scaled[9] = 0;
-		state_scaled[10] = 0;
+		state_scaled.segment<3>(6) = SCALE_VELOCITY * state.segment<3>(6);
+		state_scaled[9] = SCALE_A * state[9];
+		state_scaled[10] = SCALE_B * state[10];
 
 		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
 		PRE_camToWorld = PRE_worldToCam.inverse();
@@ -217,8 +214,6 @@ struct FrameHessian
 			delete[]  absSquaredGrad[i];
 
 		}
-
-
 
 		if(debugImage != 0) delete debugImage;
 	};
@@ -246,29 +241,28 @@ struct FrameHessian
 	inline VecIF getPrior()
 	{
 		VecIF p =  VecIF::Zero();
-		if(frameID==0)
-		{
-			p.head<3>() = Vec3::Constant(setting_initialTransPrior);
-			p.segment<3>(3) = Vec3::Constant(setting_initialRotPrior);
-			if(setting_solverMode & SOLVER_REMOVE_POSEPRIOR) p.head<6>().setZero();
+		if(frameID==0) {
+			if (!(setting_solverMode & SOLVER_REMOVE_POSEPRIOR)) {
+				p.head<3>() = Vec3::Constant(setting_initialTransPrior);
+				p.segment<3>(3) = Vec3::Constant(setting_initialRotPrior);
+				p.segment<3>(6) = Vec3::Constant(setting_initialVelPrior);
+			}
 
-			p[6] = setting_initialAffAPrior;
-			p[7] = setting_initialAffBPrior;
+			p[9] = setting_initialAffAPrior;
+			p[10] = setting_initialAffBPrior;
 		}
 		else
 		{
 			if(setting_affineOptModeA < 0)
-				p[6] = setting_initialAffAPrior;
+				p[9] = setting_initialAffAPrior;
 			else
-				p[6] = setting_affineOptModeA;
+				p[9] = setting_affineOptModeA;
 
 			if(setting_affineOptModeB < 0)
-				p[7] = setting_initialAffBPrior;
+				p[10] = setting_initialAffBPrior;
 			else
-				p[7] = setting_affineOptModeB;
+				p[10] = setting_affineOptModeB;
 		}
-//		p[8] = setting_initialAffAPrior;
-//		p[9] = setting_initialAffBPrior;
 		return p;
 	}
 

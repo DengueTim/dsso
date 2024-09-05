@@ -47,6 +47,7 @@ float setting_idepthFixPrior = 50*50;
 float setting_idepthFixPriorMargFac = 600*600;
 float setting_initialRotPrior = 1e11;
 float setting_initialTransPrior = 1e10;
+float setting_initialVelPrior = 1e10;
 float setting_initialAffBPrior = 1e14;
 float setting_initialAffAPrior = 1e14;
 float setting_initialCalibHessian = 5e9;
