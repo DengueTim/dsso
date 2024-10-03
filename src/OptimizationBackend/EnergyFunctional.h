@@ -39,6 +39,8 @@ class PointFrameResidual;
 class CalibHessian;
 class FrameHessian;
 class PointHessian;
+class ImuWorldHessian;
+class ImuBiasHessian;
 
 
 class EFResidual;
@@ -68,12 +70,12 @@ public:
 	friend class AccumulatedSCHessian;
 	friend class AccumulatedSCHessianSSE;
 
-	EnergyFunctional();
+	EnergyFunctional(CalibHessian &hCalib, ImuWorldHessian &hWorld, ImuBiasHessian &hBias);
 	~EnergyFunctional();
 
 
 	EFResidual* insertResidual(PointFrameResidual* r);
-	EFFrame* insertFrame(FrameHessian* fh, CalibHessian* Hcalib);
+	EFFrame* insertFrame(FrameHessian* fh);
 	EFPoint* insertPoint(PointHessian* ph);
 
 	void dropResidual(EFResidual* r);
@@ -84,16 +86,16 @@ public:
 
 	void marginalizePointsF();
 	void dropPointsF();
-	void solveSystemF(int iteration, double lambda, CalibHessian* HCalib);
+	void solveSystemF(int iteration, double lambda);
 	double calcMEnergyF();
 	double calcLEnergyF_MT();
 
 
 	void makeIDX();
 
-	void setDeltaF(CalibHessian* HCalib);
+	void setDeltaF();
 
-	void setAdjointsF(CalibHessian* Hcalib);
+	void setAdjointsF();
 
 	std::vector<EFFrame*> frames;
 	int nPoints, nFrames, nResiduals;
@@ -124,7 +126,7 @@ private:
 
 	VecX getStitchedDeltaF() const;
 
-	void resubstituteF_MT(VecX x, CalibHessian* HCalib, bool MT);
+	void resubstituteF_MT(VecX x, bool MT);
     void resubstituteFPt(const VecCf &xc, Mat18f* xAd, int min, int max, Vec10* stats, int tid);
 
 	void accumulateAF_MT(MatXX &H, VecX &b, bool MT);
@@ -135,10 +137,12 @@ private:
 
 	void orthogonalize(VecX* b, MatXX* H);
 
-	void addBDso(VecX &dsoB, VecX &fullB);
-	void addHDso(MatXX &dsoH, MatXX &fullH);
-
+	const SE3 dsoCamPoseToMetricImuPose(const SE3& T_dso_cam);
 	void addImuFactors(MatXX &H, VecX &b);
+
+	CalibHessian &hCalib;
+	ImuWorldHessian &hWorld;
+	ImuBiasHessian &hBias;
 
 	Mat18f* adHTdeltaF;
 
@@ -148,14 +152,15 @@ private:
 	Mat88f* adHostF;
 	Mat88f* adTargetF;
 
-
 	VecC cPrior;
 	VecCf cDeltaF;
 	VecCf cPriorF;
 
+	VecIW wDelta;
+	VecIB bDelta;
+
 	AccumulatedTopHessianSSE* accSSE_top_L;
 	AccumulatedTopHessianSSE* accSSE_top_A;
-
 
 	AccumulatedSCHessianSSE* accSSE_bot;
 

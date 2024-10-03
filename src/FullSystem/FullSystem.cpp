@@ -153,7 +153,7 @@ FullSystem::FullSystem()
 	initialized=false;
 
 
-	ef = new EnergyFunctional();
+	ef = new EnergyFunctional(Hcalib, hWorld, hBias);
 	ef->red = &this->treadReduce;
 
 	isLost=false;
@@ -1055,7 +1055,7 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 	frameHessians.push_back(fh);
 	fh->frameID = allKeyFramesHistory.size();
 	allKeyFramesHistory.push_back(fh->shell);
-	ef->insertFrame(fh, &Hcalib);
+	ef->insertFrame(fh);
 
 	setPrecalcValues();
 
@@ -1084,8 +1084,6 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 	// =========================== Activate Points (& flag for marginalization). =========================
 	activatePointsMT();
 	ef->makeIDX();
-
-
 
 
 	// =========================== OPTIMIZE ALL =========================
@@ -1200,7 +1198,7 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	frameHessians.push_back(firstFrame);
 	firstFrame->frameID = allKeyFramesHistory.size();
 	allKeyFramesHistory.push_back(firstFrame->shell);
-	ef->insertFrame(firstFrame, &Hcalib);
+	ef->insertFrame(firstFrame);
 	setPrecalcValues();
 
 	//int numPointsTotal = makePixelStatus(firstFrame->dI, selectionMap, wG[0], hG[0], setting_desiredDensity);
@@ -1315,7 +1313,7 @@ void FullSystem::setPrecalcValues()
 			fh->targetPrecalc[i].set(fh, frameHessians[i], &Hcalib);
 	}
 
-	ef->setDeltaF(&Hcalib);
+	ef->setDeltaF();
 }
 
 

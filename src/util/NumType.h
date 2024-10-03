@@ -53,17 +53,18 @@ typedef Sophus::SO3d SO3;
 // Calib parameter count
 #define CPARS 4
 
-// IMU World Params. Scale and Rotation(A & B rotation like ORB SLAM 3)
+// IMU World Params.
+// Scale and Rotation(A & B rotation like ORB SLAM 3)
 #define IWPARS 3
-
 // IMU Acc and Gyro biases
 #define IBPARS 6
-
-#define ICPARS (CPARS + IWPARS + IBPARS)
+#define IPARS (IWPARS + IBPARS)
+#define ICPARS (CPARS + IPARS)
 
 // Per Frame parameter counts without and with IMU .
 #define FPARS 8
 #define IFPARS (FPARS + 3)
+#define TRVPARS 9
 
 typedef Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> MatXX;
 typedef Eigen::Matrix<double,CPARS,CPARS> MatCC;
@@ -89,6 +90,7 @@ typedef Eigen::Matrix<float,8,CPARS> Mat8Cf;
 typedef Eigen::Matrix<float,CPARS,8> MatC8f;
 typedef Eigen::Matrix<double,IFPARS,IFPARS> MatIF;
 
+typedef Eigen::Matrix<double,9,9> Mat99;
 typedef Eigen::Matrix<double,8,8> Mat88;
 typedef Eigen::Matrix<double,7,7> Mat77;
 

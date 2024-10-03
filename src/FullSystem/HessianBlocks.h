@@ -184,7 +184,7 @@ struct FrameHessian
     inline AffLight aff_g2l() const {return AffLight(state_scaled[9], state_scaled[10]);}
     inline AffLight aff_g2l_0() const {return AffLight(state_zero[9]*SCALE_A, state_zero[10]*SCALE_B);}
 
-
+	inline Vec3 getVelocity() const {return state_scaled.segment<3>(6);}
 
 	inline void setState(const VecIF &newState)
 	{
@@ -475,6 +475,7 @@ struct PointHessian
 
 };
 
+// Not really Hessians, more like state.
 struct ImuWorldHessian {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
@@ -508,6 +509,8 @@ struct ImuWorldHessian {
 		value_scaled[1] = SCALE_ORIENTATION * value[1];
 		value_scaled[2] = SCALE_ORIENTATION * value[2];
 	}
+
+	EIGEN_STRONG_INLINE const VecIW get_value_minus_valueZero() const {return value - value_zero;}
 };
 
 struct ImuBiasHessian {
@@ -546,6 +549,8 @@ struct ImuBiasHessian {
 		value_scaled[1] = SCALE_BIAS_GYRO * value[4];
 		value_scaled[2] = SCALE_BIAS_GYRO * value[5];
 	}
+
+	EIGEN_STRONG_INLINE const VecIB get_value_minus_valueZero() const {return value - value_zero;}
 };
 
 

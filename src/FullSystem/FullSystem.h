@@ -166,9 +166,8 @@ public:
 private:
 
 	CalibHessian Hcalib;
-
-
-
+	ImuWorldHessian hWorld;
+	ImuBiasHessian hBias;
 
 	// opt single point
 	int optimizePoint(PointHessian* point, int minObs, bool flagOOB);

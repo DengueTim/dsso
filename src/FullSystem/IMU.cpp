@@ -7,7 +7,7 @@
 namespace dso {
 
     ImuIntegrator::ImuIntegrator(const dso::ImuCalib &imuCalib) {
-        params.reset(new gtsam::PreintegrationParams((gtsam::Vector(3) << 0, 0, imuCalib.gravity).finished()));
+        params.reset(new gtsam::PreintegrationParams((gtsam::Vector(3) << 0, 0, Gravity[3]).finished()));
         params->setIntegrationCovariance(imuCalib.integration_sigma * imuCalib.integration_sigma * Eigen::Matrix3d::Identity());
         params->setAccelerometerCovariance(imuCalib.accel_sigma * imuCalib.accel_sigma * Eigen::Matrix3d::Identity());
         params->setGyroscopeCovariance(imuCalib.gyro_sigma * imuCalib.gyro_sigma * Eigen::Matrix3d::Identity());

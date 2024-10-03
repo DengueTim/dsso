@@ -22,11 +22,13 @@
 */
 
 
+#include <Eigen/Core>
 #include "OptimizationBackend/EnergyFunctional.h"
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
 #include "FullSystem/FullSystem.h"
 #include "FullSystem/HessianBlocks.h"
 #include "FullSystem/Residuals.h"
+#include "FullSystem/IMU.h"
 #include "OptimizationBackend/AccumulatedSCHessian.h"
 #include "OptimizationBackend/AccumulatedTopHessian.h"
 
@@ -42,8 +44,7 @@ bool EFAdjointsValid = false;
 bool EFIndicesValid = false;
 bool EFDeltaValid = false;
 
-
-void EnergyFunctional::setAdjointsF(CalibHessian* Hcalib)
+void EnergyFunctional::setAdjointsF()
 {
 
 	if(adHost != 0) delete[] adHost;
@@ -105,13 +106,9 @@ void EnergyFunctional::setAdjointsF(CalibHessian* Hcalib)
 	EFAdjointsValid = true;
 }
 
-
-
-EnergyFunctional::EnergyFunctional()
-{
+EnergyFunctional::EnergyFunctional(CalibHessian &hCalib, ImuWorldHessian &hWorld, ImuBiasHessian &hBias) : hCalib(hCalib), hWorld(hWorld), hBias(hBias) {
 	adHost=0;
 	adTarget=0;
-
 
 	red=0;
 
@@ -132,6 +129,7 @@ EnergyFunctional::EnergyFunctional()
 	resInA = resInL = resInM = 0;
 	currentLambda=0;
 }
+
 EnergyFunctional::~EnergyFunctional()
 {
 	for(EFFrame* f : frames)
@@ -168,7 +166,7 @@ EnergyFunctional::~EnergyFunctional()
 
 
 
-void EnergyFunctional::setDeltaF(CalibHessian* HCalib)
+void EnergyFunctional::setDeltaF()
 {
 	if(adHTdeltaF != 0) delete[] adHTdeltaF;
 	adHTdeltaF = new Mat18f[nFrames*nFrames];
@@ -185,7 +183,10 @@ void EnergyFunctional::setDeltaF(CalibHessian* HCalib)
 					        +tZero.head<FPARS>().cast<float>().transpose() * adTargetF[idx];
 		}
 
-	cDeltaF = HCalib->value_minus_value_zero.cast<float>();
+	cDeltaF = hCalib.value_minus_value_zero.cast<float>();
+	wDelta = hWorld.get_value_minus_valueZero();
+	bDelta = hBias.get_value_minus_valueZero();
+
 	for(EFFrame* f : frames)
 	{
 		f->delta = f->data->get_state_minus_stateZero();
@@ -265,13 +266,15 @@ void EnergyFunctional::accumulateSCF_MT(MatXX &H, VecX &b, bool MT)
 	}
 }
 
-void EnergyFunctional::resubstituteF_MT(VecX x, CalibHessian* HCalib, bool MT)
+void EnergyFunctional::resubstituteF_MT(VecX x, bool MT)
 {
 	assert(x.size() == ICPARS+nFrames*IFPARS);
 	assert(!x.hasNaN());
 
 	VecXf xF = x.cast<float>();
-	HCalib->step = - x.head<CPARS>();
+	hCalib.step = - x.head<CPARS>();
+	hWorld.step = - x.segment<3>(CPARS);
+	hBias.step = - x.segment<6>(CPARS + 3);
 
 	Mat18f* xAd = new Mat18f[nFrames*nFrames];
 	VecCf cstep = xF.head<CPARS>();
@@ -441,7 +444,7 @@ EFResidual* EnergyFunctional::insertResidual(PointFrameResidual* r)
 	r->efResidual = efr;
 	return efr;
 }
-EFFrame* EnergyFunctional::insertFrame(FrameHessian* fh, CalibHessian* Hcalib)
+EFFrame* EnergyFunctional::insertFrame(FrameHessian* fh)
 {
 	EFFrame* eff = new EFFrame(fh);
 	eff->idx = frames.size();
@@ -461,7 +464,7 @@ EFFrame* EnergyFunctional::insertFrame(FrameHessian* fh, CalibHessian* Hcalib)
 	EFAdjointsValid=false;
 	EFDeltaValid=false;
 
-	setAdjointsF(Hcalib);
+	setAdjointsF();
 	makeIDX();
 
 
@@ -615,8 +618,39 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 	makeIDX();
 }
 
+void addBDso(VecX &dsoB, VecX &fullB) {
+	const int nFrames = (dsoB.size() - CPARS) / FPARS;
+	fullB.head<CPARS>() = dsoB.head<CPARS>();
+	for (int f = 0 ; f < nFrames ; f++) {
+		fullB.segment<6>(ICPARS + f * IFPARS) = dsoB.segment<6>(CPARS + f * FPARS);
+		fullB.segment<2>(ICPARS + f * IFPARS + 9) = dsoB.segment<2>(CPARS + f * FPARS + 6);
+	}
+}
 
+void addHDso(MatXX &dsoH, MatXX &fullH) {
+	const int nFrames = (dsoH.cols() - CPARS) / FPARS;
+	fullH.topLeftCorner<CPARS,CPARS>() = dsoH.topLeftCorner<CPARS,CPARS>();
 
+	for (int i = 0 ; i < nFrames ; i++) {
+		int di = CPARS + i * FPARS;
+		int fi = ICPARS + i * IFPARS;
+
+		fullH.block<CPARS,6>(0,fi) = dsoH.block<CPARS,6>(0,di);
+		fullH.block<CPARS,2>(0,fi+9) = dsoH.block<CPARS,2>(0,di+6);
+		fullH.block<6,CPARS>(fi,0) = dsoH.block<6,CPARS>(di,0);
+		fullH.block<2,CPARS>(fi+9,0) = dsoH.block<2,CPARS>(di+6,0);
+
+		for (int j = 0 ; j < nFrames ; j++) {
+			int dj = CPARS + j * FPARS;
+			int fj = ICPARS + j * IFPARS;
+
+			fullH.block<6,6>(fi,fj) = dsoH.block<6,6>(di,dj);
+			fullH.block<2,2>(fi+9,fj+9) = dsoH.block<2,2>(di+6,dj+6);
+			fullH.block<6,2>(fi,fj+9) = dsoH.block<6,2>(di,dj+6);
+			fullH.block<2,6>(fi+9,fj) = dsoH.block<2,6>(di+6,dj);
+		}
+	}
+}
 
 void EnergyFunctional::marginalizePointsF()
 {
@@ -793,7 +827,7 @@ void EnergyFunctional::orthogonalize(VecX* b, MatXX* H)
 }
 
 
-void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* HCalib)
+void EnergyFunctional::solveSystemF(int iteration, double lambda)
 {
 	if(setting_solverMode & SOLVER_USE_GN) lambda=0;
 	if(setting_solverMode & SOLVER_FIX_LAMBDA) lambda = 1e-5;
@@ -816,9 +850,10 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 	 * 1 - scale
 	 * 2 - Gravity dir. like in ORB_SLAM3
 	 * 6 - IMU Accel & Gyro biases
+	 *
 	 * 6 - DSO's Pose. Per frame
-	 * 2 - DSO's Aff. Per frame
 	 * 3 - Velocity. Per frame
+	 * 2 - DSO's Aff. Per frame
 	 */
 	const size_t fullSize = ICPARS + nFrames * IFPARS;
 	MatXX HFull_top = MatXX::Identity(fullSize, fullSize);
@@ -920,99 +955,223 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda, CalibHessian* 
 	lastX = x;
 
 	currentLambda= lambda;
-	resubstituteF_MT(x, HCalib, multiThreading);
+	resubstituteF_MT(x, multiThreading);
 	currentLambda=0;
 }
 
-void EnergyFunctional::addBDso(VecX &dsoB, VecX &fullB) {
-	fullB.head<CPARS>() = dsoB.head<CPARS>();
-	for (int f = 0 ; f < nFrames ; f++) {
-		fullB.segment<6>(ICPARS + f * IFPARS) = dsoB.segment<6>(CPARS + f * FPARS);
-		fullB.segment<2>(ICPARS + f * IFPARS + 9) = dsoB.segment<2>(CPARS + f * FPARS + 6);
+const Mat33 so3RightJacobian(const Vec3& omega) {
+	double theta = omega.norm();
+	if (theta < 1e-6) {  // Small angle approximation
+		return Mat33::Identity();
 	}
+
+	Mat33 omegaHat = SO3::hat(omega);
+	Mat33 omegaHatSquared = omegaHat * omegaHat;
+
+	double thetaSquared = theta * theta;
+	double thetaCubed = thetaSquared * theta;
+	double cosTheta = std::cos(theta);
+	double sinTheta = std::sin(theta);
+
+	return Mat33::Identity()
+		- (1 - cosTheta) / thetaSquared * omegaHat
+		+ (theta - sinTheta) / thetaCubed * omegaHatSquared;
 }
 
-void EnergyFunctional::addHDso(MatXX &dsoH, MatXX &fullH) {
-	fullH.topLeftCorner<CPARS,CPARS>() = dsoH.topLeftCorner<CPARS,CPARS>();
+const Mat33 so3RightJacobianInverse(const Vec3& omega) {
+	double theta = omega.norm();
 
-	for (int i = 0 ; i < nFrames ; i++) {
-		int di = CPARS + i * FPARS;
-		int fi = ICPARS + i * IFPARS;
-
-		fullH.block<CPARS,6>(0,fi) = dsoH.block<CPARS,6>(0,di);
-		fullH.block<CPARS,2>(0,fi+9) = dsoH.block<CPARS,2>(0,di+6);
-		fullH.block<6,CPARS>(fi,0) = dsoH.block<6,CPARS>(di,0);
-		fullH.block<2,CPARS>(fi+9,0) = dsoH.block<2,CPARS>(di+6,0);
-
-		for (int j = 0 ; j < nFrames ; j++) {
-			int dj = CPARS + j * FPARS;
-			int fj = ICPARS + j * IFPARS;
-
-			fullH.block<6,6>(fi,fj) = dsoH.block<6,6>(di,dj);
-			fullH.block<2,2>(fi+9,fj+9) = dsoH.block<2,2>(di+6,dj+6);
-			fullH.block<6,2>(fi,fj+9) = dsoH.block<6,2>(di,dj+6);
-			fullH.block<2,6>(fi+9,fj) = dsoH.block<2,6>(di+6,dj);
-		}
+	if (theta < 1e-6) {  // Small angle approximation
+		return Mat33::Identity();
 	}
+
+	Mat33 omegaHat = SO3::hat(omega);
+	Mat33 omegaHatSquared = omegaHat * omegaHat;
+
+	double thetaSquared = theta * theta;
+	double cosTheta = std::cos(theta);
+	double sinTheta = std::sin(theta);
+
+	return Mat33::Identity()
+		+ 0.5 * omegaHat
+		+ (1 / thetaSquared - (1 + cosTheta) / (2 * theta * sinTheta)) * omegaHatSquared;
 }
+
+const SE3 EnergyFunctional::dsoCamPoseToMetricImuPose(const SE3& T_dso_cam) {
+	const Sim3& Tmd = Sim3(); // Metric world -> DSO world. Scale and rotation to be optimised.
+	const SE3& Tcb = SE3(); // Camera -> Base(IMU). Fix, in Metric world scale
+
+	// Where the IMU is in metric world for the given camera pose(in DSO world)
+	return SE3(Tmd.matrix() * T_dso_cam.inverse().matrix() * Tmd.inverse().matrix() * Tcb.matrix());
+};
+
+/**
+ * Responsible for IMU's J and r indexing.
+ */
+struct JrWrapper {
+	// Jacobian of residual errors for frame i to j:
+	//   Position 3
+	//   Rotation 3
+	//   Velocity 3
+	// against state estimate:
+	//   Scale 1
+	//   Gravity dir. 2
+	//   Bias Acc & Gyro 6
+	//   Position, rotation, velocity for frames i and j. 9 + 9
+	Eigen::Matrix<double,TRVPARS,27> J = Eigen::Matrix<double,TRVPARS,27>::Zero();
+	Eigen::Matrix<double,TRVPARS,1> r = Eigen::Matrix<double,TRVPARS,1>::Zero();
+
+	void rPosRoti(const Mat33& m) {}
+	void rPosPosi(const Mat33& m) {}
+	void rPosVeli(const Mat33& m) {}
+	void rPosPosj(const Mat33& m) {}
+	void rPosBiasa(const Mat33& m) {}
+	void rPosBiasg(const Mat33& m) {}
+
+	void rVelRoti(const Mat33& m) {}
+	void rVelVeli(const Mat33& m) {}
+	void rVelVelj(const Mat33& m) {}
+	void rVelBiasa(const Mat33& m) {}
+	void rVelBiasg(const Mat33& m) {}
+
+	void rRotRoti(const Mat33& m) {}
+	void rRotRotj(const Mat33& m) {}
+	void rRotBiasg(const Mat33& m) {}
+
+	Eigen::Matrix<double,27,27> H;
+	Eigen::Matrix<double,27,1> b;
+
+	void computeHb() {
+		// TODO. Only compute the upper half..
+		H = J.transpose() * J;
+		b = J.transpose() * r;
+	}
+
+	// Indexes in H and b
+	const int worldIdx = 0; // Scale and gravity direction.
+	const int iTrvIdx = IPARS;
+	const int jTrvIdx = IPARS + TRVPARS;
+
+	Vec9 bWorld() { return b.segment<IPARS>(worldIdx); }
+	Vec9 bi() { return b.segment<TRVPARS>(iTrvIdx); }
+	Vec9 bj() { return b.segment<TRVPARS>(jTrvIdx); }
+
+	Mat99 HWorld() { return H.block<IPARS,IPARS>(worldIdx,worldIdx); }
+	Mat99 Hii() { return H.block<TRVPARS,TRVPARS>(iTrvIdx,iTrvIdx); }
+	Mat99 Hjj() { return H.block<TRVPARS,TRVPARS>(jTrvIdx,jTrvIdx); }
+
+	// Off diagonal blocks.
+	Mat99 Hij() { return H.block<TRVPARS,TRVPARS>(iTrvIdx,jTrvIdx); }
+	Mat99 Hji() { return H.block<TRVPARS,TRVPARS>(jTrvIdx,iTrvIdx); }
+
+	Mat99 HWorldi() { return H.block<IPARS,TRVPARS>(worldIdx,iTrvIdx); }
+	Mat99 HWorldj() { return H.block<IPARS,TRVPARS>(worldIdx,jTrvIdx); }
+
+	Mat99 HiWorld() { return H.block<TRVPARS,IPARS>(iTrvIdx,worldIdx); }
+	Mat99 HjWorld() { return H.block<TRVPARS,IPARS>(jTrvIdx,worldIdx); }
+};
 
 // WIP
 void EnergyFunctional::addImuFactors(MatXX &H, VecX &b) {
 	if (nFrames==1)
 		return;
 
+	// Indexes in expanded DSO H and b
+	const int worldIdx = CPARS;
+	const int gDirIdx = CPARS + 1;
+	const int aBiasIdx = CPARS + 3;
+	const int gBiasIdx = CPARS + 6;
+
 	for(int i=0 ; i<frames.size()-1 ; i++) {
-		int j = i+1;
+		const int j = i+1;
 		// TODO. Preintegrate...
 
-		// Jacobian of residual errors for frame i to j:
-		//   Position 3
-		//   Rotation 3
-		//   Velocity 3
-		// VS state estimates:
-		//   Scale 1
-		//   Gravity dir. 2
-		//   Bias Acc & Gyro 6
-		//   Position, rotation, velocity for frames i and j. 9 + 9
-		// TODO. Only compute the upper half..
-		MatXX J = MatXX::Zero(9, 27);
-		VecX r = VecX::Zero(9);
+		ImuIntegration imuIJ;
+		Vec3 deltaBg;
+		Vec3 deltaBa;
+		double dt;
 
-		J.block<2,2>(0,0) = MatXX::Zero(2,2);
+		JrWrapper Jr;
 
-		MatXX H_ = J.transpose() * J;
-		VecX b_ = J.transpose() * r;
+		const FrameHessian* const frameI = frames[i]->data;
+		const FrameHessian* const frameJ = frames[j]->data;
 
-		// Indexes in H_ * b_
-		int iPoseIdx_ = 9 + 9 * i;
-		int jPoseIdx_ = 9 + 9 * j;
-		int scaleIdx_ = 0;
-		int iVelIdx_ = iPoseIdx_ + 6;
-		int jVelIdx_ = jPoseIdx_ + 6;
+		// TODO Biases..
 
-		// Aligns with DSO top left corner
-		int iPoseIdx = CPARS + 8 * i;
-		int jPoseIdx = CPARS + 8 * j;
+		// Where DSO's origin is relative to frameI's evaluation point.
+		const SE3& TCamiDsoEval = frameI->get_worldToCam_evalPT();
+		// Where frameI is relative to DSO's origin. Current estimate.
+		const SE3& TDsoCamiEst = frameI->PRE_camToWorld;
+		const SE3& TCamjDsoEval = frameI->get_worldToCam_evalPT();
+		const SE3& TDsoCamjEst = frameJ->PRE_camToWorld;
 
-		// After DSO
-		int scaleIdx = CPARS + 8 * nFrames;
+		// IMU/Base poses in Metric world.
+		const SE3 TBaseiEval = dsoCamPoseToMetricImuPose(TCamiDsoEval.inverse());
+		const SE3 TBasejEval = dsoCamPoseToMetricImuPose(TCamjDsoEval.inverse());
+		const SE3 TBaseiEst = dsoCamPoseToMetricImuPose(TDsoCamiEst);
+		const SE3 TBasejEst = dsoCamPoseToMetricImuPose(TDsoCamjEst);
 
-		int iVelIdx = scaleIdx + 9 + 3 * i;
-		int jVelIdx = scaleIdx + 9 + 3 * j;
+		const Mat33 RBaseiEstTranspose = TBaseiEst.rotationMatrix().transpose();
 
-		b.segment<6>(iPoseIdx) += b_.segment<6>(iPoseIdx_);
-		b.segment<6>(jPoseIdx) += b_.segment<6>(jPoseIdx_);
-		b.segment<9>(scaleIdx) += b_.segment<9>(scaleIdx_);
-		b.segment<3>(iVelIdx) += b_.segment<3>(iVelIdx_);
-		b.segment<3>(jVelIdx) += b_.segment<3>(jVelIdx_);
+		const Vec3 veli = frameI->getVelocity();
+		const Vec3 velj = frameJ->getVelocity();
+		const Vec3 velTemp = velj - veli - Gravity * dt;
+		const Vec3 posTemp = TBasejEst.translation() - TBaseiEst.translation() - veli * dt - Gravity*dt*dt/2;
 
-		H.block<6,6>(iPoseIdx,iPoseIdx) += H_.block<6,6>(iPoseIdx_,iPoseIdx_);
-		H.block<6,6>(jPoseIdx,jPoseIdx) += H_.block<6,6>(jPoseIdx_,jPoseIdx_);
-		H.block<9,9>(scaleIdx,scaleIdx) += H_.block<9,9>(scaleIdx_,scaleIdx_);
-		H.block<3,3>(iVelIdx,iVelIdx) += H_.block<3,3>(iVelIdx_,iVelIdx_);
-		H.block<3,3>(jVelIdx,jVelIdx) += H_.block<3,3>(jVelIdx_,jVelIdx_);
+		// Compute Rotation, Velocity and Position residual errors for current estimate.
+		// From Forster, IMU Preintegration (36) & (37)
+		const Mat33 deltaRot = imuIJ.deltaRot * SO3::exp(imuIJ.jRotBg * deltaBg).matrix();
+		const Vec3 resRot = SO3(deltaRot.transpose() * TBaseiEst.rotationMatrix().transpose() * TBasejEst.rotationMatrix()).log();
 
-		// TODO.  off diagonal blocks....
+		// TODO. Velocity/Position scale? Metric, DSO or as "scaled" for optimization...
+		const Vec3 deltaVel = imuIJ.deltaVel + imuIJ.jVelBg * deltaBg + imuIJ.jVelBa * deltaBa;
+		const Vec3 resVel = RBaseiEstTranspose * velTemp - deltaVel;
+
+		const Vec3 deltaPos = imuIJ.deltaPos + imuIJ.jPosBg * deltaBg + imuIJ.jPosBa * deltaBa;
+		const Vec3 resPos = RBaseiEstTranspose * posTemp - deltaPos;
+
+		// Position Jacobians. From Forster, IMU Preintegration supplement section 2.1
+		Jr.rPosRoti(SO3::hat(TBaseiEst.rotationMatrix().transpose() * posTemp));
+		Jr.rPosPosi(-Mat33::Identity());
+		Jr.rPosVeli(-RBaseiEstTranspose * dt);
+		Jr.rPosPosj(RBaseiEstTranspose * TBasejEst.rotationMatrix());
+		Jr.rPosBiasa(-imuIJ.jPosBa);
+		Jr.rPosBiasg(-imuIJ.jPosBg);
+
+		// Velocity Jacobians. From Forster, IMU Preintegration supplement section 2.2
+		Jr.rVelRoti(SO3::hat(RBaseiEstTranspose * velTemp));
+		Jr.rVelVeli(-RBaseiEstTranspose);
+		Jr.rVelVelj(RBaseiEstTranspose);
+		Jr.rVelBiasa(-imuIJ.jVelBa);
+		Jr.rVelBiasg(-imuIJ.jVelBg);
+
+		// Rotation Jacobians. From Forster, IMU Preintegration supplement section 2.3
+		const Mat33 resRotJri = so3RightJacobianInverse(resRot);
+		Jr.rRotRoti(-resRotJri * TBasejEst.rotationMatrix().inverse() * TBaseiEst.rotationMatrix());
+		Jr.rRotRotj(resRotJri);
+		Jr.rRotBiasg(resRotJri * SO3::exp(resRot).matrix().transpose() * so3RightJacobian(deltaBg) * imuIJ.jRotBg);
+
+		Jr.computeHb();
+
+		// Indexes in expanded DSO H and b
+		int iTrvIdx = ICPARS + IFPARS * i;
+		int jTrvIdx = ICPARS + IFPARS * j;
+
+		b.segment<IPARS>(worldIdx) += Jr.bWorld();
+		b.segment<TRVPARS>(iTrvIdx) += Jr.bi();
+		b.segment<TRVPARS>(jTrvIdx) += Jr.bj();
+
+		H.block<IPARS,IPARS>(worldIdx,worldIdx) += Jr.HWorld();
+		H.block<TRVPARS,TRVPARS>(iTrvIdx,iTrvIdx) += Jr.Hii();
+		H.block<TRVPARS,TRVPARS>(jTrvIdx,jTrvIdx) += Jr.Hjj();
+
+		// Off diagonal blocks.
+		H.block<TRVPARS,TRVPARS>(iTrvIdx,jTrvIdx) += Jr.Hij();
+		H.block<TRVPARS,TRVPARS>(jTrvIdx,iTrvIdx) += Jr.Hji();
+		H.block<IPARS,TRVPARS>(worldIdx,iTrvIdx) += Jr.HWorldi();
+		H.block<IPARS,TRVPARS>(worldIdx,jTrvIdx) += Jr.HWorldj();
+		H.block<TRVPARS,IPARS>(iTrvIdx,worldIdx) += Jr.HiWorld();
+		H.block<TRVPARS,IPARS>(jTrvIdx,worldIdx) += Jr.HjWorld();
 	}
 }
 

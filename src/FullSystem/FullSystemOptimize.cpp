@@ -325,6 +325,11 @@ void FullSystem::backupState(bool backupLastStep)
 		{
 			Hcalib.step_backup = Hcalib.step;
 			Hcalib.value_backup = Hcalib.value;
+			hWorld.step_backup = hWorld.step;
+			hWorld.value_backup = hWorld.value;
+			hBias.step_backup = hBias.step;
+			hBias.value_backup = hBias.value;
+
 			for(FrameHessian* fh : frameHessians)
 			{
 				fh->step_backup = fh->step;
@@ -340,6 +345,11 @@ void FullSystem::backupState(bool backupLastStep)
 		{
 			Hcalib.step_backup.setZero();
 			Hcalib.value_backup = Hcalib.value;
+			hWorld.step_backup.setZero();
+			hWorld.value_backup = hWorld.value;
+			hBias.step_backup.setZero();
+			hBias.value_backup = hBias.value;
+
 			for(FrameHessian* fh : frameHessians)
 			{
 				fh->step_backup.setZero();
@@ -355,6 +365,8 @@ void FullSystem::backupState(bool backupLastStep)
 	else
 	{
 		Hcalib.value_backup = Hcalib.value;
+		hWorld.value_backup = hWorld.value;
+		hBias.value_backup = hBias.value;
 		for(FrameHessian* fh : frameHessians)
 		{
 			fh->state_backup = fh->get_state();
@@ -368,6 +380,9 @@ void FullSystem::backupState(bool backupLastStep)
 void FullSystem::loadSateBackup()
 {
 	Hcalib.setValue(Hcalib.value_backup);
+	hWorld.setValue(hWorld.value_backup);
+	hBias.setValue(hBias.value_backup);
+
 	for(FrameHessian* fh : frameHessians)
 	{
 		fh->setState(fh->state_backup);
@@ -379,7 +394,6 @@ void FullSystem::loadSateBackup()
 		}
 
 	}
-
 
 	EFDeltaValid=false;
 	setPrecalcValues();
@@ -554,7 +568,7 @@ float FullSystem::optimize(int mnumOptIts)
 	frameHessians.back()->setEvalPTAndStateZero(frameHessians.back()->PRE_worldToCam, frameHessians.back()->aff_g2l());
 	EFDeltaValid=false;
 	EFAdjointsValid=false;
-	ef->setAdjointsF(&Hcalib);
+	ef->setAdjointsF();
 	setPrecalcValues();
 
 
@@ -613,7 +627,7 @@ void FullSystem::solveSystem(int iteration, double lambda)
 			ef->lastNullspaces_affA,
 			ef->lastNullspaces_affB);
 
-	ef->solveSystemF(iteration, lambda,&Hcalib);
+	ef->solveSystemF(iteration, lambda);
 }
 
 

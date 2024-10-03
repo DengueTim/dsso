@@ -212,7 +212,7 @@ void FullSystem::marginalizeFrame(FrameHessian* frame)
 
 
 	setPrecalcValues();
-	ef->setAdjointsF(&Hcalib);
+	ef->setAdjointsF();
 	delete toDelete;
 }
 
