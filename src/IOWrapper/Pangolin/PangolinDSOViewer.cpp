@@ -431,7 +431,7 @@ void PangolinDSOViewer::publishKeyframes(std::vector<FrameHessian*> &frames, boo
 		keyframesByKFID[fh->keyFrameID]->setFromKF(fh, HCalib);
 	}
 }
-void PangolinDSOViewer::publishCamPose(FrameShell *frame, CalibHessian *HCalib, const Vec9 *imu) {
+void PangolinDSOViewer::publishCamPose(FrameShell *frame, CalibHessian *HCalib) {
 	if (!setting_render_display3D)
 		return;
 	if (disableAllDisplay)
@@ -451,8 +451,6 @@ void PangolinDSOViewer::publishCamPose(FrameShell *frame, CalibHessian *HCalib, 
 
 	currentCam->setFromF(frame, HCalib);
 	allFramePoses.push_back(frame->camToWorld.translation().cast<float>());
-
-	std::cout << "Preintegrated IMU:" << imu->format(MatlabFmt) << "\n";
 }
 
 void PangolinDSOViewer::pushLiveFrame(FrameHessian *image) {

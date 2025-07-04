@@ -47,8 +47,6 @@
 
 std::string vignette = "";
 std::string gammaCalib = "";
-std::string imuCalib = "";
-std::string imuData = "";
 std::string sourceL = "";
 std::string sourceR = "";
 std::string calibL = "";
@@ -259,18 +257,6 @@ void parseArgument(char *arg) {
 		return;
 	}
 
-    if (1 == sscanf(arg, "imuCalib=%s", buf)) {
-        imuCalib = buf;
-        printf("loading imuCalib from %s!\n", imuCalib.c_str());
-        return;
-    }
-
-    if (1 == sscanf(arg, "imuData=%s", buf)) {
-        imuData= buf;
-        printf("loading imuData from %s!\n", imuData.c_str());
-        return;
-    }
-
 	if (1 == sscanf(arg, "rescale=%f", &foption)) {
 		rescale = foption;
 		printf("RESCALE %f!\n", rescale);
@@ -339,11 +325,6 @@ int main(int argc, char **argv) {
 		printf("ERROR: dont't have photometric calibation. Need to use commandline options mode=1 or mode=2 ");
 		exit(1);
 	}
-
-    if (imuData.length() > 0 && reader->loadImuMeasurements(imuCalib, imuData) == 0) {
-        printf("ERROR: No(or incomplete) IMU data/calibration data loaded for given filenames.");
-        exit(1);
-    }
 
 	int lstart = start;
 	int lend = end;
@@ -417,11 +398,7 @@ int main(int argc, char **argv) {
 		clock_t started = clock();
 		double sInitializerOffset = 0;
 
-        std::vector<ImuMeasurement>::iterator imuIt = reader->imuMeasurements.begin();
-        std::vector<ImuMeasurement>::iterator imuItEnd = reader->imuMeasurements.end();
-        ImuMeasurements imuMeasurements;
-
-        for (int ii = 0; ii < (int) idsToPlay.size(); ii++) {
+		for (int ii = 0; ii < (int) idsToPlay.size(); ii++) {
 			if (!fullSystem->initialized)	// if not initialized: reset start time.
 			{
 				gettimeofday(&tv_start, NULL);
@@ -450,23 +427,8 @@ int main(int argc, char **argv) {
 				}
 			}
 
-            if (reverse) {
-                printf("Reversing IMU data not implemented.");
-                return;
-            } else {
-                while (imuIt != imuItEnd && imuIt->timestamp < iae->timestamp) {
-					imuMeasurements.push_back(*imuIt++);
-                }
-            }
-
-            if (ii == 0) {
-                imuMeasurements.clear();
-            }
-
-            if (!skipFrame) {
-                fullSystem->addActiveFrame(iae, i, imuMeasurements);
-                imuMeasurements.clear();
-            }
+			if (!skipFrame)
+				fullSystem->addActiveFrame(iae, i);
 
 			if (fullSystem->initFailed || setting_fullResetRequested) {
 				if (ii < 250 || setting_fullResetRequested) {

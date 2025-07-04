@@ -26,9 +26,7 @@
 #include "util/NumType.h"
 #include "OptimizationBackend/MatrixAccumulators.h"
 #include "IOWrapper/Output3DWrapper.h"
-#include "FullSystem/IMU.h"
 #include "util/settings.h"
-#include "util/ImuMeasurement.h"
 #include "vector"
 #include <math.h>
 
@@ -79,7 +77,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	~CoarseInitializer();
 
 	void setFirst(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
-	bool trackFrame(FrameHessian *newFrameHessian, const Vec9 &imu, std::vector<IOWrap::Output3DWrapper*> &wraps);
+	bool trackFrame(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps);
 	void calcTGrads(FrameHessian *newFrameHessian);
 	void debugPlot(std::vector<IOWrap::Output3DWrapper*> &wraps, int lvl = 0);
 
@@ -138,8 +136,6 @@ private:
 	Accumulator9 acc9;
 	Accumulator9 acc9SC;
 
-	ImuIntegrator *imuIntegrator;
-
 	float alphaK;
 	float alphaW;
 
@@ -180,7 +176,6 @@ struct FLANNPointcloud {
 		const float d1 = p1[1] - points[idx_p2].v;
 		return d0 * d0 + d1 * d1;
 	}
-
 
 	inline float kdtree_get_pt(const size_t idx, int dim) const {
 		if (dim == 0)

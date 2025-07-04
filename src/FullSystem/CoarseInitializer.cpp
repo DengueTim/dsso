@@ -82,9 +82,6 @@ CoarseInitializer::CoarseInitializer(CalibHessian *HCalib, int ww, int hh) :
 			rotatedPattern[lvl][idx] = Rplane * Vec2f(patternP[idx][0], patternP[idx][1]);
 		}
 	}
-
-	ImuCalib defaultImuCalib;
-	imuIntegrator = new ImuIntegrator(defaultImuCalib);
 }
 
 CoarseInitializer::~CoarseInitializer() {
@@ -97,7 +94,7 @@ CoarseInitializer::~CoarseInitializer() {
 	delete[] JbBuffer_new;
 }
 
-bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, const Vec9 &imu, std::vector<IOWrap::Output3DWrapper*> &wraps) {
+bool CoarseInitializer::trackFrame(FrameHessian *newFrameHessian, std::vector<IOWrap::Output3DWrapper*> &wraps) {
 	newFrame = newFrameHessian;
 
 	for (IOWrap::Output3DWrapper *ow : wraps)

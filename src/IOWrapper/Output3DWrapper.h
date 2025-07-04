@@ -144,7 +144,7 @@ public:
 	 * Calling:
 	 * Always called, no overhead if not used.
 	 */
-	virtual void publishCamPose(FrameShell *frame, CalibHessian *HCalib, const Vec9 *imu) {
+	virtual void publishCamPose(FrameShell *frame, CalibHessian *HCalib) {
 	}
 
 	/* Usage:

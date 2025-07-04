@@ -38,8 +38,6 @@
 #include "util/IndexThreadReduce.h"
 #include "OptimizationBackend/EnergyFunctional.h"
 #include "FullSystem/PixelSelector2.h"
-#include "util/ImuMeasurement.h"
-#include "IMU.h"
 
 #include <math.h>
 
@@ -119,7 +117,7 @@ public:EIGEN_MAKE_ALIGNED_OPERATOR_NEW
 	virtual ~FullSystem();
 
 	// adds a new frame, and creates point & residual structs.
-	void addActiveFrame(ImageAndExposure *image, int id, const ImuMeasurements &imuMeasurements);
+	void addActiveFrame(ImageAndExposure *image, int id);
 
 	// marginalizes a frame. drops / marginalizes points & residuals.
 	void marginalizeFrame(FrameHessian *frame);
@@ -154,7 +152,7 @@ private:
 	double linAllPointSinle(PointHessian *point, float outlierTHSlack, bool plot);
 
 	// mainPipelineFunctions
-	Vec4 trackNewCoarse(FrameHessian *fh, const ImuMeasurements &imuMeasurements);
+	Vec4 trackNewCoarse(FrameHessian *fh);
 	void traceNewCoarse(FrameHessian *fh);
 	void activatePoints();
 	void activatePointsMT();
@@ -272,8 +270,6 @@ private:
 	bool needToKetchupMapping;
 
 	int lastRefStopID;
-
-	ImuIntegrator *imuIntegrator;
 };
 }
 
