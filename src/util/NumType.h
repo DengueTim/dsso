@@ -54,8 +54,9 @@ typedef Sophus::SO3d SO3;
 #define CPARS 4
 
 // IMU World Params.
-// Scale and Rotation(A & B rotation like ORB SLAM 3)
-#define IWPARS 3
+// !!Scale and Rotation(A & B rotation like ORB SLAM 3)
+// Scale and Full Rotation
+#define IWPARS 4
 // IMU Acc and Gyro biases
 #define IBPARS 6
 #define IPARS (IWPARS + IBPARS)
@@ -89,10 +90,17 @@ typedef Eigen::Matrix<double,CPARS,8> MatC8;
 typedef Eigen::Matrix<float,8,CPARS> Mat8Cf;
 typedef Eigen::Matrix<float,CPARS,8> MatC8f;
 typedef Eigen::Matrix<double,IFPARS,IFPARS> MatIF;
+typedef Eigen::Matrix<double,FPARS,FPARS> MatF;
 
+typedef Eigen::Matrix<double,9,6> Mat96;
+typedef Eigen::Matrix<double,9,3> Mat93;
+typedef Eigen::Matrix<double,9,7> Mat97;
 typedef Eigen::Matrix<double,9,9> Mat99;
 typedef Eigen::Matrix<double,8,8> Mat88;
 typedef Eigen::Matrix<double,7,7> Mat77;
+
+typedef Eigen::Matrix<double,10,9> Mat109;
+typedef Eigen::Matrix<double,9,10> Mat910;
 
 typedef Eigen::Matrix<double,CPARS,1> VecC;
 typedef Eigen::Matrix<float,CPARS,1> VecCf;
@@ -111,6 +119,9 @@ typedef Eigen::Matrix<double,4,1> Vec4;
 typedef Eigen::Matrix<double,3,1> Vec3;
 typedef Eigen::Matrix<double,2,1> Vec2;
 typedef Eigen::Matrix<double,Eigen::Dynamic,1> VecX;
+
+template <size_t L>
+using VecT = Eigen::Matrix<double,L,1>;
 
 typedef Eigen::Matrix<float,3,3> Mat33f;
 typedef Eigen::Matrix<float,10,3> Mat103f;
@@ -176,10 +187,6 @@ typedef Eigen::Matrix<double,14,14> Mat1414;
 typedef Eigen::Matrix<double,14,1> Vec14;
 
 
-
-
-
-
 // transforms points from one frame to another.
 struct AffLight
 {
@@ -209,7 +216,8 @@ struct AffLight
 	}
 };
 
-const Eigen::IOFormat MatlabFmt(16, 0, ", ", "\n", "\t", ";", "[", "\n]");
+const Eigen::IOFormat MatlabFmt(16, 0, ", ", "\n", "\t", ";", "[", "];\n");
+const Eigen::IOFormat StdOutFmt(16, 0, ",", "\n", "", "", "", "");
 
 }
 

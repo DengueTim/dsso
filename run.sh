@@ -1,11 +1,11 @@
 #!/bin/bash
 
 
-./build/Debug/bin/dso_dataset \
-	files=$HOME/src/dso/EuRoC_MAV/sequence/cam0/data \
-	calib=$HOME/src/dso/EuRoC_MAV/cameraLeft.txt \
-	gamma=$HOME/src/dso/EuRoC_MAV/pcalib.txt \
-	vignette=$HOME/src/dso/EuRoC_MAV/vignette.png \
-	preset=0
+./build/bin/dso_dataset \
+	files=/Users/tp/datasets/EuRoC/MH_01_easy/cam0/data \
+	calib=/Users/tp/src/dsso/EuRoC_MAV/cameraLeft.txt \
+	gamma=/Users/tp/src/dsso/EuRoC_MAV/pcalib.txt \
+	vignette=/Users/tp/src/dsso/EuRoC_MAV/vignette.png \
+	imuData=/Users/tp/datasets/EuRoC/MH_01_easy/imu0/data.csv \
+	preset=0 \
 	mode=0
-

@@ -52,16 +52,16 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 
 	for(EFResidual* r : p->residualsAll)
 	{
-		if(mode==0)
+		if(mode==0) // Active.
 		{
 			if(r->isLinearized || !r->isActive()) continue;
 		}
-		if(mode==1)
+		if(mode==1) // Linearized(and active)
 		{
 			if(!r->isLinearized || !r->isActive()) continue;
 		}
-		if(mode==2)
-		{
+		if(mode==2) // Marginalized...
+ 		{
 			if(!r->isActive()) continue;
 			assert(r->isLinearized);
 		}
@@ -168,7 +168,7 @@ template void AccumulatedTopHessianSSE::addPoint<2>(EFPoint* p, EnergyFunctional
 
 
 
-void AccumulatedTopHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional const * const EF, bool usePrior, bool useDelta, int tid)
+void AccumulatedTopHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional const * const EF, int tid)
 {
 	H = MatXX::Zero(nframes[tid]*8+CPARS, nframes[tid]*8+CPARS);
 	b = VecX::Zero(nframes[tid]*8+CPARS);
@@ -222,27 +222,26 @@ void AccumulatedTopHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional 
 			H.block<8,8>(tIdx, hIdx).noalias() = H.block<8,8>(hIdx, tIdx).transpose();
 		}
 	}
-
-
-	if(usePrior)
-	{
-		assert(useDelta);
-		H.diagonal().head<CPARS>() += EF->cPrior;
-		b.head<CPARS>() += EF->cPrior.cwiseProduct(EF->cDeltaF.cast<double>());
-		for(int h=0;h<nframes[tid];h++)
-		{
-			H.diagonal().segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>();
-			H.diagonal().segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>();
-			b.segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>().cwiseProduct(EF->frames[h]->delta_prior.head<6>());
-			b.segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>().cwiseProduct(EF->frames[h]->delta_prior.tail<2>());
-		}
-	}
+//
+//
+//	if(usePrior)
+//	{
+//		assert(useDelta);
+//		H.diagonal().head<CPARS>() += EF->cPrior;
+//		b.head<CPARS>() += EF->cPrior.cwiseProduct(EF->cDeltaF.cast<double>());
+//		for(int h=0;h<nframes[tid];h++)
+//		{
+//			H.diagonal().segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>();
+//			H.diagonal().segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>();
+//			b.segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>().cwiseProduct(EF->frames[h]->delta_prior.head<6>());
+//			b.segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>().cwiseProduct(EF->frames[h]->delta_prior.tail<2>());
+//		}
+//	}
 }
 
 
 void AccumulatedTopHessianSSE::stitchDoubleInternal(
-		MatXX* H, VecX* b, EnergyFunctional const * const EF, bool usePrior,
-		int min, int max, Vec10* stats, int tid)
+		MatXX* H, VecX* b, EnergyFunctional const * const EF, int min, int max, Vec10* stats, int tid)
 {
 	int toAggregate = NUM_THREADS;
 	if(tid == -1) { toAggregate = 1; tid = 0; }	// special case: if we dont do multithreading, dont aggregate.
@@ -291,16 +290,16 @@ void AccumulatedTopHessianSSE::stitchDoubleInternal(
 
 
 	// only do this on one thread.
-	if(min==0 && usePrior) {
-		H[tid].diagonal().head<CPARS>() += EF->cPrior;
-		b[tid].head<CPARS>() += EF->cPrior.cwiseProduct(EF->cDeltaF.cast<double>());
-		for(int h=0;h<nframes[tid];h++) {
-			H[tid].diagonal().segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>();
-			H[tid].diagonal().segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>();
-			b[tid].segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>().cwiseProduct(EF->frames[h]->delta_prior.head<6>());
-			b[tid].segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>().cwiseProduct(EF->frames[h]->delta_prior.tail<2>());
-		}
-	}
+//	if(min==0 && usePrior) {
+//		H[tid].diagonal().head<CPARS>() += EF->cPrior;
+//		b[tid].head<CPARS>() += EF->cPrior.cwiseProduct(EF->cDeltaF.cast<double>());
+//		for(int h=0;h<nframes[tid];h++) {
+//			H[tid].diagonal().segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>();
+//			H[tid].diagonal().segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>();
+//			b[tid].segment<6>(CPARS+h*8) += EF->frames[h]->prior.head<6>().cwiseProduct(EF->frames[h]->delta_prior.head<6>());
+//			b[tid].segment<2>(CPARS+h*8+6) += EF->frames[h]->prior.tail<2>().cwiseProduct(EF->frames[h]->delta_prior.tail<2>());
+//		}
+//	}
 }
 
 

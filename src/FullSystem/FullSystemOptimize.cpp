@@ -213,6 +213,7 @@ Vec3 FullSystem::linearizeAll(bool fixLinearization)
 
 
 // applies step to linearization point.
+[[clang::optnone]]
 bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,float stepfacV,float stepfacA,float stepfacD)
 {
 //	float meanStepC=0,meanStepP=0,meanStepD=0;
@@ -221,44 +222,53 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 	VecIF pstepfac;
 	pstepfac.segment<3>(0).setConstant(stepfacT);
 	pstepfac.segment<3>(3).setConstant(stepfacR);
-	pstepfac.segment<3>(6).setConstant(0);//stepfacV);
+	pstepfac.segment<3>(6).setConstant(stepfacV);
 	pstepfac.segment<2>(9).setConstant(stepfacA);
 
 
 	float sumA=0, sumB=0, sumT=0, sumR=0, sumV=0, sumID=0, numID=0;
 
 	float sumNID=0;
+	float stepfacW = 0.2 * stepfacC;
+	float stepfacB = 0.2 * stepfacC;
 
 	if(setting_solverMode & SOLVER_MOMENTUM)
 	{
-		Hcalib.setValue(Hcalib.value_backup + Hcalib.step);
-		for(FrameHessian* fh : frameHessians)
-		{
-			VecIF step = fh->step;
-			step.head<9>() += 0.5f*(fh->step_backup.head<9>());
-
-			fh->setState(fh->state_backup + step);
-			sumA += step[9]*step[9];
-			sumB += step[10]*step[10];
-			sumT += step.segment<3>(0).squaredNorm();
-			sumR += step.segment<3>(3).squaredNorm();
-			sumV += step.segment<3>(6).squaredNorm();
-
-			for(PointHessian* ph : fh->pointHessians)
-			{
-				float step = ph->step+0.5f*(ph->step_backup);
-				ph->setIdepth(ph->idepth_backup + step);
-				sumID += step*step;
-				sumNID += fabsf(ph->idepth_backup);
-				numID++;
-
-                ph->setIdepthZero(ph->idepth_backup + step);
-			}
-		}
+		abort();
+//		Hcalib.setValue(Hcalib.value_backup + Hcalib.step);
+//		for(FrameHessian* fh : frameHessians)
+//		{
+//			VecIF step = fh->step;
+//			step.head<9>() += 0.5f*(fh->step_backup.head<9>());
+//
+//			fh->setState(fh->state_backup + step);
+//			sumA += step[9]*step[9];
+//			sumB += step[10]*step[10];
+//			sumT += step.segment<3>(0).squaredNorm();
+//			sumR += step.segment<3>(3).squaredNorm();
+//			sumV += step.segment<3>(6).squaredNorm();
+//
+//			for(PointHessian* ph : fh->pointHessians)
+//			{
+//				float step = ph->step+0.5f*(ph->step_backup);
+//				ph->setIdepth(ph->idepth_backup + step);
+//				sumID += step*step;
+//				sumNID += fabsf(ph->idepth_backup);
+//				numID++;
+//
+//                ph->setIdepthZero(ph->idepth_backup + step);
+//			}
+//		}
 	}
 	else
 	{
 		Hcalib.setValue(Hcalib.value_backup + stepfacC*Hcalib.step);
+//		Vec3 w = Hworld.value_backup;
+//		w(1) += stepfacC*Hworld.step(1);
+//		w(2) += stepfacC*Hworld.step(2);
+//		Hworld.setValue(w);
+		Hworld.setValue(Hworld.value_backup + stepfacC*Hworld.step);
+		Hbias.setValue(Hbias.value_backup + stepfacC*Hbias.step);
 		for(FrameHessian* fh : frameHessians)
 		{
 			fh->setState(fh->state_backup + pstepfac.cwiseProduct(fh->step));
@@ -290,13 +300,18 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 
 
 
-    if(!setting_debugout_runquiet)
-        printf("STEPS: A %.1f; B %.1f; R %.1f; V %.1f; T %.1f. \t",
-                sqrtf(sumA) / (0.0005*setting_thOptIterations),
-                sqrtf(sumB) / (0.00005*setting_thOptIterations),
-                sqrtf(sumR) / (0.00005*setting_thOptIterations),
-			    sqrtf(sumV) / (0.00005*setting_thOptIterations),
-                sqrtf(sumT)*sumNID / (0.00005*setting_thOptIterations));
+    if(!setting_debugout_runquiet) {
+        printf("STEPS: A %.1f; B %.1f; R %.1f; V %.1f; T %.1f S %.3f(%.3f) Bias %.3e/%.3e. \t",
+               sqrtf(sumA) / (0.0005 * setting_thOptIterations),
+               sqrtf(sumB) / (0.00005 * setting_thOptIterations),
+               sqrtf(sumR) / (0.00005 * setting_thOptIterations),
+               sqrtf(sumV) / (0.00005 * setting_thOptIterations),
+               sqrtf(sumT) * sumNID / (0.00005 * setting_thOptIterations),
+			   Hworld.step(0),
+			   Hworld.value_backup(0),
+			   Hbias.step.head(3).norm(),
+			   Hbias.step.tail(3).norm());
+    }
 
 
 	EFDeltaValid=false;
@@ -325,10 +340,10 @@ void FullSystem::backupState(bool backupLastStep)
 		{
 			Hcalib.step_backup = Hcalib.step;
 			Hcalib.value_backup = Hcalib.value;
-			hWorld.step_backup = hWorld.step;
-			hWorld.value_backup = hWorld.value;
-			hBias.step_backup = hBias.step;
-			hBias.value_backup = hBias.value;
+			//Hworld.step_backup = Hworld.step;
+			Hworld.value_backup = Hworld.value;
+			//Hbias.step_backup = Hbias.step;
+			Hbias.value_backup = Hbias.value;
 
 			for(FrameHessian* fh : frameHessians)
 			{
@@ -345,10 +360,10 @@ void FullSystem::backupState(bool backupLastStep)
 		{
 			Hcalib.step_backup.setZero();
 			Hcalib.value_backup = Hcalib.value;
-			hWorld.step_backup.setZero();
-			hWorld.value_backup = hWorld.value;
-			hBias.step_backup.setZero();
-			hBias.value_backup = hBias.value;
+			//Hworld.step_backup.setZero();
+			Hworld.value_backup = Hworld.value;
+			//Hbias.step_backup.setZero();
+			Hbias.value_backup = Hbias.value;
 
 			for(FrameHessian* fh : frameHessians)
 			{
@@ -365,8 +380,8 @@ void FullSystem::backupState(bool backupLastStep)
 	else
 	{
 		Hcalib.value_backup = Hcalib.value;
-		hWorld.value_backup = hWorld.value;
-		hBias.value_backup = hBias.value;
+		Hworld.value_backup = Hworld.value;
+		Hbias.value_backup = Hbias.value;
 		for(FrameHessian* fh : frameHessians)
 		{
 			fh->state_backup = fh->get_state();
@@ -380,8 +395,8 @@ void FullSystem::backupState(bool backupLastStep)
 void FullSystem::loadSateBackup()
 {
 	Hcalib.setValue(Hcalib.value_backup);
-	hWorld.setValue(hWorld.value_backup);
-	hBias.setValue(hBias.value_backup);
+	Hworld.setValue(Hworld.value_backup);
+	Hbias.setValue(Hbias.value_backup);
 
 	for(FrameHessian* fh : frameHessians)
 	{
@@ -424,18 +439,13 @@ void FullSystem::printOptRes(const Vec3 &res, double resL, double resM, double r
 
 }
 
-
+[[clang::optnone]]
 float FullSystem::optimize(int mnumOptIts)
 {
 
 	if(frameHessians.size() < 2) return 0;
 	if(frameHessians.size() < 3) mnumOptIts = 20;
 	if(frameHessians.size() < 4) mnumOptIts = 15;
-
-
-
-
-
 
 	// get statistics and active residuals.
 
@@ -458,8 +468,9 @@ float FullSystem::optimize(int mnumOptIts)
 			numPoints++;
 		}
 
-    if(!setting_debugout_runquiet)
-        printf("OPTIMIZE %d pts, %d active res, %d lin res!\n",ef->nPoints,(int)activeResiduals.size(), numLRes);
+    if(!setting_debugout_runquiet) {
+        printf("OPTIMIZE %d pts, %d active res, %d lin res!\n", ef->nPoints, (int) activeResiduals.size(), numLRes);
+    }
 
 
 	Vec3 lastEnergy = linearizeAll(false);
@@ -527,10 +538,11 @@ float FullSystem::optimize(int mnumOptIts)
 
         if(!setting_debugout_runquiet)
         {
-            printf("%s %d (L %.2f, dir %.2f, ss %.1f): \t",
-				(newEnergy[0] +  newEnergy[1] +  newEnergyL + newEnergyM <
+            printf("%s%s %d (L %.2f, dir %.2f, ss %.1f): \t",
+				   (newEnergy[0] +  newEnergy[1] +  newEnergyL + newEnergyM <
 						lastEnergy[0] + lastEnergy[1] + lastEnergyL + lastEnergyM) ? "ACCEPT" : "REJECT",
-				iteration,
+				   setting_forceAceptStep ? " FORCED" : "",
+				   iteration,
 				log10(lambda),
 				incDirChange,
 				stepsize);
@@ -540,7 +552,6 @@ float FullSystem::optimize(int mnumOptIts)
 		if(setting_forceAceptStep || (newEnergy[0] +  newEnergy[1] +  newEnergyL + newEnergyM <
 				lastEnergy[0] + lastEnergy[1] + lastEnergyL + lastEnergyM))
 		{
-
 			if(multiThreading)
 				treadReduce.reduce(boost::bind(&FullSystem::applyRes_Reductor, this, true, _1, _2, _3, _4), 0, activeResiduals.size(), 50);
 			else
@@ -565,19 +576,17 @@ float FullSystem::optimize(int mnumOptIts)
 		if(canbreak && iteration >= setting_minOptIterations) break;
 	}
 
-	frameHessians.back()->setEvalPTAndStateZero(frameHessians.back()->PRE_worldToCam, frameHessians.back()->aff_g2l());
+	frameHessians.back()->setEvalPTAndStateZero(false);
+	Hworld.updateEvalPt();
 	EFDeltaValid=false;
 	EFAdjointsValid=false;
 	ef->setAdjointsF();
 	setPrecalcValues();
 
-
-
+	std::cout << "Hworld:" << Hworld;
+	std::cout << " HBias:" << Hbias;
 
 	lastEnergy = linearizeAll(true);
-
-
-
 
 	if(!std::isfinite((double)lastEnergy[0]) || !std::isfinite((double)lastEnergy[1]) || !std::isfinite((double)lastEnergy[2]))
     {
@@ -601,8 +610,9 @@ float FullSystem::optimize(int mnumOptIts)
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		for(FrameHessian* fh : frameHessians)
 		{
-			fh->shell->camToWorld = fh->PRE_camToWorld;
+			fh->shell->TWorldCam = fh->PRE_TWorldCam;
 			fh->shell->aff_g2l = fh->aff_g2l();
+			fh->shell->velocity = fh->getVelocityScaled();
 		}
 	}
 

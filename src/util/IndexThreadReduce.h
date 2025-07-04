@@ -35,7 +35,6 @@ using namespace boost::placeholders;
 namespace dso
 {
 
-template<typename Running>
 class IndexThreadReduce
 {
 
@@ -74,10 +73,9 @@ public:
 
 	}
 
-	inline void reduce(boost::function<void(int,int,Running*,int)> callPerIndex, int first, int end, int stepSize = 0)
+	inline void reduce(boost::function<void(int,int,Vec10*,int)> callPerIndex, int first, int end, int stepSize = 0)
 	{
-
-		memset(&stats, 0, sizeof(Running));
+        stats.setZero();
 
 //		if(!multiThreading)
 //		{
@@ -137,7 +135,7 @@ public:
 		//printf("reduce done (all threads finished)\n");
 	}
 
-	Running stats;
+	Vec10 stats;
 
 private:
 	boost::thread workerThreads[NUM_THREADS];
@@ -154,9 +152,9 @@ private:
 
 	bool running;
 
-	boost::function<void(int,int,Running*,int)> callPerIndex;
+	boost::function<void(int,int,Vec10*,int)> callPerIndex;
 
-	void callPerIndexDefault(int i, int j,Running* k, int tid)
+	void callPerIndexDefault(int i, int j,Vec10* k, int tid)
 	{
 		printf("ERROR: should never be called....\n");
 		assert(false);
@@ -186,7 +184,7 @@ private:
 
 				assert(callPerIndex != 0);
 
-				Running s; memset(&s, 0, sizeof(Running));
+                Vec10 s = Vec10::Zero();
 				callPerIndex(todo, std::min(todo+stepSize, maxIndex), &s, idx);
 				gotOne[idx] = true;
 				lock.lock();
@@ -200,7 +198,7 @@ private:
 				{
 					lock.unlock();
 					assert(callPerIndex != 0);
-					Running s; memset(&s, 0, sizeof(Running));
+                    Vec10 s = Vec10::Zero();
 					callPerIndex(0, 0, &s, idx);
 					gotOne[idx] = true;
 					lock.lock();

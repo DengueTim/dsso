@@ -155,7 +155,23 @@ public:
 	VecIF delta_prior;		// = state-state_prior (E_prior = (delta_prior)' * diag(prior) * (delta_prior)
 	VecIF delta;				// state - state_zero.
 
+	inline VecF dsoPrior() {
+		VecF v(FPARS);
+		v << prior.head<6>(), prior.tail<2>();
+		return v;
+	}
 
+	inline VecF dsoDeltaPrior() {
+		VecF v(FPARS);
+		v << delta_prior.head<6>(), delta_prior.tail<2>();
+		return v;
+	}
+
+	inline VecF dsoDelta() {
+		VecF v(FPARS);
+		v << delta.head<6>(), delta.tail<2>();
+		return v;
+	}
 
 	std::vector<EFPoint*> points;
 	FrameHessian* data;

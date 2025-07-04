@@ -2,9 +2,11 @@ SET(PROJECT_NAME DSO)
 
 # If ld can't find boost_system do: export LIBRARY_PATH=/opt/homebrew/lib
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.5)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.8)
 PROJECT(${PROJECT_NAME})
 #set(CMAKE_VERBOSE_MAKEFILE ON)
+
+SET(CMAKE_CXX_STANDARD 17)
 
 
 set(CMAKE_BUILD_TYPE Debug)
@@ -50,8 +52,9 @@ endif()
 
 add_definitions("-DENABLE_SSE")
 set(CMAKE_CXX_FLAGS
-   "${SSE_FLAGS} -O3 -g -std=c++0x ${CPU_CXX_FLAG}"
-#   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
+#   "${SSE_FLAGS} -O -Wall -g ${CPU_CXX_FLAG}"
+	"${SSE_FLAGS} -O1 -g ${CPU_CXX_FLAG}"
+#   "${SSE_FLAGS} -O3 -g -fno-omit-frame-pointer"
 )
 
 if (MSVC)
@@ -86,12 +89,9 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
   ${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
   ${EIGEN3_INCLUDE_DIR}
-<<<<<<< HEAD
-=======
   ${GTSAM_INCLUDE_DIR}
   ${PROJECT_SOURCE_DIR}/tests
->>>>>>> d1a7fc5 (IMU data read from file into GTSAM::Preintegration...)
-) 
+)
 
 # decide if we have pangolin
 if (Pangolin_FOUND)
@@ -121,7 +121,7 @@ else ()
 	message("    this means there will be no image display, and image read / load functionality.")
 	set(dso_opencv_SOURCE_FILES 
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageDisplay_dummy.cpp
-	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageRW_dummy.cpp)
+	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageRW_dummy.cpp src/util/OptimisationUtils.h)
 	set(HAS_OPENCV 0)
 endif ()
 
@@ -135,7 +135,6 @@ else()
 	set(LIBZIP_LIBRARY "")
 endif()
 
-
 # compile main library.
 include_directories( ${CSPARSE_INCLUDE_DIR} ${CHOLMOD_INCLUDE_DIR}) 
 add_library(dso ${dso_SOURCE_FILES} ${dso_opencv_SOURCE_FILES} ${dso_pangolin_SOURCE_FILES})
@@ -143,11 +142,11 @@ add_library(dso ${dso_SOURCE_FILES} ${dso_opencv_SOURCE_FILES} ${dso_pangolin_SO
 #set_property( TARGET dso APPEND_STRING PROPERTY COMPILE_FLAGS -Wall )
 
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # OSX
-    set(BOOST_THREAD_LIBRARY boost_thread-mt)
-else()
+#if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # OSX
+#    set(BOOST_THREAD_LIBRARY boost_thread-mt)
+#else()
     set(BOOST_THREAD_LIBRARY boost_thread)
-endif()
+#endif()
 
 # build main executable (only if we have both OpenCV and Pangolin)
 if (OpenCV_FOUND AND Pangolin_FOUND)

@@ -257,8 +257,16 @@ public:
 	// undistorter. [0] always exists, [1-2] only when MT is enabled.
 	Undistort* undistort;
 
+	[[clang::optnone]]
     inline int loadImuMeasurements(std::string &imuCalibFilename, std::string &imuDataFilename) {
         //std::ifstream imuCalibStream(imuCalibFilename.c_str());
+		// TODO load TBaseCam from cam0(left) sensor.yaml file...
+		Mat44 Tbc;
+		Tbc << 0.0148655429818, -0.999880929698, 0.00414029679422, -0.0216401454975,
+			0.999557249008, 0.0149672133247, 0.025715529948, -0.064676986768,
+			-0.0257744366974, 0.00375618835797, 0.999660727178, 0.00981073058949,
+			0.0, 0.0, 0.0, 1.0;
+		TBaseCam = SE3(Tbc);
         std::ifstream imuDataStream(imuDataFilename.c_str());
 
         long long lastImuStamp = 0;
@@ -276,9 +284,10 @@ public:
 
             if (7 == sscanf(lineBuf, "%lld,%lf,%lf,%lf,%lf,%lf,%lf", &imuStamp, &wx ,&wy, &wz, &ax ,&ay, &az)) {
                 if (lastImuStamp == 0) {
-                    lastImuStamp = imuStamp;
-                }
-                imuMeasurements.emplace_back(wx ,wy, wz, ax ,ay, az, imuStamp, imuStamp - lastImuStamp);
+                    lastImuStamp = imuStamp; // First measurement. Remember its time stamp and throw it away.
+                } else {
+					imuMeasurements.emplace_back(wx, wy, wz, ax, ay, az, imuStamp, imuStamp - lastImuStamp);
+				}
                 lastImuStamp = imuStamp;
             }
         }
@@ -288,6 +297,7 @@ public:
         return imuMeasurements.size();
     }
 
+	SE3 TBaseCam;
     ImuMeasurements imuMeasurements;
 private:
 
@@ -372,7 +382,7 @@ private:
             }
             tr.close();
         } else {
-            for (auto i = 0 ; i < files.size() ; i++) {
+            for (long unsigned int i = 0 ; i < files.size() ; i++) {
                 long long timestamp = getTimestampFromFilename(files[i]);
                 timestamps.push_back(timestamp);
             }

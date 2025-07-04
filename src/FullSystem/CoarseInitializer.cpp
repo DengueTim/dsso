@@ -82,27 +82,23 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 {
 	newFrame = newFrameHessian;
 
-    for(IOWrap::Output3DWrapper* ow : wraps)
+    for(IOWrap::Output3DWrapper* ow : wraps) {
         ow->pushLiveFrame(newFrameHessian);
+    }
 
 	int maxIterations[] = {5,5,10,30,50};
-
-
 
 	alphaK = 2.5*2.5;//*freeDebugParam1*freeDebugParam1;
 	alphaW = 150*150;//*freeDebugParam2*freeDebugParam2;
 	regWeight = 0.8;//*freeDebugParam4;
 	couplingWeight = 1;//*freeDebugParam5;
 
-	if(!snapped)
-	{
+	if(!snapped) {
 		thisToNext.translation().setZero();
-		for(int lvl=0;lvl<pyrLevelsUsed;lvl++)
-		{
+		for(int lvl=0;lvl<pyrLevelsUsed;lvl++) {
 			int npts = numPoints[lvl];
 			Pnt* ptsl = points[lvl];
-			for(int i=0;i<npts;i++)
-			{
+			for(int i=0;i<npts;i++) {
 				ptsl[i].iR = 1;
 				ptsl[i].idepth_new = 1;
 				ptsl[i].lastHessian = 0;
@@ -119,11 +115,7 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 
 
 	Vec3f latestRes = Vec3f::Zero();
-	for(int lvl=pyrLevelsUsed-1; lvl>=0; lvl--)
-	{
-
-
-
+	for(int lvl=pyrLevelsUsed-1; lvl>=0; lvl--) {
 		if(lvl<pyrLevelsUsed-1)
 			propagateDown(lvl+1);
 
@@ -325,7 +317,7 @@ void CoarseInitializer::debugPlot(int lvl, std::vector<IOWrap::Output3DWrapper*>
         ow->pushDepthImage(&iRImg);
 }
 
-// calculates residual, Hessian and Hessian-block neede for re-substituting depth.
+// calculates residual, Hessian and Hessian-block(General Solution) neede for re-substituting depth.
 Vec3f CoarseInitializer::calcResAndGS(
 		int lvl, Mat88f &H_out, Vec8f &b_out,
 		Mat88f &H_out_sc, Vec8f &b_out_sc,
@@ -764,7 +756,7 @@ void CoarseInitializer::makeGradients(Eigen::Vector3f** data)
 		}
 	}
 }
-void CoarseInitializer::setFirst(	CalibHessian* HCalib, FrameHessian* newFrameHessian)
+void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHessian)
 {
 
 	makeK(HCalib);

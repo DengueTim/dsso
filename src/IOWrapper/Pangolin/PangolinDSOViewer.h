@@ -56,10 +56,10 @@ class PangolinDSOViewer : public Output3DWrapper
 {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-    PangolinDSOViewer(int w, int h, bool startRunThread=true);
+    PangolinDSOViewer(int w, int h, const SE3& TBaseCam);
 	virtual ~PangolinDSOViewer();
 
-	void run();
+	void run(std::atomic_char& key);
 	void close();
 
 	void addImageToDisplay(std::string name, MinimalImageB3* image);
@@ -68,13 +68,15 @@ public:
 
 	// ==================== Output3DWrapper Functionality ======================
     virtual void publishGraph(const std::map<uint64_t, Eigen::Vector2i, std::less<uint64_t>, Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>> &connectivity) override;
-    virtual void publishKeyframes( std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib) override;
+    virtual void publishKeyframes( std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib, MetricWorldHessian* HWorld) override;
     virtual void publishCamPose(FrameShell* frame, CalibHessian* HCalib) override;
 
 
     virtual void pushLiveFrame(FrameHessian* image) override;
     virtual void pushDepthImage(MinimalImageB3* image) override;
     virtual bool needPushDepthImage() override;
+
+	virtual void publishVecDebug(const Vec3& vec) override;
 
     virtual void join() override;
 
@@ -84,10 +86,14 @@ private:
 	bool needReset;
 	void reset_internal();
 	void drawConstraints();
+	void drawMetricOrigin(const float size=0.5f);
 
 	boost::thread runThread;
 	bool running;
-	int w,h;
+	const int w,h;
+	const Mat44f TBaseCam;
+	float lastTMetricDsoScale;
+	Mat44f lastTMetricDsoRotation;
 
 
 
@@ -104,9 +110,10 @@ private:
 	boost::mutex model3DMutex;
 	KeyFrameDisplay* currentCam;
 	std::vector<KeyFrameDisplay*> keyframes;
-	std::vector<Vec3f,Eigen::aligned_allocator<Vec3f>> allFramePoses;
+	std::vector<Vec3f,Eigen::aligned_allocator<Vec3f>> allPoses;
 	std::map<int, KeyFrameDisplay*> keyframesByKFID;
 	std::vector<GraphConnection,Eigen::aligned_allocator<GraphConnection>> connections;
+	Vec3 debugVec;
 
 
 

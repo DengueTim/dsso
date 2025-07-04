@@ -82,13 +82,13 @@ public:
 		nres[tid]=0;
 
 	}
-	void stitchDouble(MatXX &H, VecX &b, EnergyFunctional const * const EF, bool usePrior, bool useDelta, int tid=0);
+	void stitchDouble(MatXX &H, VecX &b, EnergyFunctional const * const EF, int tid=0);
 
 	template<int mode> void addPoint(EFPoint* p, EnergyFunctional const * const ef, int tid=0);
 
 
 
-	void stitchDoubleMT(IndexThreadReduce<Vec10>* red, MatXX &H, VecX &b, EnergyFunctional const * const EF, bool usePrior, bool MT)
+	void stitchDoubleMT(IndexThreadReduce* red, MatXX &H, VecX &b, EnergyFunctional const * const EF, bool MT)
 	{
 		// sum up, splitting by bock in square.
 		if(MT)
@@ -103,7 +103,7 @@ public:
 			}
 
 			red->reduce(boost::bind(&AccumulatedTopHessianSSE::stitchDoubleInternal,
-				this,Hs, bs, EF, usePrior,  _1, _2, _3, _4), 0, nframes[0]*nframes[0], 0);
+				this,Hs, bs, EF, _1, _2, _3, _4), 0, nframes[0]*nframes[0], 0);
 
 			// sum up results
 			H = Hs[0];
@@ -120,7 +120,7 @@ public:
 		{
 			H = MatXX::Zero(nframes[0]*8+CPARS, nframes[0]*8+CPARS);
 			b = VecX::Zero(nframes[0]*8+CPARS);
-			stitchDoubleInternal(&H, &b, EF, usePrior,0,nframes[0]*nframes[0],0,-1);
+			stitchDoubleInternal(&H, &b, EF, 0,nframes[0]*nframes[0],0,-1);
 		}
 
 		// make diagonal by copying over parts.
@@ -161,8 +161,7 @@ public:
 private:
 
 	void stitchDoubleInternal(
-			MatXX* H, VecX* b, EnergyFunctional const * const EF, bool usePrior,
-			int min, int max, Vec10* stats, int tid);
+			MatXX* H, VecX* b, EnergyFunctional const * const EF, int min, int max, Vec10* stats, int tid);
 };
 }
 

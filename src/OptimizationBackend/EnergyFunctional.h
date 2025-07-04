@@ -39,7 +39,7 @@ class PointFrameResidual;
 class CalibHessian;
 class FrameHessian;
 class PointHessian;
-class ImuWorldHessian;
+class MetricWorldHessian;
 class ImuBiasHessian;
 
 
@@ -70,7 +70,7 @@ public:
 	friend class AccumulatedSCHessian;
 	friend class AccumulatedSCHessianSSE;
 
-	EnergyFunctional(CalibHessian &hCalib, ImuWorldHessian &hWorld, ImuBiasHessian &hBias);
+	EnergyFunctional(const double imuWeight, CalibHessian &HCalib, MetricWorldHessian &HWorld, ImuBiasHessian &HBias);
 	~EnergyFunctional();
 
 
@@ -100,9 +100,6 @@ public:
 	std::vector<EFFrame*> frames;
 	int nPoints, nFrames, nResiduals;
 
-	MatXX HM;
-	VecX bM;
-
 	int resInA, resInL, resInM;
 	MatXX lastHS;
 	VecX lastbS;
@@ -113,8 +110,7 @@ public:
 	std::vector<VecX> lastNullspaces_affA;
 	std::vector<VecX> lastNullspaces_affB;
 
-	IndexThreadReduce<Vec10>* red;
-
+	IndexThreadReduce* red;
 
 	std::map<uint64_t,
 	  Eigen::Vector2i,
@@ -123,8 +119,9 @@ public:
 	  > connectivityMap;
 
 private:
+	inline const static float dmin = sqrt(1.1);
 
-	VecX getStitchedDeltaF() const;
+	void getStitchedDeltaF(VecX &delta);
 
 	void resubstituteF_MT(VecX x, bool MT);
     void resubstituteFPt(const VecCf &xc, Mat18f* xAd, int min, int max, Vec10* stats, int tid);
@@ -138,11 +135,16 @@ private:
 	void orthogonalize(VecX* b, MatXX* H);
 
 	const SE3 dsoCamPoseToMetricImuPose(const SE3& T_dso_cam);
-	void addImuFactors(MatXX &H, VecX &b);
+	double addImuFactors(const int frameIndex, MatXX &H, VecX &b);
+	void addPrior(MatXX &H, VecX &b);
 
-	CalibHessian &hCalib;
-	ImuWorldHessian &hWorld;
-	ImuBiasHessian &hBias;
+	const SE3 TBaseCam; // Fixed Base(IMU) to Camera transform in metric world
+
+	const double imuWeightSquared;
+
+	CalibHessian &HCalib;
+	MetricWorldHessian &HWorld;
+	ImuBiasHessian &HBias;
 
 	Mat18f* adHTdeltaF;
 
@@ -153,10 +155,13 @@ private:
 	Mat88f* adTargetF;
 
 	VecC cPrior;
+	VecC cDelta;
 	VecCf cDeltaF;
-	VecCf cPriorF;
 
+	VecIW wPrior;
 	VecIW wDelta;
+
+	VecIB bPrior;
 	VecIB bDelta;
 
 	AccumulatedTopHessianSSE* accSSE_top_L;
@@ -166,6 +171,16 @@ private:
 
 	std::vector<EFPoint*> allPoints;
 	std::vector<EFPoint*> allPointsToMarg;
+
+	// M_visual & b_visual in paper.
+	MatXX HMDso;
+	VecX bMDso;
+
+	std::unique_ptr<MatXX> HMImuCurr, HMImuHalf;
+	std::unique_ptr<VecX> bMImuCurr, bMImuHalf;
+
+	bool lastUpper;
+	float sMiddle, sLast, di;
 
 	float currentLambda;
 };

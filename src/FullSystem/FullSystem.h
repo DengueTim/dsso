@@ -133,11 +133,11 @@ inline bool eigenTestNan(const MatXX &m, std::string msg)
 class FullSystem {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-	FullSystem();
+	FullSystem(const SE3 &TBaseCam, const double imuWeight);
 	virtual ~FullSystem();
 
 	// adds a new frame, and creates point & residual structs.
-	void addActiveFrame(ImageAndExposure* image, int id, const ImuMeasurements &imuMeasurements);
+	void addActiveFrame(ImageAndExposure* image, int id, const std::shared_ptr<ImuMeasurements> imuMeasurements);
 
 	// marginalizes a frame. drops / marginalizes points & residuals.
 	void marginalizeFrame(FrameHessian* frame);
@@ -164,10 +164,13 @@ public:
 	void setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH);
 
 private:
+	const SE3 TBaseCam;
+
+	const double imuWeight;
 
 	CalibHessian Hcalib;
-	ImuWorldHessian hWorld;
-	ImuBiasHessian hBias;
+	MetricWorldHessian Hworld;
+	ImuBiasHessian Hbias;
 
 	// opt single point
 	int optimizePoint(PointHessian* point, int minObs, bool flagOOB);
@@ -183,7 +186,7 @@ private:
 	void activatePointsOldFirst();
 	void flagPointsForRemoval();
 	void makeNewTraces(FrameHessian* newFrame, float* gtDepth);
-	void initializeFromInitializer(FrameHessian* newFrame);
+	void initializeFromInitializer(FrameHessian* newFrame, Mat33 rotWorldImu);
 	void flagFramesForMarginalization(FrameHessian* newFH);
 
 
@@ -263,7 +266,7 @@ private:
 	std::vector<FrameShell*> allKeyFramesHistory;
 
 	EnergyFunctional* ef;
-	IndexThreadReduce<Vec10> treadReduce;
+	IndexThreadReduce treadReduce;
 
 	float* selectionMap;
 	PixelSelector* pixelSelector;

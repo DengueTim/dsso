@@ -62,7 +62,7 @@ public:
 
             int maxWrite = 5;
 
-            for(const std::pair<uint64_t,Eigen::Vector2i> &p : connectivity)
+            for(const std::pair<uint64_t,Eigen::Vector2i>& p : connectivity)
             {
                 int idHost = p.first>>32;
                 int idTarget = p.first & ((uint64_t)0xFFFFFFFF);
@@ -74,7 +74,7 @@ public:
 
 
 
-        virtual void publishKeyframes( std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib) override
+        virtual void publishKeyframes( std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib, MetricWorldHessian* HWorld) override
         {
             for(FrameHessian* f : frames)
             {
@@ -84,7 +84,7 @@ public:
                        f->shell->incoming_id,
                        f->shell->timestamp,
                        (int)f->pointHessians.size(), (int)f->pointHessiansMarginalized.size(), (int)f->immaturePoints.size());
-                std::cout << f->shell->camToWorld.matrix3x4() << "\n";
+                std::cout << f->shell->TWorldCam.matrix3x4() << "\n";
 
 
                 int maxWrite = 5;
@@ -104,7 +104,7 @@ public:
                    frame->incoming_id,
                    frame->timestamp,
                    frame->id);
-            std::cout << frame->camToWorld.matrix3x4() << "\n";
+            std::cout << frame->TWorldCam.matrix3x4() << "\n";
         }
 
 
@@ -129,7 +129,7 @@ public:
                    KF->shell->incoming_id,
                    KF->shell->timestamp,
                    KF->shell->id);
-            std::cout << KF->shell->camToWorld.matrix3x4() << "\n";
+            std::cout << KF->shell->TWorldCam.matrix3x4() << "\n";
 
             int maxWrite = 5;
             for(int y=0;y<image->h;y++)

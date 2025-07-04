@@ -39,12 +39,8 @@ namespace IOWrap
 
 
 
-PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread)
-{
-	this->w = w;
-	this->h = h;
+PangolinDSOViewer::PangolinDSOViewer(int w, int h, const SE3& TBaseCam) : w(w), h(h), TBaseCam(TBaseCam.matrix().cast<float>()) {
 	running=true;
-
 
 	{
 		boost::unique_lock<boost::mutex> lk(openImagesMutex);
@@ -60,26 +56,32 @@ PangolinDSOViewer::PangolinDSOViewer(int w, int h, bool startRunThread)
 
 
 	{
-		currentCam = new KeyFrameDisplay();
+		currentCam = new KeyFrameDisplay(this->TBaseCam);
 	}
 
 	needReset = false;
-
-
-    if(startRunThread)
-        runThread = boost::thread(&PangolinDSOViewer::run, this);
-
+	lastTMetricDsoRotation.setIdentity();
 }
 
 
 PangolinDSOViewer::~PangolinDSOViewer()
 {
+	reset_internal();
 	close();
+
+	{
+		boost::unique_lock<boost::mutex> lk(openImagesMutex);
+		delete internalVideoImg;
+		delete internalKFImg;
+		delete internalResImg;
+	}
+
+	delete currentCam;
 	runThread.join();
 }
 
 
-void PangolinDSOViewer::run()
+void PangolinDSOViewer::run(std::atomic_char& key)
 {
 	printf("START PANGOLIN!\n");
 
@@ -91,12 +93,14 @@ void PangolinDSOViewer::run()
 	// 3D visualization
 	pangolin::OpenGlRenderState Visualization3D_camera(
 		pangolin::ProjectionMatrix(w,h,400,400,w/2,h/2,0.1,1000),
-		pangolin::ModelViewLookAt(-0,-5,-10, 0,0,0, pangolin::AxisNegY)
+		//pangolin::ModelViewLookAt(-4,1,2, 0,0,0, pangolin::AxisZ) // Metric world, Z+ is up, X+ is forwards
+		pangolin::ModelViewLookAt(2,1,-4, 0,0,0, pangolin::AxisX) // Metric/IMU world, X+ is up, Z+ is forwards
 		);
 
+	pangolin::Handler3D Handler(Visualization3D_camera);
 	pangolin::View& Visualization3D_display = pangolin::CreateDisplay()
 		.SetBounds(0.0, 1.0, pangolin::Attach::Pix(UI_WIDTH), 1.0, -w/(float)h)
-		.SetHandler(new pangolin::Handler3D(Visualization3D_camera));
+		.SetHandler(&Handler);
 
 
 	// 3 images
@@ -162,6 +166,8 @@ void PangolinDSOViewer::run()
 	pangolin::Var<double> settings_trackFps("ui.Track fps",0,0,0,false);
 	pangolin::Var<double> settings_mapFps("ui.KF fps",0,0,0,false);
 
+	auto spaceFunc = [&key]() mutable {if (key.load() == -1) {key = ' '; key.notify_one();}};
+	pangolin::RegisterKeyPressCallback(' ', spaceFunc);
 
 	// Default hooks for exiting (Esc) and fullscreen (tab).
 	while( !pangolin::ShouldQuit() && running )
@@ -174,20 +180,33 @@ void PangolinDSOViewer::run()
 			// Activate efficiently by object
 			Visualization3D_display.Activate(Visualization3D_camera);
 			boost::unique_lock<boost::mutex> lk3d(model3DMutex);
+
 			//pangolin::glDrawColouredCube();
+			drawMetricOrigin();
+
+			glPushMatrix();
+			Mat44f m = lastTMetricDsoRotation;
+			//m.topLeftCorner<3,3>() *= TBaseCam.topLeftCorner<3,3>();
+			m(3,3) = lastTMetricDsoScale;
+			glMultMatrixf((GLfloat *)m.data());
+
 			int refreshed=0;
-			for(KeyFrameDisplay* fh : keyframes)
+			for(KeyFrameDisplay* kfd : keyframes)
 			{
 				float blue[3] = {0,0,1};
-				if(this->settings_showKFCameras) fh->drawCam(1,blue,0.1);
+				if(this->settings_showKFCameras) kfd->drawCam(1,blue,0.1);
 
 
-				refreshed += (int)(fh->refreshPC(refreshed < 10, this->settings_scaledVarTH, this->settings_absVarTH,
+				refreshed += (int)(kfd->refreshPC(refreshed < 10, this->settings_scaledVarTH, this->settings_absVarTH,
 						this->settings_pointCloudMode, this->settings_minRelBS, this->settings_sparsity));
-				fh->drawPC(1);
+				kfd->drawPC(1);
+				kfd->drawImuIntegration();
 			}
 			if(this->settings_showCurrentCamera) currentCam->drawCam(2,0,0.2);
 			drawConstraints();
+
+			glPopMatrix();
+
 			lk3d.unlock();
 		}
 
@@ -284,15 +303,14 @@ void PangolinDSOViewer::run()
 		// Swap frames and Process Events
 		pangolin::FinishFrame();
 
-
 	    if(needReset) reset_internal();
 	}
 
-
-	printf("QUIT Pangolin thread!\n");
-	printf("I'll just kill the whole process.\nSo Long, and Thanks for All the Fish!\n");
-
-	exit(1);
+	spaceFunc(); // For things waiting on key.
+	printf("Pangolin loop ended.\n");
+	//printf("QUIT Pangolin thread!\n");
+	//printf("I'll just kill the whole process.\nSo Long, and Thanks for All the Fish!\n");
+	// exit(1);
 }
 
 
@@ -317,7 +335,7 @@ void PangolinDSOViewer::reset_internal()
 	model3DMutex.lock();
 	for(size_t i=0; i<keyframes.size();i++) delete keyframes[i];
 	keyframes.clear();
-	allFramePoses.clear();
+	allPoses.clear();
 	keyframesByKFID.clear();
 	connections.clear();
 	model3DMutex.unlock();
@@ -333,6 +351,33 @@ void PangolinDSOViewer::reset_internal()
 	needReset = false;
 }
 
+void PangolinDSOViewer::drawMetricOrigin(const float size) {
+	const GLfloat l = -size;
+	const GLfloat h = size;
+
+	glColor3f(0.5,0.5,0.5);
+
+	glBegin(GL_LINE_STRIP);
+	glVertex3f(0,l,h);
+	glVertex3f(0,l,l);
+	glVertex3f(0,h,l);
+	glVertex3f(0,h,h);
+	glVertex3f(0,l,h);
+	glEnd();
+	glBegin(GL_LINE_STRIP);
+	glVertex3f(h,0,0); // Up
+	glVertex3f(0,0,0);
+	glVertex3f(0,0,h); // Forward
+	glEnd();
+
+	if (debugVec.norm() != 0) {
+		glColor3f(0,1,1);
+		glBegin(GL_LINE_STRIP);
+		glVertex3f(0,0,0);
+		glVertex3f(debugVec[0],debugVec[1],debugVec[2]);
+		glEnd();
+	}
+}
 
 void PangolinDSOViewer::drawConstraints()
 {
@@ -351,10 +396,10 @@ void PangolinDSOViewer::drawConstraints()
 			int nMarg = connections[i].bwdMarg + connections[i].fwdMarg;
 			if(nAct==0 && nMarg>0  )
 			{
-				Sophus::Vector3f t = connections[i].from->camToWorld.translation().cast<float>();
-				glVertex3f((GLfloat) t[0],(GLfloat) t[1], (GLfloat) t[2]);
-				t = connections[i].to->camToWorld.translation().cast<float>();
-				glVertex3f((GLfloat) t[0],(GLfloat) t[1], (GLfloat) t[2]);
+				Sophus::Matrix4f& f = connections[i].from->TWorldCam;
+				glVertex3f((GLfloat) f(0,3),(GLfloat) f(1,3), (GLfloat) f(2,3));
+				Sophus::Matrix4f& t = connections[i].to->TWorldCam;
+				glVertex3f((GLfloat) t(0,3),(GLfloat) t(1,3), (GLfloat) t(2,3));
 			}
 		}
 		glEnd();
@@ -372,10 +417,10 @@ void PangolinDSOViewer::drawConstraints()
 
 			if(nAct>0)
 			{
-				Sophus::Vector3f t = connections[i].from->camToWorld.translation().cast<float>();
-				glVertex3f((GLfloat) t[0],(GLfloat) t[1], (GLfloat) t[2]);
-				t = connections[i].to->camToWorld.translation().cast<float>();
-				glVertex3f((GLfloat) t[0],(GLfloat) t[1], (GLfloat) t[2]);
+				Sophus::Matrix4f& f = connections[i].from->TWorldCam;
+				glVertex3f((GLfloat) f(0,3),(GLfloat) f(1,3), (GLfloat) f(2,3));
+				Sophus::Matrix4f& t = connections[i].to->TWorldCam;
+				glVertex3f((GLfloat) t(0,3),(GLfloat) t(1,3), (GLfloat) t(2,3));
 			}
 		}
 		glEnd();
@@ -390,9 +435,9 @@ void PangolinDSOViewer::drawConstraints()
 		glBegin(GL_LINE_STRIP);
 		for(unsigned int i=0;i<keyframes.size();i++)
 		{
-			glVertex3f((float)keyframes[i]->camToWorld.translation()[0],
-					(float)keyframes[i]->camToWorld.translation()[1],
-					(float)keyframes[i]->camToWorld.translation()[2]);
+			glVertex3f((float)keyframes[i]->TWorldCam(0,3),
+					(float)keyframes[i]->TWorldCam(1,3),
+					(float)keyframes[i]->TWorldCam(2,3));
 		}
 		glEnd();
 	}
@@ -404,11 +449,11 @@ void PangolinDSOViewer::drawConstraints()
 		glLineWidth(3);
 
 		glBegin(GL_LINE_STRIP);
-		for(unsigned int i=0;i<allFramePoses.size();i++)
+		for(unsigned int i=0;i<allPoses.size();i++)
 		{
-			glVertex3f((float)allFramePoses[i][0],
-					(float)allFramePoses[i][1],
-					(float)allFramePoses[i][2]);
+			glVertex3f((float)allPoses[i][0],
+					(float)allPoses[i][1],
+					(float)allPoses[i][2]);
 		}
 		glEnd();
 	}
@@ -466,7 +511,8 @@ void PangolinDSOViewer::publishGraph(const std::map<uint64_t, Eigen::Vector2i, s
 void PangolinDSOViewer::publishKeyframes(
 		std::vector<FrameHessian*> &frames,
 		bool final,
-		CalibHessian* HCalib)
+		CalibHessian* HCalib,
+		MetricWorldHessian* HWorld)
 {
 	if(!setting_render_display3D) return;
     if(disableAllDisplay) return;
@@ -476,17 +522,20 @@ void PangolinDSOViewer::publishKeyframes(
 	{
 		if(keyframesByKFID.find(fh->frameID) == keyframesByKFID.end())
 		{
-			KeyFrameDisplay* kfd = new KeyFrameDisplay();
+			KeyFrameDisplay* kfd = new KeyFrameDisplay(TBaseCam);
 			keyframesByKFID[fh->frameID] = kfd;
 			keyframes.push_back(kfd);
 		}
 		keyframesByKFID[fh->frameID]->setFromKF(fh, HCalib);
 	}
+	lastTMetricDsoScale = HWorld->TMetricDso.scale();
+	lastTMetricDsoRotation.topLeftCorner<3,3>() = HWorld->TMetricDso.rotationMatrix().cast<float>();
 }
 void PangolinDSOViewer::publishCamPose(FrameShell* frame,
 		CalibHessian* HCalib)
 {
     if(!setting_render_display3D) return;
+
     if(disableAllDisplay) return;
 
 	boost::unique_lock<boost::mutex> lk(model3DMutex);
@@ -496,10 +545,14 @@ void PangolinDSOViewer::publishCamPose(FrameShell* frame,
 	if(lastNTrackingMs.size() > 10) lastNTrackingMs.pop_front();
 	last_track = time_now;
 
-	if(!setting_render_display3D) return;
-
 	currentCam->setFromF(frame, HCalib);
-	allFramePoses.push_back(frame->camToWorld.translation().cast<float>());
+
+	// IMU poses, Cam + TCamImu.
+	Sophus::Matrix4f m = frame->TWorldCam.matrix().cast<float>() * TBaseCam.inverse();
+	allPoses.push_back(m.topRightCorner<3,1>().cast<float>());
+
+	// Camera poses.
+	//allPoses.push_back((frame->TWorldCam.translation()).cast<float>());
 }
 
 
@@ -540,6 +593,35 @@ void PangolinDSOViewer::pushDepthImage(MinimalImageB3* image)
 	memcpy(internalKFImg->data, image->data, w*h*3);
 	kfImgChanged=true;
 }
+
+void PangolinDSOViewer::publishVecDebug(const Vec3& vec) {
+	debugVec = vec;
+//	glColor3f(0.0,1,1);
+//	glBegin(GL_LINE_STRIP);
+//	glVertex3f(0,0,0);
+//	glVertex3f(vec[0],vec[1],vec[2]);
+//	glEnd();
+}
+
+
+//void PangolinDSOViewer::setTWorldCam(const Sim3& TMetricDso, const SE3& TDsoCam) {
+	//TMetricCam = (HWorld->TMetricDso.matrix() * frame->TWorldCam.matrix()).cast<float>();
+	//TMetricCam = (HWorld->TMetricDso.matrix() * TBaseCam.matrix() * frame->TWorldCam.matrix()).cast<float>();
+//	Mat44 m = TWorldCam.matrix();
+//	m.topRightCorner<3,1>() *= TMetricDso.scale();
+//	m = TBaseCam.matrix() * m;
+//	m.topLeftCorner<3,4>() = TMetricDso.rotationMatrix() * m.topLeftCorner<3,4>();
+//	TMetricCam = m.cast<float>();
+	//TMetricCam = (TBaseCam.matrix().inverse() * TMetricDso.matrix() * TWorldCam.matrix()).cast<float>();
+	//TWorldImu = (TMetricDso.matrix() * TDsoCam.matrix() * TMetricDso.matrix().inverse()).cast<float>() * TBaseCam.inverse();
+//	Mat44 scaledTBaseCam = TBaseCam.cast<double>();
+//	scaledTBaseCam.topRightCorner<3,1>() *= TMetricDso.scale();
+//	TWorldCam = (TMetricDso.matrix() * scaledTBaseCam *TDsoCam.matrix()).cast<float>();
+	//TWorldCam = (TDsoCam.matrix()).cast<float>();
+//	TMetricImu.setIdentity(); //TWorldCam.matrix() * TBaseCam.matrix().inverse()).cast<float>();
+//	Mat44 m = TBaseCam.matrix() * TMetricDso.matrix() * TWorldCam.matrix();
+//	TMetricCam = m.cast<float>();
+//}
 
 }
 }

@@ -28,6 +28,7 @@
 #include <Eigen/Core>
 #include "util/NumType.h"
 #include <pangolin/pangolin.h>
+#include "FullSystem/IMU.h"
 
 #include <sstream>
 #include <fstream>
@@ -35,6 +36,7 @@
 namespace dso
 {
 class CalibHessian;
+class MetricWorldHessian;
 class FrameHessian;
 class FrameShell;
 
@@ -66,7 +68,7 @@ class KeyFrameDisplay
 
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-	KeyFrameDisplay();
+	KeyFrameDisplay(const Mat44f& TBaseCam);
 	~KeyFrameDisplay();
 
 	// copies points from KF over to internal buffer,
@@ -83,10 +85,12 @@ public:
 	// renders cam & pointcloud.
 	void drawCam(float lineWidth = 1, float* color = 0, float sizeFactor=1);
 	void drawPC(float pointSize);
+	void drawImuIntegration();
 
 	int id;
 	bool active;
-	SE3 camToWorld;
+	Mat44f TWorldCam; // Camare's pose in Metric World
+	Vec3f velocity;
 
     inline bool operator < (const KeyFrameDisplay& other) const
     {
@@ -95,6 +99,8 @@ public:
 
 
 private:
+	const Mat44f TBaseCam;
+
 	float fx,fy,cx,cy;
 	float fxi,fyi,cxi,cyi;
 	int width, height;
@@ -116,6 +122,8 @@ private:
 	int numGLBufferGoodPoints;
 	pangolin::GlBuffer vertexBuffer;
 	pangolin::GlBuffer colorBuffer;
+
+	ImuIntegration imuIntegration;
 };
 
 }

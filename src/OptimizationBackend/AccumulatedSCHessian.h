@@ -90,7 +90,7 @@ public:
 	void addPoint(EFPoint* p, bool shiftPriorToZero, int tid=0);
 
 
-	void stitchDoubleMT(IndexThreadReduce<Vec10>* red, MatXX &H, VecX &b, EnergyFunctional const * const EF, bool MT)
+	void stitchDoubleMT(IndexThreadReduce* red, MatXX &H, VecX &b, EnergyFunctional const * const EF, bool MT)
 	{
 		// sum up, splitting by bock in square.
 		if(MT)

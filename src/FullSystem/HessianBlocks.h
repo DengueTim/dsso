@@ -34,6 +34,7 @@
 #include "util/NumType.h"
 #include "FullSystem/Residuals.h"
 #include "util/ImageAndExposure.h"
+#include "FullSystem/IMU.h"
 
 
 namespace dso
@@ -78,11 +79,6 @@ class EFPoint;
 #define SCALE_W_INVERSE (1.0f / SCALE_W)
 #define SCALE_A_INVERSE (1.0f / SCALE_A)
 #define SCALE_B_INVERSE (1.0f / SCALE_B)
-#define SCALE_VELOCITY_INVERSE (1.0f / SCALE_VELOCITY)
-#define SCALE_SCALE_INVERSE (1.0f / SCALE_SCALE)
-#define SCALE_ORIENTATION_INVERSE (1.0f / SCALE_ORIENTATION)
-#define SCALE_BIAS_ACC_INVERSE (1.0f / SCALE_BIAS_ACC)
-#define SCALE_BIAS_GYRO_INVERSE (1.0f / SCALE_BIAS_GYRO)
 
 
 struct FrameFramePrecalc
@@ -175,16 +171,22 @@ struct FrameHessian
 
 	// precalc values
 	SE3 PRE_worldToCam;
-	SE3 PRE_camToWorld;
+	SE3 PRE_TWorldCam;
 	std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
 	MinimalImageB3* debugImage;
 
+	ImuIntegration imuIntegration;
 
     inline Vec6 w2c_leftEps() const {return state_scaled.head<6>();}
     inline AffLight aff_g2l() const {return AffLight(state_scaled[9], state_scaled[10]);}
     inline AffLight aff_g2l_0() const {return AffLight(state_zero[9]*SCALE_A, state_zero[10]*SCALE_B);}
 
-	inline Vec3 getVelocity() const {return state_scaled.segment<3>(6);}
+	inline Vec3 getVelocityScaled() const {return state_scaled.segment<3>(6);}
+	inline void setVelocityScaled(const Vec3 &velocityScaled) {
+		state_scaled.segment<3>(6) = velocityScaled;
+		state.segment<3>(6) = velocityScaled / SCALE_VELOCITY;
+		std::cerr << "velocityScaled" << idx << "=" << velocityScaled.transpose().format(MatlabFmt) << "\n";
+	}
 
 	inline void setState(const VecIF &newState)
 	{
@@ -195,12 +197,13 @@ struct FrameHessian
 		state_scaled[9] = SCALE_A * state[9];
 		state_scaled[10] = SCALE_B * state[10];
 
-		PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
-		PRE_camToWorld = PRE_worldToCam.inverse();
+		PRE_worldToCam = SE3::exp(state_scaled.head<6>()) * worldToCam_evalPT;
+		PRE_TWorldCam = PRE_worldToCam.inverse();
 		//setCurrentNullspace();
 	};
 
-	void setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l_scaled);
+	//void setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l_scaled);
+	void setEvalPTAndStateZero(const bool fromShell);
 
 	void release();
 
@@ -279,7 +282,7 @@ struct CalibHessian
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 	static int instanceCounter;
 
-	VecC value_zero;
+	VecC value_zero; // Value from config. Doesn't change.
 	VecC value_scaled;
 	VecCf value_scaledf;
 	VecCf value_scaledi;
@@ -476,7 +479,7 @@ struct PointHessian
 };
 
 // Not really Hessians, more like state.
-struct ImuWorldHessian {
+struct MetricWorldHessian {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
 	VecIW value_zero;
@@ -484,23 +487,35 @@ struct ImuWorldHessian {
 	VecIW value;
 	VecIW value_backup;
 	VecIW step;
-	VecIW step_backup;
+	//VecIW step_backup;
 
-	inline ImuWorldHessian()
+	Sim3 TMetricDso;
+	Sim3 TDsoMetric;
+
+	// inv(TBaseCam) in the Metric frame(adjusted for the camera's orientation in the Metric frame).
+	SE3 TMetricCamImu;
+
+	inline MetricWorldHessian()
 	{
 		VecIW initial_value = VecIW::Zero();
-		initial_value[0] = 1.0f;
+		initial_value[0] = 1.0f; // initial scale.
 
 		setValueScaled(initial_value);
 		value_zero = value;
+
+		value_backup.setZero();
+		step.setZero();
+		//step_backup.setZero();
 	};
 
 	inline void setValueScaled(const VecIW &value_scaled)
 	{
 		this->value_scaled = value_scaled;
-		value[0] = SCALE_SCALE_INVERSE * value_scaled[0];
-		value[1] = SCALE_ORIENTATION_INVERSE * value_scaled[1];
-		value[2] = SCALE_ORIENTATION_INVERSE * value_scaled[2];
+		value[0] = value_scaled[0] / SCALE_SCALE;
+		value[1] = value_scaled[1] / SCALE_ORIENTATION;
+		value[2] = value_scaled[2] / SCALE_ORIENTATION;
+		value[3] = value_scaled[3] / SCALE_ORIENTATION;
+		updateTransform();
 	};
 
 	inline void setValue(const VecIW &value) {
@@ -508,36 +523,67 @@ struct ImuWorldHessian {
 		value_scaled[0] = SCALE_SCALE * value[0];
 		value_scaled[1] = SCALE_ORIENTATION * value[1];
 		value_scaled[2] = SCALE_ORIENTATION * value[2];
+		value_scaled[3] = SCALE_ORIENTATION * value[3];
+		updateTransform();
+	}
+
+	inline void setScaleAndRotation(const SO3 &RMetricDso, const double scale = 1) {
+		SO3::Tangent tangent = RMetricDso.log();
+		setValueScaled(VecIW(scale, tangent(0), tangent(1), tangent(2)));
+		value_zero = value;
+	}
+
+	inline void updateEvalPt() {
+		value_zero = value;
 	}
 
 	EIGEN_STRONG_INLINE const VecIW get_value_minus_valueZero() const {return value - value_zero;}
+
+private:
+	[[clang::optnone]]
+	inline void updateTransform() {
+		// Current estimate of transform from metric world to DSO world.
+		if (value_scaled(0) <= 0.1) {
+			assert(value_scaled(0) > 0.1);
+		}
+		TMetricDso = Sim3::exp(Vec7(0,0,0,value_scaled(1),value_scaled(2),value_scaled(3),log(value_scaled(0))));
+		TDsoMetric = TMetricDso.inverse();
+		//const Sim3 TMetricDso = Sim3::exp(Vec7(0,0,0,0.0,0.0,0,0));
+//		std::cerr << "value_scaled:" << value_scaled.format(MatlabFmt) << "\n";
+//		std::cerr << "Mat:" << TMetricDso.matrix().format(MatlabFmt) << "\n";
+//		std::cerr << "Scale:" << TMetricDso.scale() << "\n";
+//		std::cerr << "Rot:" << TMetricDso.rotationMatrix().format(MatlabFmt) << "\n";
+//		std::cerr << "Trans:" << TMetricDso.translation().format(MatlabFmt) << "\n";
+	}
 };
+std::ostream& operator<<(std::ostream& os, const MetricWorldHessian& metricWorld);
 
 struct ImuBiasHessian {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-	VecIB value_zero;
+	VecIB value_zero; // Set at start of each optimisation run.
 	VecIB value_scaled;
 	VecIB value;
 	VecIB value_backup;
 	VecIB step;
-	VecIB step_backup;
+	//VecIB step_backup;
 
 	inline ImuBiasHessian()
 	{
-		VecIB initial_value = VecIB::Zero();
-		setValueScaled(initial_value);
+		setValueScaled(VecIB::Zero());
 		value_zero = value;
+		value_backup.setZero();
+		step.setZero();
 	};
 
 	inline void setValueScaled(const VecIB &value_scaled)
 	{
 		this->value_scaled = value_scaled;
-		value[0] = SCALE_BIAS_ACC_INVERSE * value_scaled[0];
-		value[1] = SCALE_BIAS_ACC_INVERSE * value_scaled[1];
-		value[2] = SCALE_BIAS_ACC_INVERSE * value_scaled[2];
-		value[0] = SCALE_BIAS_GYRO_INVERSE * value_scaled[3];
-		value[1] = SCALE_BIAS_GYRO_INVERSE * value_scaled[4];
-		value[2] = SCALE_BIAS_GYRO_INVERSE * value_scaled[5];
+		value[0] = value_scaled[0] / SCALE_BIAS_ACC;
+		value[1] = value_scaled[1] / SCALE_BIAS_ACC;
+		value[2] = value_scaled[2] / SCALE_BIAS_ACC;
+		value[3] = value_scaled[3] / SCALE_BIAS_GYRO;
+		value[4] = value_scaled[4] / SCALE_BIAS_GYRO;
+		value[5] = value_scaled[5] / SCALE_BIAS_GYRO;
 	};
 
 	inline void setValue(const VecIB &value) {
@@ -545,14 +591,14 @@ struct ImuBiasHessian {
 		value_scaled[0] = SCALE_BIAS_ACC * value[0];
 		value_scaled[1] = SCALE_BIAS_ACC * value[1];
 		value_scaled[2] = SCALE_BIAS_ACC * value[2];
-		value_scaled[0] = SCALE_BIAS_GYRO * value[3];
-		value_scaled[1] = SCALE_BIAS_GYRO * value[4];
-		value_scaled[2] = SCALE_BIAS_GYRO * value[5];
+		value_scaled[3] = SCALE_BIAS_GYRO * value[3];
+		value_scaled[4] = SCALE_BIAS_GYRO * value[4];
+		value_scaled[5] = SCALE_BIAS_GYRO * value[5];
 	}
 
 	EIGEN_STRONG_INLINE const VecIB get_value_minus_valueZero() const {return value - value_zero;}
 };
-
+std::ostream& operator<<(std::ostream& os, const ImuBiasHessian& imuBias);
 
 }
 

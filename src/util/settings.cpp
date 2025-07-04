@@ -51,7 +51,10 @@ float setting_initialVelPrior = 1e10;
 float setting_initialAffBPrior = 1e14;
 float setting_initialAffAPrior = 1e14;
 float setting_initialCalibHessian = 5e9;
-
+float setting_initialScaleHessian = 5e4;
+float setting_initialDirABHessian = 5e5;
+float setting_initialBiasAccHessian = 1e0;
+float setting_initialBiasGyroHessian = 1e0;
 
 
 
@@ -194,7 +197,7 @@ bool setting_logStuff = true;
 
 
 
-bool goStepByStep = false;
+bool goStepByStep = false; // Doesn't work on mac. UI on main thread issue.
 
 
 bool setting_render_displayCoarseTrackingFull=false;

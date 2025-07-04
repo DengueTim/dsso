@@ -70,6 +70,10 @@ extern float setting_initialTransPrior;
 extern float setting_initialAffBPrior;
 extern float setting_initialAffAPrior;
 extern float setting_initialCalibHessian;
+extern float setting_initialScaleHessian;
+extern float setting_initialDirABHessian;
+extern float setting_initialBiasAccHessian;
+extern float setting_initialBiasGyroHessian;
 
 extern int setting_solverMode;
 extern double setting_solverModeDelta;

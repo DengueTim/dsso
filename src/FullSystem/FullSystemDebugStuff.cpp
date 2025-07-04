@@ -77,7 +77,8 @@ namespace dso
 				{
 					// BRIGHTNESS TRANSFER
 					float colL = affL[0] * fd[i][0] + affL[1];
-					if(colL<0) colL=0; if(colL>255) colL =255;
+					if(colL<0) colL=0;
+                    if(colL>255) colL =255;
 					debugImage->at(i) = Vec3b(colL, colL, colL);
 				}
 			}

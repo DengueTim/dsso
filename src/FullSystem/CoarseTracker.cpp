@@ -35,6 +35,7 @@
 #include "FullSystem/Residuals.h"
 #include "OptimizationBackend/EnergyFunctionalStructs.h"
 #include "IOWrapper/ImageRW.h"
+#include "util/OptimisationUtils.h"
 #include <algorithm>
 
 #if !defined(__SSE3__) && !defined(__SSE2__) && !defined(__SSE1__)
@@ -56,7 +57,7 @@ T* allocAligned(int size, std::vector<T*> &rawPtrVec)
 }
 
 
-CoarseTracker::CoarseTracker(int ww, int hh) : lastRef_aff_g2l(0,0)
+CoarseTracker::CoarseTracker(int ww, int hh, const SE3 &TBaseCam) : lastRef_aff_g2l(0,0), TBaseCam(TBaseCam)
 {
 	// make coarse tracking templates.
 	for(int lvl=0; lvl<pyrLevelsUsed; lvl++)
@@ -99,7 +100,7 @@ CoarseTracker::~CoarseTracker()
     ptrToDelete.clear();
 }
 
-void CoarseTracker::makeK(CalibHessian* HCalib)
+void CoarseTracker::makeK(CalibHessian* HCalib, MetricWorldHessian* Hworld, ImuBiasHessian* Hbias)
 {
 	w[0] = wG[0];
 	h[0] = hG[0];
@@ -128,6 +129,14 @@ void CoarseTracker::makeK(CalibHessian* HCalib)
 		cxi[level] = Ki[level](0,2);
 		cyi[level] = Ki[level](1,2);
 	}
+
+	Hworld->get_value_minus_valueZero();
+
+	TMetricDso = Hworld->TMetricDso;
+
+	const VecIB &imuBias = Hbias->get_value_minus_valueZero();
+	imuBiasAccDelta = imuBias.head<3>();
+	imuBiasGyroDelta = imuBias.tail<3>();
 }
 
 
@@ -292,7 +301,6 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 }
 
 
-
 void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &refToNew, AffLight aff_g2l)
 {
 	acc.initialize();
@@ -338,21 +346,19 @@ void CoarseTracker::calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &ref
 	H_out = acc.H.topLeftCorner<8,8>().cast<double>() * (1.0f/n);
 	b_out = acc.H.topRightCorner<8,1>().cast<double>() * (1.0f/n);
 
-	H_out.block<8,3>(0,0) *= SCALE_XI_ROT;
-	H_out.block<8,3>(0,3) *= SCALE_XI_TRANS;
+	H_out.block<8,3>(0,0) *= SCALE_XI_TRANS;
+	H_out.block<8,3>(0,3) *= SCALE_XI_ROT;
 	H_out.block<8,1>(0,6) *= SCALE_A;
 	H_out.block<8,1>(0,7) *= SCALE_B;
-	H_out.block<3,8>(0,0) *= SCALE_XI_ROT;
-	H_out.block<3,8>(3,0) *= SCALE_XI_TRANS;
+	H_out.block<3,8>(0,0) *= SCALE_XI_TRANS;
+	H_out.block<3,8>(3,0) *= SCALE_XI_ROT;
 	H_out.block<1,8>(6,0) *= SCALE_A;
 	H_out.block<1,8>(7,0) *= SCALE_B;
-	b_out.segment<3>(0) *= SCALE_XI_ROT;
-	b_out.segment<3>(3) *= SCALE_XI_TRANS;
+	b_out.segment<3>(0) *= SCALE_XI_TRANS;
+	b_out.segment<3>(3) *= SCALE_XI_ROT;
 	b_out.segment<1>(6) *= SCALE_A;
 	b_out.segment<1>(7) *= SCALE_B;
 }
-
-
 
 
 Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, float cutoffTH)
@@ -513,10 +519,79 @@ Vec6 CoarseTracker::calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, floa
 	return rs;
 }
 
+[[clang::optnone]]
+double CoarseTracker::calcImuResAndGs(Mat66 &Himu, Vec6 &bimu, const SE3 &TNewRef, ImuIntegration &imuIntegration, double imuWeight) {
+	SE3& T_DCi = lastRef->shell->TWorldCam;
+	Mat44 M_WD = TMetricDso.matrix();
+	Mat44 M_WB = M_WD*T_DCi.matrix()*M_WD.inverse()*TBaseCam.inverse().matrix();
+	SE3 T_WB(M_WB);
+	Mat33 R_WB = T_WB.rotationMatrix();
+	Vec3 t_WB = T_WB.translation();
 
+	SE3 TRefNew = TNewRef.inverse();
+	Mat44 M_DCj = (T_DCi * TRefNew).matrix();
+	Mat44 M_WBj = M_WD*M_DCj*M_WD.inverse()*TBaseCam.inverse().matrix();
+	SE3 T_WBj(M_WBj);
+	Mat33 R_WBj = T_WBj.rotationMatrix();
+	Vec3 t_WBj = T_WBj.translation();
 
+	double dt = imuIntegration.deltaTime;
 
+	const Vec3 negativeG(-dso::Gravity);
 
+	Vec3 so3 = imuIntegration.jRotBg*imuBiasGyroDelta;
+	Mat33 R_temp = Mat33::Identity();
+	R_temp = SO3::exp(imuIntegration.jRotBg*imuBiasGyroDelta).matrix();
+
+	Mat33 res_R = (imuIntegration.deltaRot*R_temp).transpose()*R_WB.transpose()*R_WBj;
+
+	Vec3 res_phi = SO3(res_R).log();
+
+	const Vec3 velocity = R_WB*(R_WB.transpose()*(lastRef->getVelocityScaled()+negativeG*dt)+
+		(imuIntegration.deltaVel+imuIntegration.jVelBa*imuBiasAccDelta+imuIntegration.jVelBg*imuBiasGyroDelta));
+	//std::cerr << "CoarseTracker velocity:" << velocity.transpose().format(StdOutFmt) << "\n";
+//	newFrame->setVelocityScaled(velocity);
+//	newFrame->shell->velocity = velocity;
+
+	Vec3 res_p = R_WB.transpose()*(t_WBj-t_WB-lastRef->getVelocityScaled()*dt-0.5*negativeG*dt*dt)-
+		(imuIntegration.deltaTrn+imuIntegration.jTrnBa*imuBiasAccDelta+imuIntegration.jTrnBg*imuBiasGyroDelta);
+
+	Vec6 res_PVPhi;
+	res_PVPhi << res_p, res_phi;
+
+	// Velocity isn't estimated when course tracking.
+	Vec9 covariance9 = imuIntegration.measurementCovariance.diagonal();
+	Vec6 covarianceInverse;
+	covarianceInverse << covariance9.head<3>().cwiseInverse(), covariance9.tail<3>().cwiseInverse();
+	double res = imuWeight*imuWeight*(res_PVPhi.array().square() * covarianceInverse.array()).sum();
+	Mat66 Weight = imuWeight * imuWeight * covarianceInverse.asDiagonal();
+
+	Mat33 J_resP_p_j = R_WB.transpose()*R_WBj;
+	Mat33 J_resPhi_phi_j = so3RightJacobianInverse(res_phi);
+
+	Mat66 J_imu1 = Mat66::Zero();
+	J_imu1.block(0,0,3,3) = J_resP_p_j;
+	J_imu1.block(3,3,3,3) = J_resPhi_phi_j;
+
+	Vec6 b_1;
+	b_1 << res_p, res_phi;
+
+	Mat44 T_temp = TBaseCam.matrix()*M_WD.matrix()*M_DCj.inverse();
+	Mat66 J_rel = (-1*Sim3(T_temp).Adj()).block(0,0,6,6);
+	Mat66 dsoWorldCamIAdjoint = T_DCi.Adj();
+
+	Mat66 J_xi_r_l = TRefNew.Adj(); // Changes from right(local) to left(global) update.
+	Mat66 J_2 = Mat66::Zero();
+	// IMUj to DsoWorld to CAMi as Left increment at camI pose.
+	J_2 = J_imu1*J_rel*dsoWorldCamIAdjoint*J_xi_r_l;
+	J_2.block<3,3>(0,0) *= SCALE_XI_TRANS;
+	J_2.block<3,3>(3,3) *= SCALE_XI_ROT;
+
+	Himu = J_2.transpose()*Weight*J_2;
+	bimu = J_2.transpose()*Weight*b_1;
+
+	return res;
+}
 
 void CoarseTracker::setCoarseTrackingRef(
 		std::vector<FrameHessian*> frameHessians)
@@ -552,12 +627,12 @@ bool CoarseTracker::trackNewestCoarse(
 	newFrame = newFrameHessian;
 	int maxIterations[] = {10,20,50,50,50};
 	float lambdaExtrapolationLimit = 0.001;
+	const float imuWeight = 0.2;
 
 	SE3 refToNew_current = lastToNew_out;
 	AffLight aff_g2l_current = aff_g2l_out;
 
 	bool haveRepeated = false;
-
 
 	for(int lvl=coarsestLvl; lvl>=0; lvl--)
 	{
@@ -574,6 +649,12 @@ bool CoarseTracker::trackNewestCoarse(
 		}
 
 		calcGSSSE(lvl, H, b, refToNew_current, aff_g2l_current);
+		Mat66 Himu;
+		Vec6 bimu;
+		double resOldImu = 0;
+		if (lvl == 0) {
+			resOldImu = calcImuResAndGs(Himu, bimu, refToNew_current, newFrameHessian->imuIntegration, imuWeight);
+		}
 
 		float lambda = 0.01;
 
@@ -594,6 +675,13 @@ bool CoarseTracker::trackNewestCoarse(
 		for(int iteration=0; iteration < maxIterations[lvl]; iteration++)
 		{
 			Mat88 Hl = H;
+//			Vec8 bl = b;
+//
+//			if(imu_use_flag&&imu_track_flag&&imu_track_ready&&lvl<=0){
+//				Hl.block(0,0,6,6) += Himu;
+//				bl.block(0,0,6,1) += bimu;
+//			}
+
 			for(int i=0;i<8;i++) Hl(i,i) *= (1+lambda);
 			Vec8 inc = Hl.ldlt().solve(-b);
 
@@ -629,8 +717,8 @@ bool CoarseTracker::trackNewestCoarse(
 			inc *= extrapFac;
 
 			Vec8 incScaled = inc;
-			incScaled.segment<3>(0) *= SCALE_XI_ROT;
-			incScaled.segment<3>(3) *= SCALE_XI_TRANS;
+			incScaled.segment<3>(0) *= SCALE_XI_TRANS;
+			incScaled.segment<3>(3) *= SCALE_XI_ROT;
 			incScaled.segment<1>(6) *= SCALE_A;
 			incScaled.segment<1>(7) *= SCALE_B;
 
@@ -642,6 +730,10 @@ bool CoarseTracker::trackNewestCoarse(
 			aff_g2l_new.b += incScaled[7];
 
 			Vec6 resNew = calcRes(lvl, refToNew_new, aff_g2l_new, setting_coarseCutoffTH*levelCutoffRepeat);
+			double resNewImu = 0;
+			if (lvl == 0) {
+				resNewImu = calcImuResAndGs(Himu, bimu, refToNew_new, newFrameHessian->imuIntegration, imuWeight);
+			}
 
 			bool accept = (resNew[0] / resNew[1]) < (resOld[0] / resOld[1]);
 
@@ -662,6 +754,7 @@ bool CoarseTracker::trackNewestCoarse(
 			{
 				calcGSSSE(lvl, H, b, refToNew_new, aff_g2l_new);
 				resOld = resNew;
+				resOldImu = resNewImu;
 				aff_g2l_current = aff_g2l_new;
 				refToNew_current = refToNew_new;
 				lambda *= 0.5;
@@ -733,6 +826,8 @@ void CoarseTracker::debugPlotIDepthMap(float* minID_pt, float* maxID_pt, std::ve
 			if(idepth[lvl][i] > 0)
 				allID.push_back(idepth[lvl][i]);
 		}
+		if (!allID.size()) return;
+
 		std::sort(allID.begin(), allID.end());
 		int n = allID.size()-1;
 
@@ -884,7 +979,7 @@ void CoarseDistanceMap::makeDistanceMap(
 	{
 		if(frame == fh) continue;
 
-		SE3 fhToNew = frame->PRE_worldToCam * fh->PRE_camToWorld;
+		SE3 fhToNew = frame->PRE_worldToCam * fh->PRE_TWorldCam;
 		Mat33f KRKi = (K[1] * fhToNew.rotationMatrix().cast<float>() * Ki[0]);
 		Vec3f Kt = (K[1] * fhToNew.translation().cast<float>());
 

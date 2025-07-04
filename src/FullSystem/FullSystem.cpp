@@ -64,9 +64,7 @@ int CalibHessian::instanceCounter=0;
 
 
 
-FullSystem::FullSystem()
-{
-
+FullSystem::FullSystem(const SE3 &TBaseCam, const double imuWeight) : TBaseCam(TBaseCam), imuWeight(imuWeight) {
 	int retstat =0;
 	if(setting_logStuff)
 	{
@@ -133,8 +131,8 @@ FullSystem::FullSystem()
 	selectionMap = new float[wG[0]*hG[0]];
 
 	coarseDistanceMap = new CoarseDistanceMap(wG[0], hG[0]);
-	coarseTracker = new CoarseTracker(wG[0], hG[0]);
-	coarseTracker_forNewKF = new CoarseTracker(wG[0], hG[0]);
+	coarseTracker = new CoarseTracker(wG[0], hG[0], TBaseCam);
+	coarseTracker_forNewKF = new CoarseTracker(wG[0], hG[0], TBaseCam);
 	coarseInitializer = new CoarseInitializer(wG[0], hG[0]);
 	pixelSelector = new PixelSelector(wG[0], hG[0]);
 
@@ -153,7 +151,7 @@ FullSystem::FullSystem()
 	initialized=false;
 
 
-	ef = new EnergyFunctional(Hcalib, hWorld, hBias);
+	ef = new EnergyFunctional(imuWeight, Hcalib, Hworld, Hbias);
 	ef->red = &this->treadReduce;
 
 	isLost=false;
@@ -175,7 +173,7 @@ FullSystem::FullSystem()
 	maxIdJetVisTracker = -1;
 
     ImuCalib defaultImuCalib;
-    imuIntegrator = new ImuIntegrator(defaultImuCalib);
+    imuIntegrator = new GtsamImuIntegrator(defaultImuCalib);
 }
 
 FullSystem::~FullSystem()
@@ -209,6 +207,7 @@ FullSystem::~FullSystem()
 	delete coarseInitializer;
 	delete pixelSelector;
 	delete ef;
+	delete imuIntegrator;
 }
 
 void FullSystem::setOriginalCalib(const VecXf &originalCalib, int originalW, int originalH)
@@ -261,11 +260,11 @@ void FullSystem::printResult(std::string file)
 		if(setting_onlyLogKFPoses && s->marginalizedAt == s->id) continue;
 
 		myfile << s->timestamp <<
-			" " << s->camToWorld.translation().transpose()<<
-			" " << s->camToWorld.so3().unit_quaternion().x()<<
-			" " << s->camToWorld.so3().unit_quaternion().y()<<
-			" " << s->camToWorld.so3().unit_quaternion().z()<<
-			" " << s->camToWorld.so3().unit_quaternion().w() << "\n";
+			   " " << s->TWorldCam.translation().transpose() <<
+			   " " << s->TWorldCam.so3().unit_quaternion().x() <<
+			   " " << s->TWorldCam.so3().unit_quaternion().y() <<
+			   " " << s->TWorldCam.so3().unit_quaternion().z() <<
+			   " " << s->TWorldCam.so3().unit_quaternion().w() << "\n";
 	}
 	myfile.close();
 }
@@ -277,10 +276,9 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	assert(allFrameHistory.size() > 0);
 	// set pose initialization.
 
-    for(IOWrap::Output3DWrapper* ow : outputWrapper)
+    for(IOWrap::Output3DWrapper* ow : outputWrapper) {
         ow->pushLiveFrame(fh);
-
-
+    }
 
 	FrameHessian* lastF = coarseTracker->lastRef;
 
@@ -297,8 +295,8 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 		SE3 lastF_2_slast;
 		{	// lock on global pose consistency!
 			boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-			slast_2_sprelast = sprelast->camToWorld.inverse() * slast->camToWorld;
-			lastF_2_slast = slast->camToWorld.inverse() * lastF->shell->camToWorld;
+			slast_2_sprelast = sprelast->TWorldCam.inverse() * slast->TWorldCam;
+			lastF_2_slast = slast->TWorldCam.inverse() * lastF->shell->TWorldCam;
 			aff_last_2_l = slast->aff_g2l;
 		}
 		SE3 fh_2_slast = slast_2_sprelast;// assumed to be the same as fh_2_slast.
@@ -435,24 +433,26 @@ Vec4 FullSystem::trackNewCoarse(FrameHessian* fh)
 	fh->shell->camToTrackingRef = lastF_2_fh.inverse();
 	fh->shell->trackingRef = lastF->shell;
 	fh->shell->aff_g2l = aff_g2l;
-	fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
+	fh->shell->TWorldCam = fh->shell->trackingRef->TWorldCam * fh->shell->camToTrackingRef;
 
 
 	if(coarseTracker->firstCoarseRMSE < 0)
 		coarseTracker->firstCoarseRMSE = achievedRes[0];
 
-    if(!setting_debugout_runquiet)
-        printf("Coarse Tracker tracked ab = %f %f (exp %f). Res %f!\n", aff_g2l.a, aff_g2l.b, fh->ab_exposure, achievedRes[0]);
+    if(!setting_debugout_runquiet) {
+        printf("Coarse Tracker tracked ab = %f %f (exp %f). Res %f!\n", aff_g2l.a, aff_g2l.b, fh->ab_exposure,
+               achievedRes[0]);
+    }
 
 
 
 	if(setting_logStuff)
 	{
 		(*coarseTrackingLog) << std::setprecision(16)
-						<< fh->shell->id << " "
-						<< fh->shell->timestamp << " "
-						<< fh->ab_exposure << " "
-						<< fh->shell->camToWorld.log().transpose() << " "
+							 << fh->shell->id << " "
+							 << fh->shell->timestamp << " "
+							 << fh->ab_exposure << " "
+							 << fh->shell->TWorldCam.log().transpose() << " "
 						<< aff_g2l.a << " "
 						<< aff_g2l.b << " "
 						<< achievedRes[0] << " "
@@ -478,7 +478,7 @@ void FullSystem::traceNewCoarse(FrameHessian* fh)
 	for(FrameHessian* host : frameHessians)		// go through all active frames
 	{
 
-		SE3 hostToNew = fh->PRE_worldToCam * host->PRE_camToWorld;
+		SE3 hostToNew = fh->PRE_worldToCam * host->PRE_TWorldCam;
 		Mat33f KRKi = K * hostToNew.rotationMatrix().cast<float>() * K.inverse();
 		Vec3f Kt = K * hostToNew.translation().cast<float>();
 
@@ -549,9 +549,10 @@ void FullSystem::activatePointsMT()
 	if(currentMinActDist < 0) currentMinActDist = 0;
 	if(currentMinActDist > 4) currentMinActDist = 4;
 
-    if(!setting_debugout_runquiet)
+    if(!setting_debugout_runquiet) {
         printf("SPARSITY:  MinActDist %f (need %d points, have %d points)!\n",
-                currentMinActDist, (int)(setting_desiredPointDensity), ef->nPoints);
+               currentMinActDist, (int) (setting_desiredPointDensity), ef->nPoints);
+    }
 
 
 
@@ -570,7 +571,7 @@ void FullSystem::activatePointsMT()
 	{
 		if(host == newestHs) continue;
 
-		SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_camToWorld;
+		SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_TWorldCam;
 		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
 		Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
 
@@ -801,20 +802,28 @@ void FullSystem::flagPointsForRemoval()
 
 }
 
-void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasurements &imuMeasurements) {
+[[clang::optnone]]
+void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const std::shared_ptr<ImuMeasurements> imuMeasurements) {
     if(isLost) return;
 	boost::unique_lock<boost::mutex> lock(trackMutex);
 
+	if (Hworld.TMetricDso.scale() < 0.1 || Hworld.TMetricDso.scale() > 10){
+		initFailed = true;
+	}
 
 	// =========================== add into allFrameHistory =========================
 	FrameHessian* fh = new FrameHessian();
-	FrameShell* shell = new FrameShell();
-	shell->camToWorld = SE3(); 		// no lock required, as fh is not used anywhere yet.
+    FrameShell* shell = new FrameShell();
+	shell->TWorldCam = SE3(); 		// no lock required, as fh is not used anywhere yet.
 	shell->aff_g2l = AffLight(0,0);
     shell->marginalizedAt = shell->id = allFrameHistory.size();
     shell->timestamp = image->timestamp;
     shell->incoming_id = id;
 	fh->shell = shell;
+	if (!allKeyFramesHistory.empty()) {
+		std::cerr << "addactive\n";
+		fh->setVelocityScaled(allKeyFramesHistory.back()->velocity);
+	}
 	allFrameHistory.push_back(shell);
 
 
@@ -822,23 +831,24 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasur
 	fh->ab_exposure = image->exposure_time;
     fh->makeImages(image->image, &Hcalib);
 
-	imuIntegrator->integrateImuMeasurements(imuMeasurements);
-
 	if (coarseInitializer->frameID < 0) {
 		// first frame set. fh is kept by coarseInitializer.
 
 		coarseInitializer->setFirst(&Hcalib, fh);
+		imuIntegrator->reset(Vec6::Zero()); // Discard measurements up to now.
 //		std::this_thread::sleep_for (std::chrono::milliseconds(100)); // Time to update UI..
 	} else if (!initialized) {
-		// Initializing...
+        imuIntegrator->integrateImuMeasurements(imuMeasurements);
+
+		Mat33 rotFirstBase = imuIntegrator->computeGravityInitialiser();
+
+        // Initializing...
 		if (coarseInitializer->trackFrame(fh, outputWrapper)) {
 			// if SNAPPED
-			initializeFromInitializer(fh);
+			initializeFromInitializer(fh, rotFirstBase);
 			lock.unlock();
-			deliverTrackedFrame(fh, true);
-		}
-		else
-		{
+			deliverTrackedFrame(fh, true); // Optimises initial first two frames...
+		} else {
 			// if still initializing
 			fh->shell->poseValid = false;
 			delete fh;
@@ -847,7 +857,9 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasur
 	}
 	else	// do front-end operation.
 	{
-		// =========================== SWAP tracking reference?. =========================
+        imuIntegrator->integrateImuMeasurements(imuMeasurements);
+
+        // =========================== SWAP tracking reference?. =========================
 		if(coarseTracker_forNewKF->refFrameID > coarseTracker->refFrameID)
 		{
 			boost::unique_lock<boost::mutex> crlock(coarseTrackerSwapMutex);
@@ -888,11 +900,10 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const ImuMeasur
         for(IOWrap::Output3DWrapper* ow : outputWrapper)
             ow->publishCamPose(fh->shell, &Hcalib);
 
-
-
-
 		lock.unlock();
 		deliverTrackedFrame(fh, needToMakeKF);
+
+
 		return;
 	}
 }
@@ -917,14 +928,21 @@ void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF) {
 
 
 
-		if(needKF) makeKeyFrame(fh);
-		else makeNonKeyFrame(fh);
+		if(needKF) {
+			imuIntegrator->getCurrentIntegration(fh->imuIntegration);
+			makeKeyFrame(fh);
+		} else {
+			makeNonKeyFrame(fh);
+		}
 	}
 	else
 	{
 		boost::unique_lock<boost::mutex> lock(trackMapSyncMutex);
 		unmappedTrackedFrames.push_back(fh);
-		if(needKF) needNewKFAfter=fh->shell->trackingRef->id;
+		if(needKF) {
+			imuIntegrator->getCurrentIntegration(fh->imuIntegration);
+			needNewKFAfter = fh->shell->trackingRef->id;
+		}
 		trackedFrameSignal.notify_all();
 
 		while(coarseTracker_forNewKF->refFrameID == -1 && coarseTracker->refFrameID == -1 )
@@ -979,8 +997,9 @@ void FullSystem::mappingLoop()
 				{
 					boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 					assert(fh->shell->trackingRef != 0);
-					fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-					fh->setEvalPTAndStateZero(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
+					fh->shell->TWorldCam = fh->shell->trackingRef->TWorldCam * fh->shell->camToTrackingRef;
+					fh->shell->velocity = fh->getVelocityScaled();
+					// pointless because of delete... fh->setEvalPTAndStateZero(fh->shell->TWorldCam.inverse(), fh->shell->aff_g2l);
 				}
 				delete fh;
 			}
@@ -1024,22 +1043,31 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		assert(fh->shell->trackingRef != 0);
-		fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-		fh->setEvalPTAndStateZero(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
+		fh->shell->TWorldCam = fh->shell->trackingRef->TWorldCam * fh->shell->camToTrackingRef;
+		fh->shell->velocity = fh->getVelocityScaled();
+		// fh->setEvalPTAndStateZero(fh->shell->TWorldCam.inverse(), fh->shell->aff_g2l);
+		fh->setEvalPTAndStateZero(true);
 	}
 
 	traceNewCoarse(fh);
 	delete fh;
 }
 
+[[clang::optnone]]
 void FullSystem::makeKeyFrame( FrameHessian* fh)
 {
+	//std::cout << "Keyframe time delta:" << (fh->shell->timestamp - allKeyFramesHistory.back()->timestamp) / 1000000000 << "\n";
+	ImuIntegration imuIntegration;
+	imuIntegrator->getCurrentIntegration(imuIntegration);
+	//std::cout << "II:\n" << imuIntegration << "\n";
+
 	// needs to be set by mapping thread
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		assert(fh->shell->trackingRef != 0);
-		fh->shell->camToWorld = fh->shell->trackingRef->camToWorld * fh->shell->camToTrackingRef;
-		fh->setEvalPTAndStateZero(fh->shell->camToWorld.inverse(),fh->shell->aff_g2l);
+		fh->shell->TWorldCam = fh->shell->trackingRef->TWorldCam * fh->shell->camToTrackingRef;
+		//fh->setEvalPTAndStateZero(fh->shell->TWorldCam.inverse(), fh->shell->aff_g2l);
+		fh->setEvalPTAndStateZero(true);
 	}
 
 	traceNewCoarse(fh);
@@ -1130,7 +1158,7 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 	{
 		boost::unique_lock<boost::mutex> crlock(coarseTrackerSwapMutex);
-		coarseTracker_forNewKF->makeK(&Hcalib);
+		coarseTracker_forNewKF->makeK(&Hcalib, &Hworld, &Hbias);
 		coarseTracker_forNewKF->setCoarseTrackingRef(frameHessians);
 
 
@@ -1169,8 +1197,8 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
     for(IOWrap::Output3DWrapper* ow : outputWrapper)
     {
         ow->publishGraph(ef->connectivityMap);
-        ow->publishKeyframes(frameHessians, false, &Hcalib);
-    }
+		ow->publishKeyframes(frameHessians, false, &Hcalib, &Hworld);
+	}
 
 
 
@@ -1180,15 +1208,16 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 		if(frameHessians[i]->flaggedForMarginalization)
 			{marginalizeFrame(frameHessians[i]); i=0;}
 
-
+	// TODO, Does this remove the effect of bias from the measurements?
+	imuIntegrator->reset(Vec6::Zero());//Hbias.value);
 
 	printLogLine();
     //printEigenValLine();
 
 }
 
-
-void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
+[[ clang::optnone]]
+void FullSystem::initializeFromInitializer(FrameHessian* newFrame, Mat33 rotFirstBase)
 {
 	boost::unique_lock<boost::mutex> lock(mapMutex);
 
@@ -1220,9 +1249,10 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	// randomly sub-select the points I need.
 	float keepPercentage = setting_desiredPointDensity / coarseInitializer->numPoints[0];
 
-    if(!setting_debugout_runquiet)
-        printf("Initialization: keep %.1f%% (need %d, have %d)!\n", 100*keepPercentage,
-                (int)(setting_desiredPointDensity), coarseInitializer->numPoints[0] );
+    if(!setting_debugout_runquiet) {
+        printf("Initialization: keep %.1f%% (need %d, have %d)!\n", 100 * keepPercentage,
+               (int) (setting_desiredPointDensity), coarseInitializer->numPoints[0]);
+    }
 
 	for(int i=0;i<coarseInitializer->numPoints[0];i++)
 	{
@@ -1257,19 +1287,39 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame)
 	// really no lock required, as we are initializing.
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-		firstFrame->shell->camToWorld = SE3();
+
+		// Start with camera at DSO world origin.
+		// SE3 t(TBaseCam.rotationMatrix().transpose() * rotFirstBase * TBaseCam.rotationMatrix(), Vec3::Zero());
+
+		// Start with IMU at DSO world origin.
+		// SE3 t = TBaseCam.inverse() * SE3(rotFirstBase, Vec3::Zero()) * TBaseCam;
+		// t.translation() += TBaseCam.rotationMatrix().transpose() * TBaseCam.translation();
+
+		// Start with camera at DSO origin. Hworld rotates DSO's origin so -Y is up.
+		SE3 t = SE3();
+
+		firstFrame->shell->TWorldCam = t;
 		firstFrame->shell->aff_g2l = AffLight(0,0);
-		firstFrame->setEvalPTAndStateZero(firstFrame->shell->camToWorld.inverse(),firstFrame->shell->aff_g2l);
+		//firstFrame->setEvalPTAndStateZero(firstFrame->shell->TWorldCam.inverse(), firstFrame->shell->aff_g2l);
+		firstFrame->setEvalPTAndStateZero(true);
 		firstFrame->shell->trackingRef=0;
 		firstFrame->shell->camToTrackingRef = SE3();
 
-		newFrame->shell->camToWorld = firstToNew.inverse();
+		newFrame->shell->TWorldCam = t * firstToNew.inverse();
 		newFrame->shell->aff_g2l = AffLight(0,0);
-		newFrame->setEvalPTAndStateZero(newFrame->shell->camToWorld.inverse(),newFrame->shell->aff_g2l);
+		//newFrame->setEvalPTAndStateZero(newFrame->shell->TWorldCam.inverse(), newFrame->shell->aff_g2l);
+		newFrame->setEvalPTAndStateZero(true);
 		newFrame->shell->trackingRef = firstFrame->shell;
 		newFrame->shell->camToTrackingRef = firstToNew.inverse();
-
 	}
+
+	//Hworld.setScaleAndRotation(rotFirstBase);
+	//Hworld.setScaleAndRotation(SO3(0,0,0));
+	// Set Metric world X up..
+	Hworld.setScaleAndRotation(SO3(rotFirstBase * TBaseCam.rotationMatrix()));
+	std::cout << "Hworld:" << Hworld;
+	Hworld.TMetricCamImu.setRotationMatrix(Mat33::Identity());
+	Hworld.TMetricCamImu.translation() = -TBaseCam.translation();
 
 	initialized=true;
 	printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());
@@ -1319,27 +1369,30 @@ void FullSystem::setPrecalcValues()
 
 void FullSystem::printLogLine()
 {
-	if(frameHessians.size()==0) return;
+	if(frameHessians.size()==0) {
+        return;
+    }
 
-    if(!setting_debugout_runquiet)
+    if(!setting_debugout_runquiet) {
         printf("LOG %d: %.3f fine. Res: %d A, %d L, %d M; (%'d / %'d) forceDrop. a=%f, b=%f. Window %d (%d)\n",
-                allKeyFramesHistory.back()->id,
-                statistics_lastFineTrackRMSE,
-                ef->resInA,
-                ef->resInL,
-                ef->resInM,
-                (int)statistics_numForceDroppedResFwd,
-                (int)statistics_numForceDroppedResBwd,
-                allKeyFramesHistory.back()->aff_g2l.a,
-                allKeyFramesHistory.back()->aff_g2l.b,
-                frameHessians.back()->shell->id - frameHessians.front()->shell->id,
-                (int)frameHessians.size());
+               allKeyFramesHistory.back()->id,
+               statistics_lastFineTrackRMSE,
+               ef->resInA,
+               ef->resInL,
+               ef->resInM,
+               (int) statistics_numForceDroppedResFwd,
+               (int) statistics_numForceDroppedResBwd,
+               allKeyFramesHistory.back()->aff_g2l.a,
+               allKeyFramesHistory.back()->aff_g2l.b,
+               frameHessians.back()->shell->id - frameHessians.front()->shell->id,
+               (int) frameHessians.size());
+    }
 
+	if(!setting_logStuff) {
+        return;
+    }
 
-	if(!setting_logStuff) return;
-
-	if(numsLog != 0)
-	{
+	if(numsLog != 0) {
 		(*numsLog) << allKeyFramesHistory.back()->id << " "  <<
 				statistics_lastFineTrackRMSE << " "  <<
 				(int)statistics_numCreatedPoints << " "  <<

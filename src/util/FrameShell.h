@@ -44,7 +44,8 @@ public:
 	FrameShell* trackingRef;
 
 	// constantly adapted.
-	SE3 camToWorld;				// Write: TRACKING, while frame is still fresh; MAPPING: only when locked [shellPoseMutex].
+	SE3 TWorldCam;				// Write: TRACKING, while frame is still fresh; MAPPING: only when locked [shellPoseMutex].
+	Vec3 velocity;
 	AffLight aff_g2l;
 	bool poseValid;
 
@@ -59,7 +60,7 @@ public:
 	{
 		id=0;
 		poseValid=true;
-		camToWorld = SE3();
+		TWorldCam = SE3();
 		timestamp=0;
 		marginalizedAt=-1;
 		movedByOpt=0;

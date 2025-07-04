@@ -24,6 +24,7 @@
 
 
 #include <thread>
+#include <atomic>
 #include <locale.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -57,6 +58,7 @@ std::string source = "";
 std::string calib = "";
 std::string imuCalib = "";
 std::string imuData = "";
+double imuWeight = 6; // Set to 3 or 6 in VI-Stereo-DSO
 double rescale = 1;
 bool reverse = false;
 bool disableROS = false;
@@ -306,6 +308,13 @@ void parseArgument(char* arg)
         return;
     }
 
+	if(1==sscanf(arg,"imuWeight=%f",&foption))
+	{
+		imuWeight = foption;
+		printf("IMU Weight %f!\n", imuWeight);
+		return;
+	}
+
 	if (1 == sscanf(arg, "rescale=%f", &foption)) {
 		rescale = foption;
 		printf("RESCALE %f!\n", rescale);
@@ -363,7 +372,6 @@ void parseArgument(char* arg)
 }
 
 
-
 int main( int argc, char** argv )
 {
 	//setlocale(LC_ALL, "");
@@ -385,6 +393,10 @@ int main( int argc, char** argv )
 		exit(1);
 	}
 
+	if (imuData.empty()) {
+		printf("ERROR: No IMU data filename given.");
+		exit(1);
+	}
     if (imuData.length() > 0 && reader->loadImuMeasurements(imuCalib, imuData) == 0) {
         printf("ERROR: No(or incomplete) IMU data/calibration data loaded for given filenames.");
         exit(1);
@@ -403,31 +415,24 @@ int main( int argc, char** argv )
 		linc = -1;
 	}
 
-
-
-	FullSystem* fullSystem = new FullSystem();
+	FullSystem* fullSystem = new FullSystem(reader->TBaseCam, imuWeight);
 	fullSystem->setGammaFunction(reader->getPhotometricGamma());
 	fullSystem->linearizeOperation = (playbackSpeed==0);
-
-
-
-
-
-
-
 
     IOWrap::PangolinDSOViewer* viewer = 0;
 	if(!disableAllDisplay)
     {
-        viewer = new IOWrap::PangolinDSOViewer(wG[0],hG[0], false);
+        viewer = new IOWrap::PangolinDSOViewer(wG[0],hG[0], reader->TBaseCam);
         fullSystem->outputWrapper.push_back(viewer);
     }
 
-
-
-    if(useSampleOutput)
+    if(useSampleOutput) {
         fullSystem->outputWrapper.push_back(new IOWrap::SampleOutputWrapper());
+    }
 
+	std::atomic uiHasQuit(false);
+	std::atomic_char lastKey;
+	lastKey = -1;
 
     // to make MacOS happy: run this in dedicated thread -- and use this one to run the GUI.
     std::thread runthread([&]() {
@@ -465,13 +470,13 @@ int main( int argc, char** argv )
         clock_t started = clock();
         double sInitializerOffset=0;
 
-		std::vector<ImuMeasurement>::iterator imuIt = reader->imuMeasurements.begin();
-		std::vector<ImuMeasurement>::iterator imuItEnd = reader->imuMeasurements.end();
-		ImuMeasurements imuMeasurements;
+        ImuMeasurements::iterator imuIt = reader->imuMeasurements.begin();
+        ImuMeasurements::iterator imuItEnd = reader->imuMeasurements.end();
+		//ImuMeasurements imuMeasurements;
 
         for(int ii=0;ii<(int)idsToPlay.size(); ii++)
         {
-            if(!fullSystem->initialized)	// if not initialized: reset start time.
+			if(!fullSystem->initialized)	// if not initialized: reset start time.
             {
                 gettimeofday(&tv_start, NULL);
                 started = clock();
@@ -504,22 +509,22 @@ int main( int argc, char** argv )
                 }
             }
 
+			std::shared_ptr<ImuMeasurements> imuMeasurements = std::make_shared<ImuMeasurements>();
 			if (reverse) {
 				printf("Reversing IMU data not implemented.");
 				return;
 			} else {
 				while (imuIt != imuItEnd && imuIt->timestamp < img->timestamp) {
-					imuMeasurements.push_back(*imuIt++);
+					imuMeasurements->push_back(*imuIt++);
 				}
 			}
 
 			if (ii == 0) {
-				imuMeasurements.clear();
+				imuMeasurements->clear();
 			}
 
             if(!skipFrame) {
 				fullSystem->addActiveFrame(img, i, imuMeasurements);
-				imuMeasurements.clear();
 			}
 
             delete img;
@@ -535,7 +540,7 @@ int main( int argc, char** argv )
 
                     for(IOWrap::Output3DWrapper* ow : wraps) ow->reset();
 
-                    fullSystem = new FullSystem();
+                    fullSystem = new FullSystem(reader->TBaseCam, imuWeight);
                     fullSystem->setGammaFunction(reader->getPhotometricGamma());
                     fullSystem->linearizeOperation = (playbackSpeed==0);
 
@@ -552,6 +557,12 @@ int main( int argc, char** argv )
                     break;
             }
 
+			if (fullSystem->initialized) {
+				//lastKey.wait(-1);
+				lastKey = -1;
+			}
+
+			if (uiHasQuit) break;
         }
         fullSystem->blockUntilMappingIsFinished();
         clock_t ended = clock();
@@ -588,22 +599,22 @@ int main( int argc, char** argv )
             tmlog.flush();
             tmlog.close();
         }
-
     });
 
 
-    if(viewer != 0)
-        viewer->run();
+    if(viewer != 0) {
+		viewer->run(std::ref(lastKey));
+		uiHasQuit = true;
+	}
 
     runthread.join();
 
 	for(IOWrap::Output3DWrapper* ow : fullSystem->outputWrapper)
 	{
 		ow->join();
+		printf("DELETE WRAPPER!\n");
 		delete ow;
 	}
-
-
 
 	printf("DELETE FULLSYSTEM!\n");
 	delete fullSystem;

@@ -283,7 +283,8 @@ void PointFrameResidual::debugPlot()
 	if(freeDebugParam5==0)
 	{
 		float rT = 20*sqrt(state_energy/9);
-		if(rT<0) rT=0; if(rT>255)rT=255;
+		if(rT<0) rT=0;
+        if(rT>255)rT=255;
 		cT = Vec3b(0,255-rT,rT);
 	}
 	else

@@ -40,6 +40,7 @@ namespace dso
 
 class FrameHessian;
 class CalibHessian;
+class MetricWorldHessian;
 class FrameShell;
 
 namespace IOWrap
@@ -64,8 +65,8 @@ namespace IOWrap
  *
  * ==================== How to use the structs: ===================
  * [FrameShell]: minimal struct kept for each frame ever tracked.
- *      ->camToWorld = camera to world transformation
- *      ->poseValid = false if [camToWorld] is invalid (only happens for frames during initialization).
+ *      ->TWorldCam = camera to world transformation
+ *      ->poseValid = false if [TWorldCam] is invalid (only happens for frames during initialization).
  *      ->trackingRef = Shell of the frame this frame was tracked on.
  *      ->id = ID of that frame, starting with 0 for the very first frame.
  *
@@ -146,7 +147,7 @@ public:
          * Calling:
          * Always called, negligible overhead if not used.
          */
-        virtual void publishKeyframes(std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib) {}
+        virtual void publishKeyframes(std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib, MetricWorldHessian* HWorld) {}
 
 
 
@@ -195,7 +196,7 @@ public:
          */
         virtual void pushDepthImageFloat(MinimalImageF* image, FrameHessian* KF ) {}
 
-
+		virtual void publishVecDebug(const Vec3& vec) {}
 
         /* call on finish */
         virtual void join() {}

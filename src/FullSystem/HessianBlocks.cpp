@@ -70,21 +70,29 @@ void PointHessian::release()
 	residuals.clear();
 }
 
-void FrameHessian::setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l_scaled) {
-	VecIF initial_state = VecIF::Zero();
-	initial_state[9] = aff_g2l_scaled.a;
-	initial_state[10] = aff_g2l_scaled.b;
-	this->worldToCam_evalPT = worldToCam_evalPT;
 
-	state_scaled = initial_state;
-	state.segment<3>(0) = SCALE_XI_TRANS_INVERSE * initial_state.segment<3>(0);
-	state.segment<3>(3) = SCALE_XI_ROT_INVERSE * initial_state.segment<3>(3);
-	state.segment<3>(6) = SCALE_VELOCITY_INVERSE * initial_state.segment<3>(6);
-	state[9] = SCALE_A_INVERSE * initial_state[9];
-	state[10] = SCALE_B_INVERSE * initial_state[10];
+//void FrameHessian::setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l_scaled) {
+//}
 
-	PRE_worldToCam = SE3::exp(w2c_leftEps()) * get_worldToCam_evalPT();
-	PRE_camToWorld = PRE_worldToCam.inverse();
+[[clang::optnone]]
+void FrameHessian::setEvalPTAndStateZero(const bool fromShell) {
+	if (fromShell) {
+		PRE_TWorldCam = shell->TWorldCam;
+		PRE_worldToCam = PRE_TWorldCam.inverse();
+
+		//state_scaled.setZero();
+		state_scaled[9] = shell->aff_g2l.a;
+		state_scaled[10] = shell->aff_g2l.b;
+
+		//state.setZero();
+		state[9] = SCALE_A_INVERSE * shell->aff_g2l.a;
+		state[10] = SCALE_B_INVERSE * shell->aff_g2l.b;
+	}
+
+	worldToCam_evalPT = PRE_worldToCam;
+
+	state_scaled.head<6>().setZero();
+	state.head<6>().setZero();
 
 	// Code below was setStateZero()
 	// void FrameHessian::setStateZero(const Vec10 &state_zero) {
@@ -92,26 +100,26 @@ void FrameHessian::setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const Aff
 
 	state_zero = state;
 
-	// Compute perturbations in the known unobservable parameter spaces...
+	// Compute perturbations in the parameter space...
 	for(int i=0;i<6;i++)
 	{
 		Vec6 eps; eps.setZero(); eps[i] = 1e-3;
 		SE3 EepsP = Sophus::SE3d::exp(eps);
 		SE3 EepsM = Sophus::SE3d::exp(-eps);
-		SE3 w2c_leftEps_P_x0 = (get_worldToCam_evalPT() * EepsP) * get_worldToCam_evalPT().inverse();
-		SE3 w2c_leftEps_M_x0 = (get_worldToCam_evalPT() * EepsM) * get_worldToCam_evalPT().inverse();
+		SE3 w2c_leftEps_P_x0 = (worldToCam_evalPT * EepsP) * worldToCam_evalPT.inverse();
+		SE3 w2c_leftEps_M_x0 = (worldToCam_evalPT * EepsM) * worldToCam_evalPT.inverse();
 		nullspaces_pose.col(i) = (w2c_leftEps_P_x0.log() - w2c_leftEps_M_x0.log())/(2e-3);
 	}
 	//nullspaces_pose.topRows<3>() *= SCALE_XI_TRANS_INVERSE;
 	//nullspaces_pose.bottomRows<3>() *= SCALE_XI_ROT_INVERSE;
 
 	// scale change
-	SE3 w2c_leftEps_P_x0 = (get_worldToCam_evalPT());
+	SE3 w2c_leftEps_P_x0 = (worldToCam_evalPT);
 	w2c_leftEps_P_x0.translation() *= 1.00001;
-	w2c_leftEps_P_x0 = w2c_leftEps_P_x0 * get_worldToCam_evalPT().inverse();
-	SE3 w2c_leftEps_M_x0 = (get_worldToCam_evalPT());
+	w2c_leftEps_P_x0 = w2c_leftEps_P_x0 * worldToCam_evalPT.inverse();
+	SE3 w2c_leftEps_M_x0 = worldToCam_evalPT;
 	w2c_leftEps_M_x0.translation() /= 1.00001;
-	w2c_leftEps_M_x0 = w2c_leftEps_M_x0 * get_worldToCam_evalPT().inverse();
+	w2c_leftEps_M_x0 = w2c_leftEps_M_x0 * worldToCam_evalPT.inverse();
 	nullspaces_scale = (w2c_leftEps_P_x0.log() - w2c_leftEps_M_x0.log())/(2e-3);
 
 
@@ -216,7 +224,7 @@ void FrameFramePrecalc::set(FrameHessian* host, FrameHessian* target, CalibHessi
 
 
 
-	SE3 leftToLeft = target->PRE_worldToCam * host->PRE_camToWorld;
+	SE3 leftToLeft = target->PRE_worldToCam * host->PRE_TWorldCam;
 	PRE_RTll = (leftToLeft.rotationMatrix()).cast<float>();
 	PRE_tTll = (leftToLeft.translation()).cast<float>();
 	distanceLL = leftToLeft.translation().norm();
@@ -235,6 +243,17 @@ void FrameFramePrecalc::set(FrameHessian* host, FrameHessian* target, CalibHessi
 
 	PRE_aff_mode = AffLight::fromToVecExposure(host->ab_exposure, target->ab_exposure, host->aff_g2l(), target->aff_g2l()).cast<float>();
 	PRE_b0_mode = host->aff_g2l_0().b;
+}
+
+std::ostream& operator<<(std::ostream& os, const MetricWorldHessian& HWorld) {
+	os << HWorld.value_scaled.transpose().format(StdOutFmt);
+	os << "\n  TMetricDso=...\n  " << HWorld.TMetricDso.matrix().format(MatlabFmt);
+	return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const ImuBiasHessian& imuBias) {
+	os << imuBias.value_scaled.transpose().format(MatlabFmt);
+	return os;
 }
 
 }

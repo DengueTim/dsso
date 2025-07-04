@@ -31,6 +31,7 @@
 #include "util/settings.h"
 #include "OptimizationBackend/MatrixAccumulators.h"
 #include "IOWrapper/Output3DWrapper.h"
+#include "FullSystem/IMU.h"
 
 
 
@@ -40,12 +41,13 @@ namespace dso
 struct CalibHessian;
 struct FrameHessian;
 struct PointFrameResidual;
+struct ImuBiasHessian;
 
 class CoarseTracker {
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-	CoarseTracker(int w, int h);
+	CoarseTracker(int w, int h, const SE3 &TBaseCam);
 	~CoarseTracker();
 
 	bool trackNewestCoarse(
@@ -58,7 +60,7 @@ public:
 			std::vector<FrameHessian*> frameHessians);
 
 	void makeK(
-			CalibHessian* HCalib);
+			CalibHessian* HCalib, MetricWorldHessian* Hworld, ImuBiasHessian* Hbias);
 
 	bool debugPrint, debugPlot;
 
@@ -95,11 +97,9 @@ private:
 	float* weightSums[PYR_LEVELS];
 	float* weightSums_bak[PYR_LEVELS];
 
-
-	Vec6 calcResAndGS(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &refToNew, AffLight aff_g2l, float cutoffTH);
 	Vec6 calcRes(int lvl, const SE3 &refToNew, AffLight aff_g2l, float cutoffTH);
 	void calcGSSSE(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &refToNew, AffLight aff_g2l);
-	void calcGS(int lvl, Mat88 &H_out, Vec8 &b_out, const SE3 &refToNew, AffLight aff_g2l);
+	double calcImuResAndGs(Mat66 &Himu, Vec6 &bimu,const SE3 &TNewRef, ImuIntegration &imuIntegration, double imuWeight);
 
 	// pc buffers
 	float* pc_u[PYR_LEVELS];
@@ -124,6 +124,10 @@ private:
 
 
 	Accumulator9 acc;
+	const SE3 &TBaseCam;
+	Sim3 TMetricDso;
+	Vec3 imuBiasAccDelta;
+	Vec3 imuBiasGyroDelta;
 };
 
 

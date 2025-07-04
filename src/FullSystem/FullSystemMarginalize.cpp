@@ -197,7 +197,7 @@ void FullSystem::marginalizeFrame(FrameHessian* frame)
         std::vector<FrameHessian*> v;
         v.push_back(frame);
         for(IOWrap::Output3DWrapper* ow : outputWrapper)
-            ow->publishKeyframes(v, true, &Hcalib);
+            ow->publishKeyframes(v, true, &Hcalib, &Hworld);
     }
 
 

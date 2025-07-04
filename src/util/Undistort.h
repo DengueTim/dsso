@@ -85,7 +85,7 @@ public:
 
 	void loadPhotometricCalibration(std::string file, std::string noiseImage, std::string vignetteImage);
 
-	PhotometricUndistorter* photometricUndist;
+	PhotometricUndistorter* photometricUndist = NULL;
 
 protected:
     int w, h, wOrg, hOrg, wUp, hUp;
