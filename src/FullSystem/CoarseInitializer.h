@@ -138,6 +138,8 @@ private:
 	Accumulator9 acc9;
 	Accumulator9 acc9SC;
 
+	ImuIntegrator *imuIntegrator;
+
 	float alphaK;
 	float alphaW;
 
@@ -178,6 +180,7 @@ struct FLANNPointcloud {
 		const float d1 = p1[1] - points[idx_p2].v;
 		return d0 * d0 + d1 * d1;
 	}
+
 
 	inline float kdtree_get_pt(const size_t idx, int dim) const {
 		if (dim == 0)

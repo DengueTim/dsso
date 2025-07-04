@@ -82,6 +82,9 @@ CoarseInitializer::CoarseInitializer(CalibHessian *HCalib, int ww, int hh) :
 			rotatedPattern[lvl][idx] = Rplane * Vec2f(patternP[idx][0], patternP[idx][1]);
 		}
 	}
+
+	ImuCalib defaultImuCalib;
+	imuIntegrator = new ImuIntegrator(defaultImuCalib);
 }
 
 CoarseInitializer::~CoarseInitializer() {

@@ -59,7 +59,7 @@ endif()
 
 add_definitions("-DENABLE_SSE")
 set(CMAKE_CXX_FLAGS
-   "${SSE_FLAGS} -O3 -g -std=c++0x ${CPU_CXX_FLAG}"
+   "${SSE_FLAGS} -O1 -g -std=c++0x ${CPU_CXX_FLAG}"
 #   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
 )
 
@@ -149,11 +149,11 @@ add_library(dsso ${dsso_SOURCE_FILES} ${dsso_opencv_SOURCE_FILES} ${dsso_pangoli
 #set_property( TARGET dsso APPEND_STRING PROPERTY COMPILE_FLAGS -Wall )
 
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # OSX
-    set(BOOST_THREAD_LIBRARY boost_thread-mt)
-else()
+#if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # OSX
+#    set(BOOST_THREAD_LIBRARY boost_thread-mt)
+#else()
     set(BOOST_THREAD_LIBRARY boost_thread)
-endif()
+#endif()
 
 # build main executable (only if we have both OpenCV and Pangolin)
 if (OpenCV_FOUND AND Pangolin_FOUND)
