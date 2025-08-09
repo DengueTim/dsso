@@ -45,6 +45,7 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 
 	VecCf dc = ef->cDeltaF;
 	float dd = p->deltaF;
+	assert(dd == 0.0);
 
 	float bd_acc=0;
 	float Hdd_acc=0;
@@ -52,15 +53,15 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 
 	for(EFResidual* r : p->residualsAll)
 	{
-		if(mode==0) // Active.
+		if(mode==0) // Active. Used in EnergyFunctional::solveSystemF
 		{
 			if(r->isLinearized || !r->isActive()) continue;
 		}
-		if(mode==1) // Linearized(and active)
+		if(mode==1) // Linearized(and active). Used in EnergyFunctional::solveSystemF
 		{
 			if(!r->isLinearized || !r->isActive()) continue;
 		}
-		if(mode==2) // Marginalized...
+		if(mode==2) // Marginalized... Used in EnergyFunctional::marginalizePointsF
  		{
 			if(!r->isActive()) continue;
 			assert(r->isLinearized);
@@ -75,9 +76,9 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 
 		VecNRf resApprox;
 		if(mode==0)
-			resApprox = rJ->resF;
+			resApprox = rJ->resF; // set in PointFrameResidual::linearize()
 		if(mode==2)
-			resApprox = r->res_toZeroF;
+			resApprox = r->res_toZeroF; // set in EFResidual::fixLinearizationF()
 		if(mode==1)
 		{
 			// compute Jp*delta

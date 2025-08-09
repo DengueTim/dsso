@@ -524,7 +524,7 @@ void FullSystem::activatePointsMT_Reductor(
 }
 
 
-
+// Check if immaturePoints from old frames are in bounds of the newest frame, if so estimate idepth and create PointHessian if good.
 void FullSystem::activatePointsMT()
 {
 
@@ -710,14 +710,10 @@ void FullSystem::flagPointsForRemoval()
 {
 	assert(EFIndicesValid);
 
-	std::vector<FrameHessian*> fhsToKeepPoints;
 	std::vector<FrameHessian*> fhsToMargPoints;
 
 	//if(setting_margPointVisWindow>0)
 	{
-		for(int i=((int)frameHessians.size())-1;i>=0 && i >= ((int)frameHessians.size());i--)
-			if(!frameHessians[i]->flaggedForMarginalization) fhsToKeepPoints.push_back(frameHessians[i]);
-
 		for(int i=0; i< (int)frameHessians.size();i++)
 			if(frameHessians[i]->flaggedForMarginalization) fhsToMargPoints.push_back(frameHessians[i]);
 	}
@@ -742,7 +738,7 @@ void FullSystem::flagPointsForRemoval()
 				host->pointHessians[i]=0;
 				flag_nores++;
 			}
-			else if(ph->isOOB(fhsToKeepPoints, fhsToMargPoints) || host->flaggedForMarginalization)
+			else if(host->flaggedForMarginalization || ph->isOOB(fhsToMargPoints))
 			{
 				flag_oob++;
 				if(ph->isInlierNew())

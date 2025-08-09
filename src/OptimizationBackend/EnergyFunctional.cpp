@@ -210,8 +210,10 @@ void EnergyFunctional::setDeltaF()
 		f->delta = f->data->get_state_minus_stateZero();
 		f->delta_prior = (f->data->get_state() - f->data->getPriorZero());
 
-		for(EFPoint* p : f->points)
-			p->deltaF = p->data->idepth-p->data->idepth_zero;
+		for(EFPoint* p : f->points) {
+			p->deltaF = p->data->idepth - p->data->idepth_zero;
+			assert(p->deltaF == 0); // Weird!
+		}
 	}
 
 	EFDeltaValid = true;
@@ -567,16 +569,42 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 
 	marginalizeSchur<FPARS>(HMDso, bMDso, CPARS + FPARS * fh->idx, fh->dsoPrior(), fh->dsoDeltaPrior());
 
+	// LOGIC FROM VI-Stereo-DSO (Which is wrong, doesn't add M to Half)
+	// Compute H & b change
+	// Update H & b Bias M
+	// Compute deltaB for:
+	// 		State delta to lin point for pose of marginalized frame and neighbours
+	//		baseDso delta
+	// add HM_change * deltaB to bM_change.
+	//
+	// If switch sides:
+	//		Half = 0;
+	//		Half's linearization point = current HWorld estimate.
+	//
+	// Schur's on Half
+	// Schur's on Bias
+	//
+	// If scale OOB:
+	//		imu = Half
+	//		imu's linearization point = Half's LP
+	//		Half = 0;
+	//		Half's linearization point = current HWorld estimate.
+	//		reset middle
+	// else:
+	//		add H & b change to imu
+	//		Schur's imu
+	//
+
+
+
 	const int nDimFull = ICPARS + IFPARS * (frames.size() - 1);
 	const float sCurrent = HWorld.TMetricDso.scale();
 	const bool upper = sCurrent > sMiddle;
 
 	if (upper != lastUpper) {
 		std::cout << "marginalizeFrame():Scale changing sides.\n";
-		HMImuHalf->resize(nDimFull,nDimFull);
-		HMImuHalf->setZero();
-		bMImuHalf->resize(nDimFull);
-		bMImuHalf->setZero();
+		HMImuHalf->setZero(nDimFull,nDimFull);
+		bMImuHalf->setZero(nDimFull);
 	}
 
 	if (sCurrent > sMiddle * di || sCurrent < sMiddle / di) {
@@ -584,10 +612,8 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 		assert(upper == lastUpper); // Moving the scale middle shouldn't happen at the same time as changing sides.
 		HMImuCurr.swap(HMImuHalf);
 		bMImuCurr.swap(bMImuHalf);
-		HMImuHalf->resize(nDimFull,nDimFull);
-		HMImuHalf->setZero();
-		bMImuHalf->resize(nDimFull);
-		bMImuHalf->setZero();
+		HMImuHalf->setZero(nDimFull,nDimFull);
+		bMImuHalf->setZero(nDimFull);
 
 		sMiddle *= (sCurrent > sMiddle * di) ? di : 1/di;
 	}
@@ -602,6 +628,12 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 
 	lastUpper = upper;
 	sLast = sCurrent;
+
+//	for (long unsigned int i = 0; i < frames.size() - 1; i++) {
+//		// Adds factors at linearization point for Curr and Half scale estimates..
+//		addImuFactors(i, HFull_top, bFull_top);
+//	}
+
 
 	if (bMImuCurr->size() != nDimFull) {
 		marginalizeSchur<IFPARS>(*HMImuCurr, *bMImuCurr, ICPARS + IFPARS * fh->idx, VecIF::Ones(), VecIF::Ones());

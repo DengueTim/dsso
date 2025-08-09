@@ -96,7 +96,7 @@ void FrameHessian::setEvalPTAndStateZero(const bool fromShell) {
 
 	// Code below was setStateZero()
 	// void FrameHessian::setStateZero(const Vec10 &state_zero) {
-	assert(state.head<6>().squaredNorm() < 1e-20);
+	//assert(state.head<6>().squaredNorm() < 1e-20);
 
 	state_zero = state;
 

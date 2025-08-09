@@ -438,6 +438,7 @@ int main( int argc, char** argv )
     std::thread runthread([&]() {
         std::vector<int> idsToPlay;
         std::vector<double> timesToPlayAt;
+		float timesToPlayFactor = playbackSpeed != 0 ? 1/playbackSpeed : 0;
         for(int i=lstart;i>= 0 && i< reader->getNumImages() && linc*i < linc*lend;i+=linc)
         {
             idsToPlay.push_back(i);
@@ -449,7 +450,7 @@ int main( int argc, char** argv )
             {
                 double tsThis = reader->getTimestamp(idsToPlay[idsToPlay.size()-1]);
                 double tsPrev = reader->getTimestamp(idsToPlay[idsToPlay.size()-2]);
-                timesToPlayAt.push_back(timesToPlayAt.back() +  fabs(tsThis-tsPrev)/playbackSpeed);
+                timesToPlayAt.push_back(timesToPlayAt.back() +  fabs(tsThis-tsPrev) * timesToPlayFactor);
             }
         }
 

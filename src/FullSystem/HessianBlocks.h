@@ -443,10 +443,7 @@ struct PointHessian
 	PointHessian(const ImmaturePoint* const rawPoint, CalibHessian* Hcalib);
     inline ~PointHessian() {assert(efPoint==0); release(); instanceCounter--;}
 
-
-	inline bool isOOB(const std::vector<FrameHessian*>& toKeep, const std::vector<FrameHessian*>& toMarg) const
-	{
-
+	inline bool isOOB(const std::vector<FrameHessian*>& toMarg) const {
 		int visInToMarg = 0;
 		for(PointFrameResidual* r : residuals)
 		{
@@ -460,18 +457,13 @@ struct PointHessian
 			return true;
 
 
-
-
-
 		if(lastResiduals[0].second == ResState::OOB) return true;
 		if(residuals.size() < 2) return false;
 		if(lastResiduals[0].second == ResState::OUTLIER && lastResiduals[1].second == ResState::OUTLIER) return true;
 		return false;
 	}
 
-
-	inline bool isInlierNew()
-	{
+	inline bool isInlierNew()   {
 		return (int)residuals.size() >= setting_minGoodActiveResForMarg
                     && numGoodResiduals >= setting_minGoodResForMarg;
 	}
