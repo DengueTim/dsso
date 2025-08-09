@@ -5,7 +5,7 @@ PROJECT(${PROJECT_NAME})
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
 
-set(BUILD_TYPE Release)
+set(BUILD_TYPE Debug)
 #set(BUILD_TYPE RelWithDebInfo)
 
 set(EXECUTABLE_OUTPUT_PATH bin)
@@ -19,7 +19,7 @@ find_package(Boost COMPONENTS system thread)
 
 # optional libraries
 find_package(LibZip QUIET)
-find_package(Pangolin 0.2 QUIET)
+find_package(Pangolin 0.6 QUIET)
 find_package(OpenCV QUIET)
 
 # flags
@@ -35,7 +35,7 @@ endif()
 
 add_definitions("-DENABLE_SSE")
 set(CMAKE_CXX_FLAGS
-   "${SSE_FLAGS} -O3 -g -std=c++0x ${CPU_CXX_FLAG}"
+   "${SSE_FLAGS} -O1 -g -std=c++0x ${CPU_CXX_FLAG}"
 #   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
 )
 
@@ -125,11 +125,11 @@ add_library(dso ${dso_SOURCE_FILES} ${dso_opencv_SOURCE_FILES} ${dso_pangolin_SO
 #set_property( TARGET dso APPEND_STRING PROPERTY COMPILE_FLAGS -Wall )
 
 
-if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # OSX
-    set(BOOST_THREAD_LIBRARY boost_thread-mt)
-else()
+#if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # OSX
+#    set(BOOST_THREAD_LIBRARY boost_thread-mt)
+#else()
     set(BOOST_THREAD_LIBRARY boost_thread)
-endif()
+#endif()
 
 # build main executable (only if we have both OpenCV and Pangolin)
 if (OpenCV_FOUND AND Pangolin_FOUND)

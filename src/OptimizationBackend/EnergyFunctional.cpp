@@ -186,8 +186,10 @@ void EnergyFunctional::setDeltaF(CalibHessian* HCalib)
 		f->delta = f->data->get_state_minus_stateZero().head<8>();
 		f->delta_prior = (f->data->get_state() - f->data->getPriorZero()).head<8>();
 
-		for(EFPoint* p : f->points)
-			p->deltaF = p->data->idepth-p->data->idepth_zero;
+		for(EFPoint* p : f->points) {
+			p->deltaF = p->data->idepth - p->data->idepth_zero;
+			assert(p->deltaF == 0.0);
+		}
 	}
 
 	EFDeltaValid = true;
