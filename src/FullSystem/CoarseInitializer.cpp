@@ -241,28 +241,25 @@ bool CoarseInitializer::trackFrame(FrameHessian* newFrameHessian, std::vector<IO
 
 	}
 
-
-
+	double dt = (newFrameHessian->shell->timestamp - lastTimestamp) /1e9;
+	newVelocity = (refToNew_current.translation() - thisToNext.translation()) /dt;
+	lastTimestamp = newFrameHessian->shell->timestamp;
 	thisToNext = refToNew_current;
 	thisToNext_aff = refToNew_aff_current;
 
 	for(int i=0;i<pyrLevelsUsed-1;i++)
 		propagateUp(i);
 
-
-
-
 	frameID++;
 	if(!snapped) snappedAt=0;
 
-	if(snapped && snappedAt==0)
+	if(snapped && snappedAt==0) {
 		snappedAt = frameID;
-
-
+		double dt = (newFrameHessian->shell->timestamp - firstFrame->shell->timestamp) / 1e9;
+		firstVelocity = refToNew_current.translation() / dt;
+	}
 
     debugPlot(0,wraps);
-
-
 
 	return snapped && frameID > snappedAt+5;
 }
@@ -837,6 +834,9 @@ void CoarseInitializer::setFirst(CalibHessian* HCalib, FrameHessian* newFrameHes
 	thisToNext=SE3();
 	snapped = false;
 	frameID = snappedAt = 0;
+	firstVelocity.setZero();
+	newVelocity.setZero();
+	lastTimestamp = 0;
 
 	for(int i=0;i<pyrLevelsUsed;i++)
 		dGrads[i].setZero();

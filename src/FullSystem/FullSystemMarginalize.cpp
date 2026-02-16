@@ -196,8 +196,10 @@ void FullSystem::marginalizeFrame(FrameHessian* frame)
     {
         std::vector<FrameHessian*> v;
         v.push_back(frame);
-        for(IOWrap::Output3DWrapper* ow : outputWrapper)
-            ow->publishKeyframes(v, true, &Hcalib, &Hworld);
+        for(IOWrap::Output3DWrapper* ow : outputWrapper) {
+			ow->publishKeyframes(v, true, &Hcalib);
+			ow->publishMetricDso(&Hworld.TMetricDso);
+		}
     }
 
 
@@ -207,9 +209,6 @@ void FullSystem::marginalizeFrame(FrameHessian* frame)
 	deleteOutOrder<FrameHessian>(frameHessians, frame);
 	for(unsigned int i=0;i<frameHessians.size();i++)
 		frameHessians[i]->idx = i;
-
-
-
 
 	setPrecalcValues();
 	ef->setAdjointsF();

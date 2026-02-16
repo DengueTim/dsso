@@ -71,14 +71,12 @@ void PointHessian::release()
 }
 
 
-//void FrameHessian::setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l_scaled) {
-//}
-
 [[clang::optnone]]
 void FrameHessian::setEvalPTAndStateZero(const bool fromShell) {
 	if (fromShell) {
 		PRE_TWorldCam = shell->TWorldCam;
-		PRE_worldToCam = PRE_TWorldCam.inverse();
+		PRE_TCamWorld = PRE_TWorldCam.inverse();
+		PRE_velocity = shell->velocity;
 
 		//state_scaled.setZero();
 		state_scaled[9] = shell->aff_g2l.a;
@@ -89,10 +87,11 @@ void FrameHessian::setEvalPTAndStateZero(const bool fromShell) {
 		state[10] = SCALE_B_INVERSE * shell->aff_g2l.b;
 	}
 
-	worldToCam_evalPT = PRE_worldToCam;
+	TCamWorld_evalPT = PRE_TCamWorld;
+	velocity_evalPT = PRE_velocity;
 
-	state_scaled.head<6>().setZero();
-	state.head<6>().setZero();
+	state_scaled.head<9>().setZero();
+	state.head<9>().setZero();
 
 	// Code below was setStateZero()
 	// void FrameHessian::setStateZero(const Vec10 &state_zero) {
@@ -106,20 +105,20 @@ void FrameHessian::setEvalPTAndStateZero(const bool fromShell) {
 		Vec6 eps; eps.setZero(); eps[i] = 1e-3;
 		SE3 EepsP = Sophus::SE3d::exp(eps);
 		SE3 EepsM = Sophus::SE3d::exp(-eps);
-		SE3 w2c_leftEps_P_x0 = (worldToCam_evalPT * EepsP) * worldToCam_evalPT.inverse();
-		SE3 w2c_leftEps_M_x0 = (worldToCam_evalPT * EepsM) * worldToCam_evalPT.inverse();
+		SE3 w2c_leftEps_P_x0 = (TCamWorld_evalPT * EepsP) * TCamWorld_evalPT.inverse();
+		SE3 w2c_leftEps_M_x0 = (TCamWorld_evalPT * EepsM) * TCamWorld_evalPT.inverse();
 		nullspaces_pose.col(i) = (w2c_leftEps_P_x0.log() - w2c_leftEps_M_x0.log())/(2e-3);
 	}
 	//nullspaces_pose.topRows<3>() *= SCALE_XI_TRANS_INVERSE;
 	//nullspaces_pose.bottomRows<3>() *= SCALE_XI_ROT_INVERSE;
 
 	// scale change
-	SE3 w2c_leftEps_P_x0 = (worldToCam_evalPT);
+	SE3 w2c_leftEps_P_x0 = (TCamWorld_evalPT);
 	w2c_leftEps_P_x0.translation() *= 1.00001;
-	w2c_leftEps_P_x0 = w2c_leftEps_P_x0 * worldToCam_evalPT.inverse();
-	SE3 w2c_leftEps_M_x0 = worldToCam_evalPT;
+	w2c_leftEps_P_x0 = w2c_leftEps_P_x0 * TCamWorld_evalPT.inverse();
+	SE3 w2c_leftEps_M_x0 = TCamWorld_evalPT;
 	w2c_leftEps_M_x0.translation() /= 1.00001;
-	w2c_leftEps_M_x0 = w2c_leftEps_M_x0 * worldToCam_evalPT.inverse();
+	w2c_leftEps_M_x0 = w2c_leftEps_M_x0 * TCamWorld_evalPT.inverse();
 	nullspaces_scale = (w2c_leftEps_P_x0.log() - w2c_leftEps_M_x0.log())/(2e-3);
 
 
@@ -224,10 +223,10 @@ void FrameFramePrecalc::set(FrameHessian* host, FrameHessian* target, CalibHessi
 
 
 
-	SE3 leftToLeft = target->PRE_worldToCam * host->PRE_TWorldCam;
-	PRE_RTll = (leftToLeft.rotationMatrix()).cast<float>();
-	PRE_tTll = (leftToLeft.translation()).cast<float>();
-	distanceLL = leftToLeft.translation().norm();
+	SE3 TTargetHost = target->PRE_TCamWorld * host->PRE_TWorldCam;
+	PRE_RTll = (TTargetHost.rotationMatrix()).cast<float>();
+	PRE_tTll = (TTargetHost.translation()).cast<float>();
+	distanceLL = TTargetHost.translation().norm();
 
 
 	Mat33f K = Mat33f::Zero();
@@ -245,9 +244,19 @@ void FrameFramePrecalc::set(FrameHessian* host, FrameHessian* target, CalibHessi
 	PRE_b0_mode = host->aff_g2l_0().b;
 }
 
+std::ostream& operator<<(std::ostream& os, const FrameHessian& frameHessian) {
+	VecIF v;
+	v.head<6>() = frameHessian.TCamWorld_evalPT.log();
+	v.segment<3>(6) = frameHessian.velocity_evalPT;
+	v.tail<2>() = frameHessian.state_zero.tail<2>();
+	v += frameHessian.state_scaled;
+	os << v.transpose().format(MatlabFmt);
+	return os;
+}
+
 std::ostream& operator<<(std::ostream& os, const MetricWorldHessian& HWorld) {
-	os << HWorld.value_scaled.transpose().format(StdOutFmt);
-	os << "\n  TMetricDso=...\n  " << HWorld.TMetricDso.matrix().format(MatlabFmt);
+	os << HWorld.value_scaled.transpose().format(MatlabFmt);
+	//os << "\n  TMetricDso=...\n  " << HWorld.TMetricDso.matrix().format(MatlabFmt);
 	return os;
 }
 

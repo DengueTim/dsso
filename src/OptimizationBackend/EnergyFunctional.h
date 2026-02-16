@@ -70,7 +70,7 @@ public:
 	friend class AccumulatedSCHessian;
 	friend class AccumulatedSCHessianSSE;
 
-	EnergyFunctional(const double imuWeight, CalibHessian &HCalib, MetricWorldHessian &HWorld, ImuBiasHessian &HBias);
+	EnergyFunctional(const double imuWeight, CalibHessian &HCalib, MetricWorldHessian &HWorld, ImuBiasHessian &HBias, const SE3 &TBaseCam);
 	~EnergyFunctional();
 
 
@@ -98,7 +98,7 @@ public:
 	void setAdjointsF();
 
 	std::vector<EFFrame*> frames;
-	int nPoints, nFrames, nResiduals;
+	int nPoints, nFrames, nResiduals, nResidualsInserts, nResidualsDrops;
 
 	int resInA, resInL, resInM;
 	MatXX lastHS;
@@ -118,12 +118,17 @@ public:
 	  Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>
 	  > connectivityMap;
 
+	std::vector<EFPoint*> allPoints;
+
+	int currCounter, halfCounter;
+	double lastImuEnergy, currImuMEnergy, halfImuMEnergy;
+
 private:
 	inline const static float dmin = sqrt(1.1);
 
 	void getStitchedDeltaF(VecX &delta);
 
-	void resubstituteF_MT(VecX x, bool MT);
+	void resubstituteF_MT(VecX x, bool MT, int iteration);
     void resubstituteFPt(const VecCf &xc, Mat18f* xAd, int min, int max, Vec10* stats, int tid);
 
 	void accumulateAF_MT(MatXX &H, VecX &b, bool MT);
@@ -134,11 +139,12 @@ private:
 
 	void orthogonalize(VecX* b, MatXX* H);
 
-	const SE3 dsoCamPoseToMetricImuPose(const SE3& T_dso_cam);
-	double addImuFactors(const int frameIndex, MatXX &H, VecX &b);
+	const SE3 dsoCamPoseToMetricImuPose(const Sim3 &TMetricDso, const SE3& T_dso_cam);
+	double addImuFactors(const Sim3 &TMetricDso, const int frameIndex, MatXX &H, VecX &b, const int iteration = -1);
 	void addPrior(MatXX &H, VecX &b);
 
-	const SE3 TBaseCam; // Fixed Base(IMU) to Camera transform in metric world
+	const Mat44 TBaseCam; // Fixed Base(IMU) to Camera transform in metric world
+	const Mat44 TCamBase;
 
 	const double imuWeightSquared;
 
@@ -169,7 +175,6 @@ private:
 
 	AccumulatedSCHessianSSE* accSSE_bot;
 
-	std::vector<EFPoint*> allPoints;
 	std::vector<EFPoint*> allPointsToMarg;
 
 	// M_visual & b_visual in paper.
@@ -181,6 +186,7 @@ private:
 
 	bool lastUpper;
 	float sMiddle, sLast, di;
+	Sim3 TMetricDsoHalf;
 
 	float currentLambda;
 };

@@ -9,14 +9,18 @@
 #include <gtsam/navigation/ImuFactor.h>
 
 namespace dso {
-	// Gravity in IMU frame. Along negative X-Axis.
-	const Vec3 Gravity(-9.8082,0,0);
+	// Gravity in Metrix frame. Along positive Y-Axis. Same orientation as camera.
+	const Vec3 Gravity(0,9.8082,0);
 
 	struct ImuCalib {
-		//
-		double integration_sigma = 0.316227;
-		double gyro_sigma = 0.1;
-		double accel_sigma = 0.316227;
+		// Error committed in integrating position from velocities. Value from GTSAM's ImuFactorsExample.cpp. A bit of a mystery..
+		double integration_covariance = 1e-8;
+		// Values from EuRoC sensor.yaml...
+		// The units for sigma/stddev are σ = rad/s/√Hz
+		double gyro_noise_density = 0.00016968;
+		// The units for sigma/stddev are σ = m/s²/√Hz
+		double accel_noise_density = 0.002;
+		// TODO: Use these values in EnergyFunctional IMU Bias calc.
 		double gyro_random_walk = 0.000019393;
 		double accel_random_walk = 0.003;
 	};
@@ -46,8 +50,8 @@ namespace dso {
 		Vec3 covBg;
 
 		// Covariances for integration interval.
-		Mat99 measurementCovariance;
-		Vec6 biasCovariance;
+		Mat99 measurementCovariance; // Order translation, rotation, velocity.
+		Vec6 biasCovariance; // Order acceleration, gyration.
 
 		// Accumulations over measurementsCount measurements, not averages.
 		Vec3 linAccAcc;
@@ -120,6 +124,11 @@ namespace dso {
 		Mat33 jRotBg;
 		Mat33 jVelBa;
 		Mat33 jVelBg;
+
+		Mat93 jBiasA;
+		Mat93 jBiasG;
+
+		Mat99 covarianceAcc;
 
 	public:
 		FosterImuIntegrator(const dso::ImuCalib& imuCalib);

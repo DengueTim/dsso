@@ -102,8 +102,8 @@ void EnergyFunctional::setAdjointsF() {
 	EFAdjointsValid = true;
 }
 
-EnergyFunctional::EnergyFunctional(const double imuWeight, CalibHessian &HCalib, MetricWorldHessian &HWorld, ImuBiasHessian &HBias) :
-		imuWeightSquared(imuWeight * imuWeight), HCalib(HCalib), HWorld(HWorld), HBias(HBias) {
+EnergyFunctional::EnergyFunctional(const double imuWeight, CalibHessian &HCalib, MetricWorldHessian &HWorld, ImuBiasHessian &HBias, const SE3 &TBaseCam) :
+		imuWeightSquared(imuWeight * imuWeight), HCalib(HCalib), HWorld(HWorld), HBias(HBias), TBaseCam(TBaseCam.matrix()), TCamBase(TBaseCam.inverse().matrix()) {
 	adHost=0;
 	adTarget=0;
 
@@ -113,7 +113,7 @@ EnergyFunctional::EnergyFunctional(const double imuWeight, CalibHessian &HCalib,
 	adTargetF=0;
 	adHTdeltaF=0;
 
-	nFrames = nResiduals = nPoints = 0;
+	nFrames = nResiduals = nPoints = nResidualsInserts = nResidualsDrops = 0;
 
 	accSSE_top_L = new AccumulatedTopHessianSSE();
 	accSSE_top_A = new AccumulatedTopHessianSSE();
@@ -134,14 +134,20 @@ EnergyFunctional::EnergyFunctional(const double imuWeight, CalibHessian &HCalib,
 	HMImuCurr->setZero();
 	bMImuCurr = std::make_unique<VecX>(ICPARS);
 	bMImuCurr->setZero();
+	lastImuEnergy = 0;
+	currCounter = 0;
+	currImuMEnergy = 0;
 	HMImuHalf = std::make_unique<MatXX>(ICPARS, ICPARS);
 	HMImuHalf->setZero();
 	bMImuHalf = std::make_unique<VecX>(ICPARS);
 	bMImuHalf->setZero();
+	halfCounter = 0;
+	halfImuMEnergy = 0;
 
 	lastUpper = false;
 	sMiddle = sLast = HWorld.TMetricDso.scale();
 	di = dmin;
+	TMetricDsoHalf = HWorld.TMetricDso;
 
 	currentLambda=0;
 }
@@ -270,7 +276,7 @@ void EnergyFunctional::accumulateSCF_MT(MatXX &H, VecX &b, bool MT)
 	{
 		red->reduce(boost::bind(&AccumulatedSCHessianSSE::setZero, accSSE_bot, nFrames,  _1, _2, _3, _4), 0, 0, 0);
 		red->reduce(boost::bind(&AccumulatedSCHessianSSE::addPointsInternal,
-				accSSE_bot, &allPoints, true,  _1, _2, _3, _4), 0, allPoints.size(), 50);
+				accSSE_bot, &allPoints,  _1, _2, _3, _4), 0, allPoints.size(), 50);
 		accSSE_bot->stitchDoubleMT(red,H,b,this,true);
 	}
 	else
@@ -284,7 +290,7 @@ void EnergyFunctional::accumulateSCF_MT(MatXX &H, VecX &b, bool MT)
 }
 
 [[clang::optnone]]
-void EnergyFunctional::resubstituteF_MT(VecX x, bool MT)
+void EnergyFunctional::resubstituteF_MT(VecX x, bool MT, int iteration)
 {
 	assert(x.size() == ICPARS+nFrames*IFPARS);
 	assert(!x.hasNaN());
@@ -297,8 +303,8 @@ void EnergyFunctional::resubstituteF_MT(VecX x, bool MT)
 //	HWorld.step(3) = - x(CPARS+3);
 	HWorld.step = - x.segment<IWPARS>(CPARS);
 	HBias.step = - x.segment<IBPARS>(CPARS + IWPARS);
-	std::cout << "HWorld step:" << HWorld.step.transpose().format(MatlabFmt);
-	std::cout << "HBias step:" << HBias.step.transpose().format(MatlabFmt);
+	std::cout << "Step"<< iteration << " HWorld:" << HWorld.step.transpose().format(MatlabFmt);
+	std::cout << "Step"<< iteration << " HBias:" << HBias.step.transpose().format(MatlabFmt);
 
 	Mat18f* xAd = new Mat18f[nFrames*nFrames];
 	VecCf cstep = xF.head<CPARS>();
@@ -306,7 +312,7 @@ void EnergyFunctional::resubstituteF_MT(VecX x, bool MT)
 	for(EFFrame* h : frames)
 	{
 		h->data->step = - x.segment<IFPARS>(ICPARS+IFPARS*h->idx);
-		std::cout << "Frame " << h->frameID << " step:" << h->data->step.transpose().format(MatlabFmt);
+		std::cout << "Step"<< iteration << " Frame" << h->frameID << ":" << h->data->step.transpose().format(MatlabFmt);
 
 		for(EFFrame* t : frames) {
 			Vec8f xh;
@@ -337,7 +343,7 @@ void EnergyFunctional::resubstituteFPt(
 		EFPoint* p = allPoints[k];
 
 		int ngoodres = 0;
-		for(EFResidual* r : p->residualsAll) if(r->isActive()) ngoodres++;
+		for(EFResidual* r : p->residualsAll) if(r->isGood) ngoodres++;
 		if(ngoodres==0)
 		{
 			p->data->step = 0;
@@ -348,7 +354,7 @@ void EnergyFunctional::resubstituteFPt(
 
 		for(EFResidual* r : p->residualsAll)
 		{
-			if(!r->isActive()) continue;
+			if(!r->isGood) continue;
 			b -= xAd[r->hostIDX*nFrames + r->targetIDX] * r->JpJdF;
 		}
 
@@ -382,7 +388,7 @@ void EnergyFunctional::calcLEnergyPt(int min, int max, Vec10* stats, int tid)
 
 		for(EFResidual* r : p->residualsAll)
 		{
-			if(!r->isLinearized || !r->isActive()) continue;
+			if(!r->isLinearized || !r->isGood) continue;
 
 			Mat18f dp = adHTdeltaF[r->hostIDX+nFrames*r->targetIDX];
 			RawResidualJacobian* rJ = r->J;
@@ -468,6 +474,7 @@ EFResidual* EnergyFunctional::insertResidual(PointFrameResidual* r)
     connectivityMap[(((uint64_t)efr->host->frameID) << 32) + ((uint64_t)efr->target->frameID)][0]++;
 
 	nResiduals++;
+	nResidualsInserts++;
 	r->efResidual = efr;
 	return efr;
 }
@@ -545,13 +552,14 @@ void EnergyFunctional::dropResidual(EFResidual* r)
 	p->residualsAll.pop_back();
 
 
-	if(r->isActive())
+	if(r->isGood)
 		r->host->data->shell->statistics_goodResOnThis++;
 	else
 		r->host->data->shell->statistics_outlierResOnThis++;
 
 
     connectivityMap[(((uint64_t)r->host->frameID) << 32) + ((uint64_t)r->target->frameID)][0]--;
+	nResidualsDrops++;
 	nResiduals--;
 	r->data->efResidual=0;
 	delete r;
@@ -560,13 +568,14 @@ void EnergyFunctional::dropResidual(EFResidual* r)
 [[clang::optnone]]
 void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 {
-	std::cout << "marginalizeFrame:" << fh->idx << "\n";
+	std::cout << "marginalizeFrame: ID(idx):" << fh->frameID << "(" << fh->idx << ")\n";
 	assert(EFDeltaValid);
 	assert(EFAdjointsValid);
 	assert(EFIndicesValid);
 
 	assert((int)fh->points.size()==0);
 
+	// HMDso & bMDso are updated in marginalizePointsF()
 	marginalizeSchur<FPARS>(HMDso, bMDso, CPARS + FPARS * fh->idx, fh->dsoPrior(), fh->dsoDeltaPrior());
 
 	// LOGIC FROM VI-Stereo-DSO (Which is wrong, doesn't add M to Half)
@@ -595,51 +604,66 @@ void EnergyFunctional::marginalizeFrame(EFFrame* fh)
 	//		Schur's imu
 	//
 
-
-
 	const int nDimFull = ICPARS + IFPARS * (frames.size() - 1);
 	const float sCurrent = HWorld.TMetricDso.scale();
 	const bool upper = sCurrent > sMiddle;
-
-	if (upper != lastUpper) {
-		std::cout << "marginalizeFrame():Scale changing sides.\n";
-		HMImuHalf->setZero(nDimFull,nDimFull);
-		bMImuHalf->setZero(nDimFull);
-	}
-
-	if (sCurrent > sMiddle * di || sCurrent < sMiddle / di) {
-		std::cout << "marginalizeFrame():Scale changing middle.\n";
-		assert(upper == lastUpper); // Moving the scale middle shouldn't happen at the same time as changing sides.
-		HMImuCurr.swap(HMImuHalf);
-		bMImuCurr.swap(bMImuHalf);
-		HMImuHalf->setZero(nDimFull,nDimFull);
-		bMImuHalf->setZero(nDimFull);
-
-		sMiddle *= (sCurrent > sMiddle * di) ? di : 1/di;
-	}
-
 	double ss = sCurrent >= sLast ? sCurrent / sLast : sLast /sCurrent;
 	di = dmin;
 	while(di <= ss) {
 		di *= dmin;
 	}
 
-	std::cout << "di:" << di << " sCurrent:" << sCurrent << " sCurrent/sLast:" << ss << " upper(last):" << upper << "(" << lastUpper << ")\n";
+	if (upper != lastUpper) {
+		std::cout << "marginalizeFrame():Scale changing sides. currCounter=" << currCounter << " halfCounter=" << halfCounter << "\n";
+		std::cout << "marginalizeFrame():Scale di:" << di << " sCurrent:" << sCurrent << " sCurrent/sLast:" << ss << " upper(last):" << upper << "(" << lastUpper << ")\n";
+		HMImuHalf->setZero(nDimFull,nDimFull);
+		bMImuHalf->setZero(nDimFull);
+		halfCounter = 0;
+	}
+
+	if (sCurrent > sMiddle * di || sCurrent < sMiddle / di) {
+		std::cout << "marginalizeFrame():Scale change middle. currCounter:" << currCounter << " halfCounter:" << halfCounter << " upper(last):" << upper << "(" << lastUpper << ")\n";
+		std::cout << "marginalizeFrame():Scale sCurrent:" << sCurrent << " sMiddle:" << sMiddle << " di:" << di << "\n";
+		if (upper != lastUpper) { // Moving the scale middle shouldn't happen at the same time as changing sides.
+			std::cout << "upper == lastUpper AND sCurrent:" << sCurrent << " sMiddle:" << sMiddle << " di:" << di << "\n";
+			abort();
+		}
+		HMImuCurr.swap(HMImuHalf);
+		bMImuCurr.swap(bMImuHalf);
+		currCounter = halfCounter;
+		currImuMEnergy = halfImuMEnergy;
+		HMImuHalf->setZero(nDimFull,nDimFull);
+		bMImuHalf->setZero(nDimFull);
+		halfCounter = 0;
+		halfImuMEnergy = 0.0;
+
+		sMiddle *= (sCurrent > sMiddle * di) ? di : 1/di;
+		HWorld.updateEvalPt();
+
+		std::cout << "marginalizeFrame():Scale sCurrent:" << sCurrent << " sCurrent/sLast:" << ss << " sMiddle:" << sMiddle << "\n";
+	}
 
 	lastUpper = upper;
 	sLast = sCurrent;
 
-//	for (long unsigned int i = 0; i < frames.size() - 1; i++) {
-//		// Adds factors at linearization point for Curr and Half scale estimates..
-//		addImuFactors(i, HFull_top, bFull_top);
-//	}
-
+	// Adds factors at linearization point for Curr and Half scale estimates..
+	// TODO: Use curr and half linearization Points here.
+	if (fh->idx > 0) {
+		currImuMEnergy += addImuFactors(HWorld.TMetricDso, fh->idx-1, *HMImuCurr, *bMImuCurr);
+		halfImuMEnergy += addImuFactors(HWorld.TMetricDso, fh->idx-1, *HMImuHalf, *bMImuHalf);
+	}
+	if (fh->idx < frames.size()) {
+		currImuMEnergy += addImuFactors(HWorld.TMetricDso, fh->idx, *HMImuCurr, *bMImuCurr);
+		halfImuMEnergy += addImuFactors(HWorld.TMetricDso, fh->idx, *HMImuHalf, *bMImuHalf);
+	}
 
 	if (bMImuCurr->size() != nDimFull) {
 		marginalizeSchur<IFPARS>(*HMImuCurr, *bMImuCurr, ICPARS + IFPARS * fh->idx, VecIF::Ones(), VecIF::Ones());
+		currCounter++;
 	}
 	if (bMImuHalf->size() != nDimFull) {
 		marginalizeSchur<IFPARS>(*HMImuHalf, *bMImuHalf, ICPARS + IFPARS * fh->idx, VecIF::Ones(), VecIF::Ones());
+		halfCounter++;
 	}
 
 	// remove from vector, without changing the order!
@@ -724,7 +748,7 @@ void EnergyFunctional::marginalizePointsF()
 			{
 				p->priorF *= setting_idepthFixPriorMargFac;
 				for(EFResidual* r : p->residualsAll)
-					if(r->isActive())
+					if(r->isGood)
                         connectivityMap[(((uint64_t)r->host->frameID) << 32) + ((uint64_t)r->target->frameID)][1]++;
 				allPointsToMarg.push_back(p);
 			}
@@ -842,22 +866,6 @@ void EnergyFunctional::orthogonalize(VecX* b, MatXX* H)
 		NFull.col(Nc++) = v.normalized();
 	}
 
-//		VecX col(rows);
-//		col.head<CPARS>() = v.head<CPARS>();
-//		for (int f=0 ; f < nFrames ; f++) {
-//			col.segment(C + F * f, F) = v.segment(CPARS + FPARS * f, F);
-//		}
-//		N.col(Nc++) = col.normalized();
-//	}
-//	for (const VecX &v : lastNullspaces_scale) {
-//		VecX col(rows);
-//		col.head<CPARS>() = v.head<CPARS>();
-//		for (int f=0 ; f < nFrames ; f++) {
-//			col.segment<FPARS>(C + F * f) = v.segment<FPARS>(CPARS + FPARS * f);
-//		}
-//		N.col(Nc++) = col.normalized();
-//	}
-
 	// decide to which nullspaces to orthogonalize.
 	std::vector<VecX> ns;
 	ns.insert(ns.end(), lastNullspaces_pose.begin(), lastNullspaces_pose.end());
@@ -940,13 +948,19 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda)
 	const int fullSize = ICPARS + nFrames * IFPARS;
 	MatXX HFull_top = MatXX::Zero(fullSize, fullSize);
 	VecX bFull_top = VecX::Zero(fullSize);
-	if (nFrames>=2) {
-		double energy = 0;
+
+	lastImuEnergy = 0;
+
+	if (nFrames>=3) {
 		for (long unsigned int i = 0; i < frames.size() - 1; i++) {
-			energy += addImuFactors(i, HFull_top, bFull_top);
+			double e = addImuFactors(HWorld.TMetricDso, i, HFull_top, bFull_top, iteration);
+			lastImuEnergy += e;
+			//std::cout << "Active imuEnergy e=" << e << "\n";
 		}
 		assert(!HFull_top.hasNaN());
 		assert(!bFull_top.hasNaN());
+
+		std::cout << "IMU Energy last=" << lastImuEnergy << " currM=" << currImuMEnergy << " halfM=" << halfImuMEnergy << "\n";
 	}
 
 //	std::cout << "HFull_top=...\n" << HFull_top.format(MatlabFmt) << "\n";
@@ -959,6 +973,12 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda)
 	getStitchedDeltaF(delta);
 	MatXX bMDso_top = bMDso + HMDso * delta;
 	assert(!bMDso_top.hasNaN());
+
+//	for(int i=0;i<nFrames;++i) {
+//		if (frames[i]->m_flag) {
+//
+//		}
+//	}
 
 	if(setting_solverMode & SOLVER_ORTHOGONALIZE_SYSTEM) {
 		abort(); // TODO IMU factors.
@@ -993,13 +1013,17 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda)
 		addDsoToFullB(bDso, bFull_top);
 		assert(!bFull_top.hasNaN());
 
-		if(HMImuCurr->sum() != 0) {
-			std::cout << "HMImuCurr=...\n" << HMImuCurr->format(MatlabFmt);
-			abort();
-		}
-		assert(bMImuCurr->sum() == 0);
+//		if(HMImuCurr->sum() != 0) {
+//			std::cout << "HMImuCurr=...\n" << HMImuCurr->format(MatlabFmt);
+//			abort();
+//		}
+//		assert(bMImuCurr->sum() == 0);
+		VecX deltaFull(bMImuCurr->size());
+		getStitchedDeltaF(deltaFull); // TODO: Should the delta only be for the IMU params? m_flag in VI-Stereo-DSO
+		// std::cout << "HMDso=" << HMDso.format(MatlabFmt) << "HMImuCurr=" << HMImuCurr->format(MatlabFmt);
+
 		HFull_top += *HMImuCurr;
-		bFull_top += *bMImuCurr;
+		bFull_top += *bMImuCurr + *HMImuCurr * deltaFull;
 
 		addPrior(HFull_top, bFull_top);
 
@@ -1051,8 +1075,15 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda)
 	else
 	{
 		VecX SVecI = (HFull_top.diagonal()+VecX::Constant(HFull_top.cols(), 10)).cwiseSqrt().cwiseInverse();
+//		std::cout << "HFull_top=...\n" << HFull_top.format(MatlabFmt) << "\n";
+//		std::cout << "bFull_top=...\n" << bFull_top.transpose().format(MatlabFmt) << "\n";
+//		std::cout << "SVecI=...\n" << SVecI.transpose().format(MatlabFmt) << "\n";
 		MatXX HFinalScaled = SVecI.asDiagonal() * HFull_top * SVecI.asDiagonal();
-		x = SVecI.asDiagonal() * HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFull_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
+//		std::cout << "HFinalScaled=...\n" << HFinalScaled.format(MatlabFmt) << "\n";
+//		std::cout << "bFinalScaled=...\n" << (SVecI.asDiagonal() * bFull_top).transpose().format(MatlabFmt) << "\n";
+		x = HFinalScaled.ldlt().solve(SVecI.asDiagonal() * bFull_top);//  SVec.asDiagonal() * svd.matrixV() * Ub;
+//		std::cout << "x=...\n" << x.transpose().format(MatlabFmt) << "\n";
+		x = SVecI.asDiagonal() * x;
 	}
 
 	if((setting_solverMode & SOLVER_ORTHOGONALIZE_X) || (iteration >= 2 && (setting_solverMode & SOLVER_ORTHOGONALIZE_X_LATER)))
@@ -1063,13 +1094,16 @@ void EnergyFunctional::solveSystemF(int iteration, double lambda)
 	lastX = x;
 
 	currentLambda= lambda;
-	resubstituteF_MT(x, multiThreading);
+	resubstituteF_MT(x, multiThreading, iteration);
 	currentLambda=0;
 }
 
-const SE3 EnergyFunctional::dsoCamPoseToMetricImuPose(const SE3& T_dso_cam) {
-	// Where the IMU is in the metric world for the given camera pose(in DSO world)
-	return SE3(HWorld.TMetricDso.matrix() * T_dso_cam.matrix() * HWorld.TDsoMetric.matrix() * HWorld.TMetricCamImu.matrix());
+const SE3 EnergyFunctional::dsoCamPoseToMetricImuPose(const Sim3 &TMetricDso, const SE3& T_dso_cam) {
+	// Where the IMU is in the metric world for the given camera pose(in DSO world).
+	// See "DM-VIO: Delayed Marginalization Visual-Inertial Odometry" not Dynamic paper
+	Mat44 m = TMetricDso.matrix() * T_dso_cam.matrix();
+	m.topLeftCorner<3,3>() /= TMetricDso.scale();
+	return SE3(m * TCamBase);
 //	Sim3 TdsoCamImu = Sim3(TBaseCam.inverse().matrix());
 //	TdsoCamImu.setScale(HWorld.TMetricDso.scale()); // Scale TBaseCam^-1 to DSO Frame.
 //	Sim3 expected = Sim3(HWorld.TMetricDso.matrix() * T_dso_cam.matrix() * TdsoCamImu.matrix() * HWorld.TDsoMetric.matrix());
@@ -1155,18 +1189,15 @@ struct JrWrapper {
 
 	[[clang::optnone]]
 	double computeHb(const Mat99 measurementWeights, const Vec6 biasWeights) {
-//		std::cerr << J.format(StdOutFmt) << "\n";
-//		std::cerr << r.transpose().format(StdOutFmt) << "\n";
 		assert(!measurementWeights.hasNaN());
 		assert(!biasWeights.hasNaN());
 		assert(!J.hasNaN());
 		assert(!r.hasNaN());
 		assert(!rBias.hasNaN());
-//		std::cerr << "J = " << J.format(MatlabFmt) << "\n";
-//		std::cerr << "r = " << r.format(MatlabFmt) << "\n";
+		//std::cout << "J = " << J.format(MatlabFmt) << "\n";
+		//std::cout << "r = " << r.format(MatlabFmt) << "\n";
 
-
-		// Scale J before computing H and b.
+//		 Scale J before computing H and b.
 		worldscale() *= SCALE_SCALE;
 		worldrot() *= SCALE_ORIENTATION;
 		biasA() *= SCALE_BIAS_ACC;
@@ -1184,14 +1215,16 @@ struct JrWrapper {
 		b = J.transpose() * measurementWeights * r;
 
 		// Accel and Gyro bias model random walk factors.  Bias errors vs bias params.
-		H.block<6,6>(4,4) += biasWeights.asDiagonal();
-		b.segment<6>(4) += biasWeights.asDiagonal() * rBias;
+//		H.block<6,6>(4,4) += biasWeights.asDiagonal();
+//		b.segment<6>(4) += biasWeights.asDiagonal() * rBias;
 
 		assert(!H.hasNaN());
 		assert(!b.hasNaN());
 
-		return (r.transpose() * measurementWeights * r + rBias.transpose() * biasWeights.asDiagonal() * rBias)[0];
-		//return (r.transpose() * measurementWeights * r)[0];
+		const double residualEnergy = (r.transpose() * measurementWeights * r)[0];
+		const double biasEnergy = (rBias.transpose() * biasWeights.asDiagonal() * rBias)[0];
+		//std::cout << "imuEnergy residualEnergy=" << residualEnergy << " biasEnergy=" << biasEnergy << "\n";
+		return residualEnergy;// + biasEnergy;
 	}
 
 	// Indexes in local H and b
@@ -1230,30 +1263,39 @@ std::ostream& operator<<(std::ostream& os, const JrWrapper& wrapper) {
 
 // WIP
 [[clang::optnone]]
-double EnergyFunctional::addImuFactors(const int frameIndex, MatXX &H, VecX &b) {
+double EnergyFunctional::addImuFactors(const Sim3 &TMetricDso, const int frameIndex, MatXX &H, VecX &b, const int iteration) {
 	const int i = frameIndex;
 	const int j = frameIndex+1;
 
 	const FrameHessian* const frameI = frames[i]->data;
 	const FrameHessian* const frameJ = frames[j]->data;
 
-	if (frames[i]->frameID != frames[j]->frameID -1) {
-		std::cerr << "Skipping IMU Factors for frames " << frames[i]->frameID << " and " << frameJ->frameID << "\n";
-		return 0;
+	// Return if I & J are not consecutive keyframes.
+	if (frameI->frameID + 1 != frameJ->frameID) {
+		if (iteration == 0) std::cout << "addImuFactors(): non-consecutive frames " << frameI->frameID << "->" << frameJ->frameID << "\n";
+		return 0.0f;
 	}
-	JrWrapper Jr;
 
 	const ImuIntegration& imuIJ = frameJ->imuIntegration;
 	const double dt = imuIJ.deltaTime;
+
+	if (dt > 0.5 || (frames[i]->frameID != frames[j]->frameID -1)) {
+		if (iteration == 0) std::cout << "addImuFactors() Skipping IMU Factors for frames " << frames[i]->frameID << " and " << frameJ->frameID << " dt=" << dt << "\n";
+		return 0;
+	}
+
+	if (iteration == 0) std::cout << "addImuFactors(): for Frames " << frameI->frameID << "->" << frameJ->frameID << " dt=" << dt << "\n";
+
+	JrWrapper Jr;
+
+
 	//std::cerr << std::setprecision (20) << "IMU Times:" << imuIJ.startTime << " " << dt << " count:" << imuIJ.measurementsCount << "\n";
 	//std::cerr << "IMU rotAcc:" << imuIJ.rotAcc.format(StdOutFmt) << "\n";
 	//std::cerr << "Velocity I:" << frameI->getVelocityScaled().transpose().format(StdOutFmt) << " J:" << frameJ->getVelocityScaled().transpose().format(StdOutFmt) << "\n";
 	//std::cerr << "IMU velAcc:" << imuIJ.velAcc.transpose().format(StdOutFmt) << "\n";
 	assert(dt > 0);
 
-	std::cout << "Frames " << frameI->frameID << "->" << frameJ->frameID << "\n";
-
-	const Vec3 deltaBa = HBias.get_value_minus_valueZero().segment<3>(0);;
+	const Vec3 deltaBa = HBias.get_value_minus_valueZero().segment<3>(0);
 	const Vec3 deltaBg = HBias.get_value_minus_valueZero().segment<3>(3);
 
 	// Where DSO's origin is relative to frameI's evaluation point.
@@ -1264,58 +1306,69 @@ double EnergyFunctional::addImuFactors(const int frameIndex, MatXX &H, VecX &b) 
 	const SE3& TDsoCamjEst = frameJ->PRE_TWorldCam;
 
 	// IMU/Base poses in Metric world.
-	const SE3 TBaseiEval = dsoCamPoseToMetricImuPose(TCamiDsoEval.inverse());
-	const SE3 TBasejEval = dsoCamPoseToMetricImuPose(TCamjDsoEval.inverse());
-	const SE3 TBaseiEst = dsoCamPoseToMetricImuPose(TDsoCamiEst);
-	const SE3 TBasejEst = dsoCamPoseToMetricImuPose(TDsoCamjEst);
+//	const SE3 TBaseiEval = dsoCamPoseToMetricImuPose(TCamiDsoEval.inverse());
+//	const SE3 TBasejEval = dsoCamPoseToMetricImuPose(TCamjDsoEval.inverse());
+	const SE3 TBaseiEst = dsoCamPoseToMetricImuPose(TMetricDso, TDsoCamiEst);
+	const SE3 TBasejEst = dsoCamPoseToMetricImuPose(TMetricDso, TDsoCamjEst);
 
 	const Mat33 RBaseiEstTranspose = TBaseiEst.rotationMatrix().transpose();
 
 	// Velocities are expressed in metric frame...
 	// Metric/IMU world, X+ is up, Z+ is forwards
-	const Vec3 veli = frameI->getVelocityScaled();
-	const Vec3 velj = frameJ->getVelocityScaled();
+	const Vec3 veli = frameI->PRE_velocity;
+	const Vec3 velj = frameJ->PRE_velocity;
 
 	// DSO's estimates in IMU/Base i's frame.
-	const Mat33 expectedRot = RBaseiEstTranspose * TBasejEst.rotationMatrix();
-	const Vec3 expectedVel = RBaseiEstTranspose * (velj - veli - Gravity * dt);
-	const Vec3 expectedTrn = RBaseiEstTranspose * (TBasejEst.translation() - TBaseiEst.translation() - veli * dt - Gravity*dt*dt/2);
+	const Mat33 estRotDelta = RBaseiEstTranspose * TBasejEst.rotationMatrix();
+	// TODO: Gravities perceived influence.
+	const Vec3 estVelDelta = RBaseiEstTranspose * (velj - veli - Gravity * dt);
+	const Vec3 estTrnDelta = RBaseiEstTranspose * (TBasejEst.translation() - TBaseiEst.translation() - veli * dt - Gravity*dt*dt/2);
 
-	std::cout << "TDsoCamiEst=...\n" << TDsoCamiEst.matrix().format(MatlabFmt);
-	std::cout << "TBaseiEst=...\n" << TBaseiEst.matrix().format(MatlabFmt);
-	std::cout << "TDsoCamjEst=...\n" << TDsoCamjEst.matrix().format(MatlabFmt);
-	std::cout << "TBasejEst=...\n" << TBasejEst.matrix().format(MatlabFmt);
-
-	std::cout << "veli=...\n" << veli.format(MatlabFmt);
-	std::cout << "velj=...\n" << velj.format(MatlabFmt);
-	std::cout << "Gravity=...\n" << Gravity.format(MatlabFmt);
+//	std::cout << "TDsoCamiEst=...\n" << TDsoCamiEst.matrix().format(MatlabFmt);
+//	std::cout << "TBaseiEst=...\n" << TBaseiEst.matrix().format(MatlabFmt);
+//	std::cout << "TDsoCamjEst=...\n" << TDsoCamjEst.matrix().format(MatlabFmt);
+//	std::cout << "TBasejEst=...\n" << TBasejEst.matrix().format(MatlabFmt);
+//
+//	std::cout << "veli=...\n" << veli.format(MatlabFmt);
+//	std::cout << "velj=...\n" << velj.format(MatlabFmt);
+//	std::cout << "Gravity=...\n" << Gravity.format(MatlabFmt);
 
 	// Compute Rotation, Velocity and Position residual errors for current imu measurement.
 	// From Forster, IMU Preintegration (37)
-	// The residuals are the DSO estimate vs the IMU measurement...
-	const Mat33 deltaRot = imuIJ.deltaRot * SO3::exp(imuIJ.jRotBg * deltaBg).matrix();
-	const Vec3 resRot = SO3(deltaRot.transpose() * expectedRot).log();
+	// The residuals are the DSO/model estimate vs the IMU measurement...  Expressed in the IMU's pose frame.
+	const Mat33 imuRotDelta = imuIJ.deltaRot;// * SO3::exp(imuIJ.jRotBg * deltaBg).matrix();
+	const Vec3 resRot = SO3(imuRotDelta.transpose() * estRotDelta).log();
 	assert(!resRot.hasNaN());
 
-	const Vec3 deltaVel = imuIJ.deltaVel + imuIJ.jVelBg * deltaBg + imuIJ.jVelBa * deltaBa;
-	const Vec3 resVel = expectedVel - deltaVel;
+	const Vec3 imuVelDelta = imuIJ.deltaVel;// + imuIJ.jVelBg * deltaBg + imuIJ.jVelBa * deltaBa;
+	const Vec3 resVel = estVelDelta - imuVelDelta;
 
-	const Vec3 deltaTrn = imuIJ.deltaTrn + imuIJ.jTrnBg * deltaBg + imuIJ.jTrnBa * deltaBa;
-	const Vec3 resTrn = expectedTrn - deltaTrn;
+//	std::cout << "Velocity: estVelDelta=" <<  estVelDelta.transpose().format(MatlabFmt);
+//	std::cout << "Velocity: imuVelDelta=" <<  imuVelDelta.transpose().format(MatlabFmt);
+
+	const Vec3 imuTrnDelta = imuIJ.deltaTrn;// + imuIJ.jTrnBg * deltaBg + imuIJ.jTrnBa * deltaBa;
+	const Vec3 resTrn = estTrnDelta - imuTrnDelta;
 
 	// Residuals
 	Jr.rTra() = resTrn;
 	Jr.rRot() = resRot;
 	Jr.rVel() = resVel;
 
-	std::cout << "expectedRot=...\n" << expectedRot.format(MatlabFmt);
-	std::cout << "Rimu=...\n" << deltaRot.format(MatlabFmt);
+	Vec9 estDelta; estDelta << estTrnDelta, SO3(estRotDelta).log(), estVelDelta;
+	Vec9 imuDelta; imuDelta << imuTrnDelta, SO3(imuRotDelta).log(), imuVelDelta;
+	std::cout << "SCALE" << iteration << ": estDelta=" << estDelta.transpose().format(MatlabFmt);
+	std::cout << "SCALE" << iteration << ": imuDelta=" << imuDelta.transpose().format(MatlabFmt);
+	std::cout << "SCALE" << iteration << ":        r=" << Jr.r.transpose().format(MatlabFmt);
+	//std::cout << "SCALE" << iteration << ":       r2=" << (Jr.r.transpose() * Jr.r).format(MatlabFmt);
 
-	std::cout << "expectedTrn=...\n" << expectedTrn.format(MatlabFmt);
-	std::cout << "deltaTrn=...\n" << deltaTrn.format(MatlabFmt);
-
-	std::cout << "expectedVel=...\n" << expectedVel.format(MatlabFmt);
-	std::cout << "deltaVel=...\n" << deltaVel.format(MatlabFmt);
+//	std::cout << "expectedRot=...\n" << expectedRot.format(MatlabFmt);
+//	std::cout << "Rimu=...\n" << deltaRot.format(MatlabFmt);
+//
+//	std::cout << "expectedTrn=...\n" << expectedTrn.format(MatlabFmt);
+//	std::cout << "deltaTrn=...\n" << deltaTrn.format(MatlabFmt);
+//
+//	std::cout << "expectedVel=...\n" << expectedVel.format(MatlabFmt);
+//	std::cout << "deltaVel=...\n" << deltaVel.format(MatlabFmt);
 
 	if (resVel.norm() > 1000000) {
 		std::cerr << imuIJ;
@@ -1324,24 +1377,25 @@ double EnergyFunctional::addImuFactors(const int frameIndex, MatXX &H, VecX &b) 
 
 	// Gyro and Accel residuals are just deltas from previous values.
 	// TODO Do they need something to keep them near 0.
-	Jr.rBiasA() = deltaBa;
-	Jr.rBiasG() = deltaBg;
+	Jr.rBiasA().setZero();// = deltaBa;
+	Jr.rBiasG().setZero();// = deltaBg;
+//	std::cout << "SCALE:     Bias=" << Jr.rBias.transpose().format(MatlabFmt);
 
 	assert(!Jr.J.hasNaN());
 	assert(!TBaseiEst.rotationMatrix().hasNaN());
 	assert(!TBasejEst.rotationMatrix().hasNaN());
 
 	// Position Jacobians. From Forster, IMU Preintegration supplement section 2.1
-	Jr.trnRoti() = SO3::hat(expectedTrn);
+	Jr.trnRoti() = SO3::hat(estTrnDelta);
 	Jr.trnTrni() = -Mat33::Identity();
 	Jr.trnVeli() = -RBaseiEstTranspose * dt;
-	Jr.trnTrnj() = expectedRot;
+	Jr.trnTrnj() = estRotDelta;
 	Jr.trnBiasa() = -imuIJ.jTrnBa;
 	Jr.trnBiasg() = -imuIJ.jTrnBg;
 	assert(!Jr.J.hasNaN());
 
 	// Velocity Jacobians. From Forster, IMU Preintegration supplement section 2.2
-	Jr.velRoti() = SO3::hat(expectedVel);
+	Jr.velRoti() = SO3::hat(estVelDelta);
 	Jr.velVeli() = -RBaseiEstTranspose;
 	Jr.velVelj() = RBaseiEstTranspose;
 	Jr.velBiasa() = -imuIJ.jVelBa;
@@ -1358,31 +1412,53 @@ double EnergyFunctional::addImuFactors(const int frameIndex, MatXX &H, VecX &b) 
 	assert(!Jr.J.hasNaN());
 
 	// Metric/DSO Transform...
-	// From Stumberg, dynamic Marginalization supplement.
-	Mat44 TMetricCamImuInverse = HWorld.TMetricCamImu.matrix().inverse();
-	Mat44 baseDso = TMetricCamImuInverse * HWorld.TMetricDso.matrix();
-	Mat77 AdjBaseDso = Sim3(baseDso).Adj();
+	// Stumberg, dynamic Marginalization supplement seems wrong.
+	// Similar to DM-VIO
+	Mat44 baseDso = TBaseCam;
+	baseDso.topLeftCorner<3,3>() *= TMetricDso.scale();
+	Mat44 baseCami = baseDso * TCamiDsoEval.matrix();
+	Mat44 baseCamj = baseDso * TCamjDsoEval.matrix();
 
-	Mat77 AdjBaseCami = Sim3(baseDso*TCamiDsoEval.matrix()).Adj();
-	Mat77 AdjBaseCamj = Sim3(baseDso*TCamjDsoEval.matrix()).Adj();
+	Mat77 AdjBaseCami = Sim3(baseCami).Adj();
+	Mat77 AdjBaseCamj = Sim3(baseCamj).Adj();
+
+	Mat77 AdjBaseDso = Sim3(baseDso).Adj();
+	Mat77 J_poseb_wdS_i = AdjBaseCami - AdjBaseDso;
+	Mat77 J_poseb_wdS_j = AdjBaseCamj - AdjBaseDso;
+
+	Mat77 J_poseb_wdR_i = Sim3(baseCami).Adj();
+	Mat77 J_poseb_wdR_j = Sim3(baseCamj).Adj();
+
+//	std::cout << "J_poseb_wdS_i=\n" << J_poseb_wdS_i.format(MatlabFmt);
+//	std::cout << "J_poseb_wdS_j=\n" << J_poseb_wdS_j.format(MatlabFmt);
+//	std::cout << "J_poseb_wdR_i=\n" << J_poseb_wdR_i.format(MatlabFmt);
+//	std::cout << "J_poseb_wdR_j=\n" << J_poseb_wdR_j.format(MatlabFmt);
+//	std::cout << "Jr.trnroti()=\n" << Jr.trnroti().format(MatlabFmt);
+//	std::cout << "Jr.trnrotj()=\n" << Jr.trnrotj().format(MatlabFmt);
 
 	// How the transform between the local IMU measurement frames and the Metric frame change WRT the Metric-DSO transform
-	Mat77 J_poseb_wd_i = AdjBaseCami - AdjBaseDso;
-	Mat77 J_poseb_wd_j = AdjBaseCamj - AdjBaseDso;
-	Mat97 JresWorld = Jr.trnroti() * J_poseb_wd_i.topLeftCorner<6,7>() + Jr.trnrotj() * J_poseb_wd_j.topLeftCorner<6,7>();
-//		// Only estimate the rotation and the scale.
-	Jr.worldscale() = JresWorld.col(6);
-//		Jr.worldrotA() = JresWorld.col(3);
-//		Jr.worldrotB() = JresWorld.col(4);
-	Jr.worldrot() = JresWorld.block<9,3>(0,3);
+	Jr.worldscale() = Jr.trnroti() * J_poseb_wdS_i.topRightCorner<6,1>() + Jr.trnrotj() * J_poseb_wdS_j.topRightCorner<6,1>();
+	std::cout << "SCALE" << iteration << ": Jr.worldscale()=" << Jr.worldscale().transpose().format(MatlabFmt);
 
-//		std::cout << "JresWorld=...\n" << JresWorld.format(MatlabFmt);
+//	Mat97 JresWorld = Jr.trnroti() * J_poseb_wdS_i.topLeftCorner<6,7>() + Jr.trnrotj() * J_poseb_wdS_j.topLeftCorner<6,7>();
+//	assert(Jr.worldscale().isApprox(JresWorld.col(6)));
+
+	Jr.worldrot() = Jr.trnroti() * J_poseb_wdR_i.block<6,3>(0,3) + Jr.trnrotj() * J_poseb_wdR_j.block<6,3>(0,3);
+//	JresWorld = Jr.trnroti() * J_poseb_wdR_i.topLeftCorner<6,7>() + Jr.trnrotj() * J_poseb_wdR_j.topLeftCorner<6,7>();
+//	Jr.worldrotA() = JresWorld.col(3);
+//	Jr.worldrotB() = JresWorld.col(4);
+//	Jr.worldrot() = JresWorld.block<9,3>(0,3);
+//	assert(Jr.worldrot().isApprox(JresWorld.block<9,3>(0,3)));
+
+
+//	std::cout << "Jr.worldscale=...\n" << Jr.worldscale().format(MatlabFmt);
+//	std::cout << "Jr.worldrot=...\n" << Jr.worldrot().format(MatlabFmt);
 //		std::cout << "Jtrnroti=...\n" << Jr.trnroti().format(MatlabFmt);
 //		std::cout << "J_poseb_wd_i=...\n" << J_poseb_wd_i.format(MatlabFmt);
 //		std::cout << "Jtrnrotj=...\n" << Jr.trnrotj().format(MatlabFmt);
 //		std::cout << "J_poseb_wd_j=...\n" << J_poseb_wd_j.format(MatlabFmt);
 
-// TODO: What happens to scaling here...
+// TODO: What happens to scaling. Should the DSO residuals be scaled by the Metric/DSO scale to keep the relative weights constant.
 	Mat66 Jreli = -1 * AdjBaseCami.block(0,0,6,6);
 	Mat66 Jrelj = -1 * AdjBaseCamj.block(0,0,6,6);
 //
@@ -1391,13 +1467,26 @@ double EnergyFunctional::addImuFactors(const int frameIndex, MatXX &H, VecX &b) 
 	// Express IMU rot & translation for i & j in DSO's world with right increments.
 	Jr.blockDsoi() *= Jreli * TCamiDsoEval.Adj().inverse();
 	Jr.blockDsoj() *= Jrelj * TCamjDsoEval.Adj().inverse();
+//	if (nFrames < setting_maxFrames) {
+//		// Using fixed IMU weight, too much influence over DSO poses when there aren't enough frames.
+//		Jr.blocki().setZero();
+//		Jr.blockj().setZero();
+//	}
 
-	std::cout << Jr;
-	std::cout << "biasCovariance=...\n" << imuIJ.biasCovariance.format(MatlabFmt);
+//	Jr.blockDsoi().setZero();
+//	Jr.blockDsoj().setZero();
+//	std::cout << Jr;
+//	std::cout << "biasCovariance=...\n" << imuIJ.biasCovariance.format(MatlabFmt);
 
-	Mat99 measurementWeights = imuWeightSquared * imuIJ.measurementCovariance.inverse();
-	Vec6 biasWeights = imuWeightSquared * imuIJ.biasCovariance.cwiseInverse();
-	std::cout << "biasH=...\n" << biasWeights.format(MatlabFmt);
+	Mat99 measurementWeights = imuIJ.measurementCovariance;//.diagonal().asDiagonal();
+	const double weight = imuWeightSquared; // * ((frames.size()-1) * (frames.size()-1) / (setting_maxFrames - 1));
+	if (iteration == 0) {
+		std::cout << "addImuFactors(): weight:" << weight << " Covariance = ...\n" << measurementWeights.format(MatlabFmt);
+		//std::cout << "addImuFactors(): BiasCovariance =\n" << imuIJ.biasCovariance.format(MatlabFmt);
+	}
+	measurementWeights = weight * measurementWeights.inverse();
+	Vec6 biasWeights = weight * imuIJ.biasCovariance.cwiseInverse();
+//	std::cout << "biasH=...\n" << biasWeights.format(MatlabFmt);
 	double energy = Jr.computeHb(measurementWeights, biasWeights);
 
 	// Accumulate IMU factors into DSO's H and b.
@@ -1435,10 +1524,10 @@ void EnergyFunctional::addPrior(MatXX &H, VecX &b) {
 	b.head<CPARS>() += cPrior.cwiseProduct(cDelta);
 
 	H.diagonal().segment<IWPARS>(CPARS) += wPrior;
-	//b.segment<IWPARS>(CPARS) += wPrior.cwiseProduct(wDelta);
+	b.segment<IWPARS>(CPARS) += wPrior.cwiseProduct(wDelta);
 
 	H.diagonal().segment<IBPARS>(CPARS + IWPARS) += bPrior;
-	//b.segment<IBPARS>(CPARS + IWPARS) += bPrior.cwiseProduct(bDelta);
+	b.segment<IBPARS>(CPARS + IWPARS) += bPrior.cwiseProduct(bDelta);
 
 	for(int h=0;h<frames.size();h++) {
 		H.diagonal().segment<11>(ICPARS+h*IFPARS) += frames[h]->prior;
@@ -1470,8 +1559,9 @@ void EnergyFunctional::makeIDX()
 
 void EnergyFunctional::getStitchedDeltaF(VecX &delta) {
 	if (delta.size() == ICPARS+nFrames*IFPARS) {
-		abort();
 		delta.head<CPARS>() = cDelta;
+		delta.segment<IWPARS>(CPARS) = wDelta;
+		delta.segment<IBPARS>(CPARS+IWPARS) = bDelta;
 		for (int h = 0; h < nFrames; h++)
 			delta.segment<IFPARS>(ICPARS + IFPARS * h) = frames[h]->delta;
 	} else {

@@ -147,10 +147,9 @@ public:
          * Calling:
          * Always called, negligible overhead if not used.
          */
-        virtual void publishKeyframes(std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib, MetricWorldHessian* HWorld) {}
+        virtual void publishKeyframes(std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib) {}
 
-
-
+		virtual void publishMetricDso(Sim3* metricDso) {}
 
 
         /* Usage:

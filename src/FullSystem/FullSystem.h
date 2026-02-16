@@ -166,8 +166,6 @@ public:
 private:
 	const SE3 TBaseCam;
 
-	const double imuWeight;
-
 	CalibHessian Hcalib;
 	MetricWorldHessian Hworld;
 	ImuBiasHessian Hbias;
@@ -316,8 +314,6 @@ private:
 	boost::thread mappingThread;
 	bool runMapping;
 	bool needToKetchupMapping;
-
-	int lastRefStopID;
 
     ImuIntegrator *imuIntegrator;
 };

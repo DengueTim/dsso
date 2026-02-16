@@ -219,5 +219,10 @@ struct AffLight
 const Eigen::IOFormat MatlabFmt(16, 0, ", ", "\n", "\t", ";", "[", "];\n");
 const Eigen::IOFormat StdOutFmt(16, 0, ",", "\n", "", "", "", "");
 
+inline std::ostream& operator<<(std::ostream& os, const VecIF& mat) {
+	os << mat.transpose().format(MatlabFmt);
+	return os;
+}
+
 }
 

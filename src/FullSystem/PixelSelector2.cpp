@@ -41,7 +41,6 @@ namespace dso
 PixelSelector::PixelSelector(int w, int h)
 {
 	randomPattern = new unsigned char[w*h];
-	std::srand(3141592);	// want to be deterministic.
 	for(int i=0;i<w*h;i++) randomPattern[i] = rand() & 0xFF;
 
 	currentPotential=3;

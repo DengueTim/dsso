@@ -77,9 +77,6 @@ public:
 	RawResidualJacobian* J;
 
 
-	bool isNew;
-
-
 	Eigen::Vector2f projectedTo[MAX_RES_PER_POINT];
 	Vec3f centerProjectedTo;
 
@@ -96,7 +93,7 @@ public:
 
 		setState(ResState::IN);
 	};
-	void applyRes( bool copyJacobians);
+	void applyRes();
 
 	void debugPlot();
 

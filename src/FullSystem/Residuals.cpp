@@ -68,8 +68,6 @@ PointFrameResidual::PointFrameResidual(PointHessian* point_, FrameHessian* host_
 	resetOOB();
 	J = new RawResidualJacobian();
 	assert(((long)J)%16==0);
-
-	isNew=true;
 }
 
 
@@ -304,24 +302,18 @@ void PointFrameResidual::debugPlot()
 
 
 
-void PointFrameResidual::applyRes(bool copyJacobians)
+void PointFrameResidual::applyRes()
 {
-	if(copyJacobians)
-	{
-		if(state_state == ResState::OOB)
-		{
-			assert(!efResidual->isActiveAndIsGoodNEW);
-			return;	// can never go back from OOB
-		}
-		if(state_NewState == ResState::IN)// && )
-		{
-			efResidual->isActiveAndIsGoodNEW=true;
-			efResidual->takeDataF();
-		}
-		else
-		{
-			efResidual->isActiveAndIsGoodNEW=false;
-		}
+	if(state_state == ResState::OOB) {
+		assert(!efResidual->isGood);
+		return;	// can never go back from OOB
+	}
+
+	if(state_NewState == ResState::IN) {
+		efResidual->isGood=true;
+		efResidual->takeDataF();
+	} else {
+		efResidual->isGood=false;
 	}
 
 	setState(state_NewState);

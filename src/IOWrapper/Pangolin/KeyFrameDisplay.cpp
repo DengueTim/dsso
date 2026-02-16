@@ -41,14 +41,14 @@
 namespace dso {
 namespace IOWrap {
 
-KeyFrameDisplay::KeyFrameDisplay(const Mat44f& TBaseCam) : TBaseCam(TBaseCam) {
+KeyFrameDisplay::KeyFrameDisplay() {
 	originalInputSparse = 0;
 	numSparseBufferSize = 0;
 	numSparsePoints = 0;
 
 	id = 0;
 	active = true;
-	TWorldCam = Mat44f::Identity();
+	TDsoCam = Mat44f::Identity();
 
 	needRefresh = true;
 
@@ -74,7 +74,7 @@ void KeyFrameDisplay::setFromF(FrameShell *frame, CalibHessian *HCalib) {
 	cxi = -cx / fx;
 	cyi = -cy / fy;
 
-	TWorldCam = frame->TWorldCam.matrix().cast<float>();
+	TDsoCam = frame->TWorldCam.matrix().cast<float>();
 	//std::cerr << "MetricDsoScale:" << HWorld->value(0) << "\nMetricDsoR:" << HWorld->TMetricDso.rotationMatrix().format(MatlabFmt) << "\n";
 
 	needRefresh = true;
@@ -153,9 +153,9 @@ void KeyFrameDisplay::setFromKF(FrameHessian *fh, CalibHessian *HCalib) {
 	}
 	assert(numSparsePoints <= npoints);
 
-	TWorldCam = fh->PRE_TWorldCam.matrix().cast<float>();
+	TDsoCam = fh->PRE_TWorldCam.matrix().cast<float>();
 
-	velocity = fh->getVelocityScaled().cast<float>();
+	velocity = fh->PRE_velocity.cast<float>();
 //	std::cerr << "velocity:" << velocity.transpose().format(StdOutFmt) << "\n";
 	imuIntegration = fh->imuIntegration;
 	needRefresh = true;
@@ -300,10 +300,6 @@ void KeyFrameDisplay::drawCam(float lineWidth, float *color, float sizeFactor) {
 
 	float sz = sizeFactor;
 
-	glPushMatrix();
-
-	glMultMatrixf((GLfloat *)TWorldCam.data());
-
 	if (color == 0) {
 		glColor3f(1, 0, 0);
 	} else
@@ -345,7 +341,6 @@ void KeyFrameDisplay::drawCam(float lineWidth, float *color, float sizeFactor) {
 	glVertex3f(0, 0, 0.01);
 
 	glEnd();
-	glPopMatrix();
 }
 
 void KeyFrameDisplay::drawPC(float pointSize) {
@@ -354,10 +349,6 @@ void KeyFrameDisplay::drawPC(float pointSize) {
 		return;
 
 	glDisable(GL_LIGHTING);
-
-	glPushMatrix();
-
-	glMultMatrixf((GLfloat *)TWorldCam.data());
 
 	glPointSize(pointSize);
 
@@ -374,37 +365,27 @@ void KeyFrameDisplay::drawPC(float pointSize) {
 
 	glDisableClientState(GL_COLOR_ARRAY);
 	colorBuffer.Unbind();
-
-	glPopMatrix();
 }
 
 void KeyFrameDisplay::drawImuIntegration() {
-	const float axisFactor = 0.005;
-
-	glPushMatrix();
-
-	Sophus::Matrix4f m = TWorldCam * TBaseCam.inverse();
-	glMultMatrixf((GLfloat *)m.data());
-
 	glLineWidth(0.1);
 
 	glBegin(GL_LINES);
 	glColor3f(0, 1, 0);
 	glVertex3f(0, 0, 0);
-	glVertex3f(0, axisFactor, 0);
+	glVertex3f(0, gravityScale, 0);
 
 	glColor3f(1, 0, 0);
 	glVertex3f(0, 0, 0);
-	glVertex3f(axisFactor, 0, 0);
+	glVertex3f(gravityScale, 0, 0);
 
 	glColor3f(0, 0, 1);
 	glVertex3f(0, 0, 0);
-	glVertex3f(0, 0, axisFactor);
-
+	glVertex3f(0, 0, gravityScale);
 
 	if (imuIntegration.deltaTime > 0) {
 		//std::cerr << "deltaTime:" << imuIntegration.deltaTime << "\n";
-		Vec3 v = 0.005 * imuIntegration.linAccAcc / imuIntegration.measurementsCount;
+		Vec3 acc = gravityScale * imuIntegration.linAccAcc / imuIntegration.measurementsCount;
 		//Vec3 v = 0.1 * imuIntegration.rotRateAcc / imuIntegration.measurementsCount;
 		//Vec3 v = 20 * SO3::vee(imuIntegration.rotAcc) / imuIntegration.measurementsCount;
 		//Vec3 v = imuIntegration.deltaVel / imuIntegration.measurementsCount;
@@ -412,33 +393,56 @@ void KeyFrameDisplay::drawImuIntegration() {
 
 		glColor3f(0, 1, 1);
 		glVertex3f(0, 0, 0);
-		glVertex3f(v[0], v[1], v[2]);
-
-		//v = 0.1 * imuIntegration.rotRateAcc / imuIntegration.measurementsCount;
-		//v = 0.005 * imuIntegration.linAccAcc / imuIntegration.measurementsCount;
-
-
-//		glColor3f(1, 1, 0);
-//		glVertex3f(0, 0, 0);
-//		glVertex3f(v[0], v[1], v[2]);
-//		glEnd();
-//		glPopMatrix();
-//
-//		// Velocity is orientated in the Metric frame at the IMU.
-//		glPushMatrix();
-//		m.topLeftCorner<3,3>().setIdentity();
-//		glMultMatrixf((GLfloat *)m.data());
-//		glBegin(GL_LINES);
-//		Vec3f vel = velocity * 0.02;
-//		glColor3f(1, 0, 1);
-//		glVertex3f(0, 0, 0);
-//		glVertex3f(vel[0], vel[1], vel[2]);
+		glVertex3f(acc[0], acc[1], acc[2]);
 	}
 
 	glEnd();
+}
 
-	glPopMatrix();
+void KeyFrameDisplay::drawVelocity() {
+//	glPushMatrix();
+//
+//	// Velocities are in Metric World frame
+//	Sophus::Matrix4f m;
+//	m.setIdentity();
+//	m.topRightCorner<3,1>() = (TWorldCam * TBaseCam.inverse()).topRightCorner<3,1>();
+//	glMultMatrixf((GLfloat *)m.data());
 
+//	glLineWidth(0.1);
+//
+//	glBegin(GL_LINES);
+//	glColor3f(0, 1, 0);
+//	glVertex3f(0, 0, 0);
+//	glVertex3f(0, gravityScale, 0);
+//
+//	glColor3f(1, 0, 0);
+//	glVertex3f(0, 0, 0);
+//	glVertex3f(gravityScale, 0, 0);
+//
+//	glColor3f(0, 0, 1);
+//	glVertex3f(0, 0, 0);
+//	glVertex3f(0, 0, gravityScale);
+//	glEnd();
+
+	glLineWidth(7);
+	glBegin(GL_LINES);
+
+	Vec3f v = velocity * 0.02;
+	glColor3f(1, 0, 1);
+	glVertex3f(0, 0, 0);
+	glVertex3f(v[0], v[1], v[2]);
+
+	glColor3f(0.5, 0, 0.5);
+	glVertex3f(0, 0, 0);
+	glVertex3f(-v[0], -v[1], -v[2]);
+
+	glColor3f(0.0,0.4,0.4);
+	glVertex3f(0,0,0);
+	Vec3 g = Gravity * KeyFrameDisplay::gravityScale;
+	glVertex3f(g[0], g[1], g[2]);
+
+	glEnd();
+//	glPopMatrix();
 }
 
 }

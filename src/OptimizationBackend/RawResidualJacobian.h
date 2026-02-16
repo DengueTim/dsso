@@ -45,10 +45,10 @@ struct RawResidualJacobian
 	Vec2f Jpdd;				// 2x1
 
 	// the two columns of d[r]/d[x,y].
-	VecNRf JIdx[2];			// 9x2
+	VecNRf JIdx[2];			// 8x2
 
 	// = the two columns of d[r] / d[ab]
-	VecNRf JabF[2];			// 9x2
+	VecNRf JabF[2];			// 8x2
 
 
 	// = JIdx^T * JIdx (inner product). Only as a shorthand.

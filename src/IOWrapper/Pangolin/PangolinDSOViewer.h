@@ -68,7 +68,8 @@ public:
 
 	// ==================== Output3DWrapper Functionality ======================
     virtual void publishGraph(const std::map<uint64_t, Eigen::Vector2i, std::less<uint64_t>, Eigen::aligned_allocator<std::pair<const uint64_t, Eigen::Vector2i>>> &connectivity) override;
-    virtual void publishKeyframes( std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib, MetricWorldHessian* HWorld) override;
+    virtual void publishKeyframes(std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib) override;
+	virtual void publishMetricDso(Sim3* metricDso) override;
     virtual void publishCamPose(FrameShell* frame, CalibHessian* HCalib) override;
 
 
@@ -92,8 +93,8 @@ private:
 	bool running;
 	const int w,h;
 	const Mat44f TBaseCam;
+	Mat44f lastTMetricDso;
 	float lastTMetricDsoScale;
-	Mat44f lastTMetricDsoRotation;
 
 
 

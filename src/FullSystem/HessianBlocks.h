@@ -127,11 +127,6 @@ struct FrameHessian
 	Eigen::Vector3f* dIp[PYR_LEVELS];	 // coarse tracking / coarse initializer. NAN in [0] only.
 	float* absSquaredGrad[PYR_LEVELS];  // only used for pixel select (histograms etc.). no NAN.
 
-
-
-
-
-
 	int frameID;						// incremental ID for keyframes only!
 	static int instanceCounter;
 	int idx;
@@ -147,13 +142,13 @@ struct FrameHessian
 	std::vector<PointHessian*> pointHessiansOut;		// contains all OUTLIER points (= discarded.).
 	std::vector<ImmaturePoint*> immaturePoints;		// contains all OUTLIER points (= discarded.).
 
-
 	Mat66 nullspaces_pose;
 	Mat42 nullspaces_affine;
 	Vec6 nullspaces_scale;
 
 	// variable info.
-	SE3 worldToCam_evalPT;
+	SE3 TCamWorld_evalPT;
+	Vec3 velocity_evalPT;
 	VecIF state_zero;
 	// Confusingly(to non-mathematicians) the "scaled state" is the real world. The "state" is the estimate in the optimiser.
 	VecIF state_scaled;
@@ -162,16 +157,15 @@ struct FrameHessian
 	VecIF step_backup;
 	VecIF state_backup;
 
-
-    EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return worldToCam_evalPT;}
+    EIGEN_STRONG_INLINE const SE3 &get_worldToCam_evalPT() const {return TCamWorld_evalPT;}
     EIGEN_STRONG_INLINE const VecIF &get_state() const {return state;}
     EIGEN_STRONG_INLINE const VecIF &get_state_scaled() const {return state_scaled;}
     EIGEN_STRONG_INLINE const VecIF get_state_minus_stateZero() const {return state - state_zero;}
 
-
 	// precalc values
-	SE3 PRE_worldToCam;
+	SE3 PRE_TCamWorld;
 	SE3 PRE_TWorldCam;
+	Vec3 PRE_velocity;
 	std::vector<FrameFramePrecalc,Eigen::aligned_allocator<FrameFramePrecalc>> targetPrecalc;
 	MinimalImageB3* debugImage;
 
@@ -180,13 +174,6 @@ struct FrameHessian
     inline Vec6 w2c_leftEps() const {return state_scaled.head<6>();}
     inline AffLight aff_g2l() const {return AffLight(state_scaled[9], state_scaled[10]);}
     inline AffLight aff_g2l_0() const {return AffLight(state_zero[9]*SCALE_A, state_zero[10]*SCALE_B);}
-
-	inline Vec3 getVelocityScaled() const {return state_scaled.segment<3>(6);}
-	inline void setVelocityScaled(const Vec3 &velocityScaled) {
-		state_scaled.segment<3>(6) = velocityScaled;
-		state.segment<3>(6) = velocityScaled / SCALE_VELOCITY;
-		std::cerr << "velocityScaled" << idx << "=" << velocityScaled.transpose().format(MatlabFmt) << "\n";
-	}
 
 	inline void setState(const VecIF &newState)
 	{
@@ -197,12 +184,13 @@ struct FrameHessian
 		state_scaled[9] = SCALE_A * state[9];
 		state_scaled[10] = SCALE_B * state[10];
 
-		PRE_worldToCam = SE3::exp(state_scaled.head<6>()) * worldToCam_evalPT;
-		PRE_TWorldCam = PRE_worldToCam.inverse();
+		PRE_TCamWorld = SE3::exp(state_scaled.head<6>()) * TCamWorld_evalPT;
+		PRE_TWorldCam = PRE_TCamWorld.inverse();
+		PRE_velocity = state_scaled.segment<3>(6) + velocity_evalPT;
 		//setCurrentNullspace();
 	};
 
-	//void setEvalPTAndStateZero(const SE3 &worldToCam_evalPT, const AffLight &aff_g2l_scaled);
+	//void setEvalPTAndStateZero(const SE3 &TCamWorld_evalPT, const AffLight &aff_g2l_scaled);
 	void setEvalPTAndStateZero(const bool fromShell);
 
 	void release();
@@ -274,15 +262,16 @@ struct FrameHessian
 	{
 		return VecIF::Zero();
 	}
-
 };
+std::ostream& operator<<(std::ostream& os, const FrameHessian& frameHessian);
+
 
 struct CalibHessian
 {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 	static int instanceCounter;
 
-	VecC value_zero; // Value from config. Doesn't change.
+	VecC value_zero; // Value from config. Doesn't change. EvalPT?
 	VecC value_scaled;
 	VecCf value_scaledf;
 	VecCf value_scaledi;
@@ -470,6 +459,8 @@ struct PointHessian
 
 };
 
+#define INITIAL_WORLD_SCALE 0.5f // 0.111f
+#define MIN_WORLD_SCALE 0.001f
 // Not really Hessians, more like state.
 struct MetricWorldHessian {
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -484,13 +475,13 @@ struct MetricWorldHessian {
 	Sim3 TMetricDso;
 	Sim3 TDsoMetric;
 
-	// inv(TBaseCam) in the Metric frame(adjusted for the camera's orientation in the Metric frame).
-	SE3 TMetricCamImu;
+	// inv(TBaseCam) in the Metric frame(adjusted for the camera's orientation in the Metric frame). Static.
+	//SE3 TMetricCamImu;
 
 	inline MetricWorldHessian()
 	{
 		VecIW initial_value = VecIW::Zero();
-		initial_value[0] = 1.0f; // initial scale.
+		initial_value[0] = INITIAL_WORLD_SCALE;
 
 		setValueScaled(initial_value);
 		value_zero = value;
@@ -519,10 +510,9 @@ struct MetricWorldHessian {
 		updateTransform();
 	}
 
-	inline void setScaleAndRotation(const SO3 &RMetricDso, const double scale = 1) {
+	inline void setScaleAndRotation(const SO3 &RMetricDso, const double scale = INITIAL_WORLD_SCALE) {
 		SO3::Tangent tangent = RMetricDso.log();
 		setValueScaled(VecIW(scale, tangent(0), tangent(1), tangent(2)));
-		value_zero = value;
 	}
 
 	inline void updateEvalPt() {
@@ -535,10 +525,11 @@ private:
 	[[clang::optnone]]
 	inline void updateTransform() {
 		// Current estimate of transform from metric world to DSO world.
-		if (value_scaled(0) <= 0.1) {
-			assert(value_scaled(0) > 0.1);
+		if (value_scaled(0) <= MIN_WORLD_SCALE) {
+			assert(value_scaled(0) > MIN_WORLD_SCALE);
 		}
-		TMetricDso = Sim3::exp(Vec7(0,0,0,value_scaled(1),value_scaled(2),value_scaled(3),log(value_scaled(0))));
+		//TMetricDso = Sim3::exp(Vec7(0,0,0,value_scaled(1),value_scaled(2),value_scaled(3),log(value_scaled(0))));
+		TMetricDso = Sim3::exp(Vec7(0,0,0,value_scaled(1),0,value_scaled(3),log(value_scaled(0))));
 		TDsoMetric = TMetricDso.inverse();
 		//const Sim3 TMetricDso = Sim3::exp(Vec7(0,0,0,0.0,0.0,0,0));
 //		std::cerr << "value_scaled:" << value_scaled.format(MatlabFmt) << "\n";

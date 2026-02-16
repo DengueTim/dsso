@@ -55,15 +55,15 @@ void AccumulatedTopHessianSSE::addPoint(EFPoint* p, EnergyFunctional const * con
 	{
 		if(mode==0) // Active. Used in EnergyFunctional::solveSystemF
 		{
-			if(r->isLinearized || !r->isActive()) continue;
+			if(r->isLinearized || !r->isGood) continue;
 		}
 		if(mode==1) // Linearized(and active). Used in EnergyFunctional::solveSystemF
 		{
-			if(!r->isLinearized || !r->isActive()) continue;
+			if(!r->isLinearized || !r->isGood) continue;
 		}
 		if(mode==2) // Marginalized... Used in EnergyFunctional::marginalizePointsF
  		{
-			if(!r->isActive()) continue;
+			if(!r->isGood) continue;
 			assert(r->isLinearized);
 		}
 
@@ -174,15 +174,12 @@ void AccumulatedTopHessianSSE::stitchDouble(MatXX &H, VecX &b, EnergyFunctional 
 	H = MatXX::Zero(nframes[tid]*8+CPARS, nframes[tid]*8+CPARS);
 	b = VecX::Zero(nframes[tid]*8+CPARS);
 
-
 	for(int h=0;h<nframes[tid];h++)
 		for(int t=0;t<nframes[tid];t++)
 		{
 			int hIdx = CPARS+h*8;
 			int tIdx = CPARS+t*8;
 			int aidx = h+nframes[tid]*t;
-
-
 
 			acc[tid][aidx].finish();
 			if(acc[tid][aidx].num==0) continue;

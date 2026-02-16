@@ -68,7 +68,7 @@ class KeyFrameDisplay
 
 public:
 	EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
-	KeyFrameDisplay(const Mat44f& TBaseCam);
+	KeyFrameDisplay();
 	~KeyFrameDisplay();
 
 	// copies points from KF over to internal buffer,
@@ -86,10 +86,11 @@ public:
 	void drawCam(float lineWidth = 1, float* color = 0, float sizeFactor=1);
 	void drawPC(float pointSize);
 	void drawImuIntegration();
+	void drawVelocity();
 
 	int id;
 	bool active;
-	Mat44f TWorldCam; // Camare's pose in Metric World
+	Mat44f TDsoCam; // Camare's pose in Dso World
 	Vec3f velocity;
 
     inline bool operator < (const KeyFrameDisplay& other) const
@@ -97,10 +98,9 @@ public:
         return (id < other.id);
     }
 
+	constexpr const static float gravityScale = 0.002;
 
 private:
-	const Mat44f TBaseCam;
-
 	float fx,fy,cx,cy;
 	float fxi,fyi,cxi,cyi;
 	int width, height;

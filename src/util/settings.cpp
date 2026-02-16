@@ -45,16 +45,19 @@ float setting_maxAffineWeight= 2;
  */
 float setting_idepthFixPrior = 50*50;
 float setting_idepthFixPriorMargFac = 600*600;
+
+// Used to "anchor" the first frame in FrameHessian.getPrior() and ultimatly EFFrame.prior
 float setting_initialRotPrior = 1e11;
 float setting_initialTransPrior = 1e10;
-float setting_initialVelPrior = 1e10;
+float setting_initialVelPrior = 1e1; // Where do these numbers come from?!
 float setting_initialAffBPrior = 1e14;
 float setting_initialAffAPrior = 1e14;
-float setting_initialCalibHessian = 5e9;
-float setting_initialScaleHessian = 5e4;
-float setting_initialDirABHessian = 5e5;
-float setting_initialBiasAccHessian = 1e0;
-float setting_initialBiasGyroHessian = 1e0;
+
+float setting_initialCalibHessian = 5e9; // EF.cPrior
+float setting_initialScaleHessian = 1e4; //1e3; // EF.wPrior
+float setting_initialDirABHessian = 1e5; //5e4; // EF.wPrior
+float setting_initialBiasAccHessian = 1e2; // EF.bPrior
+float setting_initialBiasGyroHessian = 1e2; // EF.bPrior
 
 
 
@@ -194,12 +197,7 @@ bool multiThreading = true;
 bool disableAllDisplay = false;
 bool setting_onlyLogKFPoses = true;
 bool setting_logStuff = true;
-
-
-
-bool goStepByStep = false; // Doesn't work on mac. UI on main thread issue.
-
-
+bool setting_wait_key_each_frame = false;
 bool setting_render_displayCoarseTrackingFull=false;
 bool setting_render_renderWindowFrames=true;
 bool setting_render_plotTrackingFull = false;

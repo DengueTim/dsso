@@ -134,6 +134,7 @@ extern float setting_huberTH;
 
 
 extern bool setting_logStuff;
+extern bool setting_wait_key_each_frame;
 extern float benchmarkSetting_fxfyfac;
 extern int benchmarkSetting_width;
 extern int benchmarkSetting_height;
@@ -189,7 +190,6 @@ extern bool debugSaveImages;
 
 
 extern int sparsityFactor;
-extern bool goStepByStep;
 extern bool plotStereoImages;
 extern bool multiThreading;
 

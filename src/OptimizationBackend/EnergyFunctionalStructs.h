@@ -44,10 +44,6 @@ class EFFrame;
 class EnergyFunctional;
 
 
-
-
-
-
 class EFResidual
 {
 public:
@@ -57,7 +53,7 @@ public:
 		data(org), point(point_), host(host_), target(target_)
 	{
 		isLinearized=false;
-		isActiveAndIsGoodNEW=false;
+		isGood=false;
 		J = new RawResidualJacobian();
 		assert(((long)this)%16==0);
 		assert(((long)J)%16==0);
@@ -92,8 +88,7 @@ public:
 	bool isLinearized;
 
 	// if residual is not OOB & not OUTLIER & should be used during accumulations
-	bool isActiveAndIsGoodNEW;
-	inline const bool &isActive() const {return isActiveAndIsGoodNEW;}
+	bool isGood;
 };
 
 
@@ -111,8 +106,6 @@ public:
 	void takeData();
 
 	PointHessian* data;
-
-
 
 	float priorF;
 	float deltaF;
@@ -133,7 +126,6 @@ public:
 	float Hdd_accAF;
 	VecCf Hcd_accAF;
 	float bd_accAF;
-
 
 	EFPointStatus stateFlag;
 };

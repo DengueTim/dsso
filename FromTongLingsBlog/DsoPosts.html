@@ -23,7 +23,7 @@
 <!--    </script>-->
 </head>
 <body>
-    <h2>Copied from <a href="https://tongling916.github.io/tags/DsoPosts.html">Tong Ling's DSO blog posts</a></h2>
+    <h2>Copied from <a href="https://tongling916.github.io/tags/#DSO">Tong Ling's DSO blog posts</a></h2>
 
     <h1>DSO-AccumulatedTopHessianSSE</h1>
     <div class="
@@ -44,9 +44,9 @@
         <ul>
             <li>This function has three modes
                 <ul>
-                    <li><code class="language-plaintext highlighter-rouge">active: mode = 0</code></li>
-                    <li><code class="language-plaintext highlighter-rouge">marginalize: mode = 2</code></li>
-                    <li><code class="language-plaintext highlighter-rouge">linearize (mode = 1)</code>: NOT USED, because there are NEVER linearized and active points available.</li>
+                    <li><code class="language-plaintext highlighter-rouge">active: mode = 0</code> Used for optimiser H top accumulation of Active point contrib.</li>
+                    <li><code class="language-plaintext highlighter-rouge">linearize mode = 1</code>  Used for optimiser H top accumulation of Linearised point contrib.</li>
+                    <li><code class="language-plaintext highlighter-rouge">marginalize: mode = 2</code> Used in marginalizePointsF(), point contribution to marginalisation terms.</li>
                 </ul>
             </li>
         </ul>
@@ -471,7 +471,7 @@
             <tr>
                 <td><code class="language-plaintext highlighter-rouge">JpJdF</code></td>
                 <td>\(\begin{bmatrix} (\frac{\partial r_{ji}}{\partial \boldsymbol{\xi}_{ji}})^T\frac{\partial r_{ji}}{\partial \rho_{i}} \\ (\frac{\partial r_{ji}}{\partial \begin{bmatrix} -e^{a_{ji}} \\ -b_{ji}\end{bmatrix}})^{T}\frac{\partial r_{ji}}{\partial \rho_{i}} \end{bmatrix}\)</td>
-                <td> </td>
+                <td>Pose/AB WRT Point Depth(inverse)</td>
             </tr>
             </tbody>
         </table>

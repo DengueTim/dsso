@@ -58,23 +58,20 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 
 		if(fixLinearization)
 		{
-			r->applyRes(true);
+			r->applyRes();
 
-			if(r->efResidual->isActive())
+			if(r->efResidual->isGood)
 			{
-				if(r->isNew)
-				{
-					PointHessian* p = r->point;
-					Vec3f ptp_inf = r->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u,p->v, 1);	// projected point assuming infinite depth.
-					Vec3f ptp = ptp_inf + r->host->targetPrecalc[r->target->idx].PRE_KtTll*p->idepth_scaled;	// projected point with real depth.
-					float relBS = 0.01*((ptp_inf.head<2>() / ptp_inf[2])-(ptp.head<2>() / ptp[2])).norm();	// 0.01 = one pixel.
+				PointHessian* p = r->point;
+				Vec3f ptp_inf = r->host->targetPrecalc[r->target->idx].PRE_KRKiTll * Vec3f(p->u,p->v, 1);	// projected point assuming infinite depth.
+				Vec3f ptp = ptp_inf + r->host->targetPrecalc[r->target->idx].PRE_KtTll*p->idepth_scaled;	// projected point with real depth.
+				float relBS = 0.01*((ptp_inf.head<2>() / ptp_inf[2])-(ptp.head<2>() / ptp[2])).norm();	// 0.01 = one pixel.
 
 
-					if(relBS > p->maxRelBaseline)
-						p->maxRelBaseline = relBS;
+				if(relBS > p->maxRelBaseline)
+					p->maxRelBaseline = relBS;
 
-					p->numGoodResiduals++;
-				}
+				p->numGoodResiduals++;
 			}
 			else
 			{
@@ -88,7 +85,7 @@ void FullSystem::linearizeAll_Reductor(bool fixLinearization, std::vector<PointF
 void FullSystem::applyRes_Reductor(bool copyJacobians, int min, int max, Vec10* stats, int tid)
 {
 	for(int k=min;k<max;k++)
-		activeResiduals[k]->applyRes(true);
+		activeResiduals[k]->applyRes();
 }
 void FullSystem::setNewFrameEnergyTH()
 {
@@ -202,7 +199,7 @@ Vec3 FullSystem::linearizeAll(bool fixLinearization)
 					}
 			}
 		}
-		//printf("FINAL LINEARIZATION: removed %d / %d residuals!\n", nResRemoved, (int)activeResiduals.size());
+		printf("FINAL LINEARIZATION: removed %d / %d residuals!\n", nResRemoved, (int)activeResiduals.size());
 
 	}
 
@@ -262,15 +259,20 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 	}
 	else
 	{
+		assert(Hcalib.value == Hcalib.value_backup);
 		Hcalib.setValue(Hcalib.value_backup + stepfacC*Hcalib.step);
-//		Vec3 w = Hworld.value_backup;
-//		w(1) += stepfacC*Hworld.step(1);
-//		w(2) += stepfacC*Hworld.step(2);
-//		Hworld.setValue(w);
-		Hworld.setValue(Hworld.value_backup + stepfacC*Hworld.step);
+		Vec4 w = Hworld.value_backup;
+//		w(0) *= exp(stepfacC*Hworld.step(0)); // Like ORB-SLAM3 eq. (10)
+		w(0) += stepfacC*Hworld.step(0);
+		w(1) += stepfacC*Hworld.step(1);
+		w(2) += stepfacC*Hworld.step(2);
+		w(3) += stepfacC*Hworld.step(3);
+		Hworld.setValue(w);
+		//Hworld.setValue(Hworld.value_backup + stepfacC*Hworld.step);
 		Hbias.setValue(Hbias.value_backup + stepfacC*Hbias.step);
 		for(FrameHessian* fh : frameHessians)
 		{
+			assert(fh->state == fh->state_backup);
 			fh->setState(fh->state_backup + pstepfac.cwiseProduct(fh->step));
 			sumA += fh->step[9]*fh->step[9];
 			sumB += fh->step[10]*fh->step[10];
@@ -280,11 +282,13 @@ bool FullSystem::doStepFromBackup(float stepfacC,float stepfacT,float stepfacR,f
 
 			for(PointHessian* ph : fh->pointHessians)
 			{
+				assert(ph->idepth == ph->idepth_backup);
 				ph->setIdepth(ph->idepth_backup + stepfacD*ph->step);
 				sumID += ph->step*ph->step;
 				sumNID += fabsf(ph->idepth_backup);
 				numID++;
 
+				assert(ph->idepth_zero == ph->idepth_backup);
                 ph->setIdepthZero(ph->idepth_backup + stepfacD*ph->step);
 			}
 		}
@@ -478,9 +482,6 @@ float FullSystem::optimize(int mnumOptIts)
 	double lastEnergyM = calcMEnergy();
 
 
-
-
-
 	if(multiThreading)
 		treadReduce.reduce(boost::bind(&FullSystem::applyRes_Reductor, this, true, _1, _2, _3, _4), 0, activeResiduals.size(), 50);
 	else
@@ -495,7 +496,11 @@ float FullSystem::optimize(int mnumOptIts)
 
 	debugPlotTracking();
 
+	std::cout << "optimize() PRE\n    Hworld:" << Hworld << "    HBias:" << Hbias;
 
+	for(FrameHessian* fh : frameHessians) {
+		std::cout << "    Frame" << fh->frameID << ":" << *fh;
+	}
 
 	double lambda = 1e-1;
 	float stepsize=1;
@@ -577,14 +582,17 @@ float FullSystem::optimize(int mnumOptIts)
 	}
 
 	frameHessians.back()->setEvalPTAndStateZero(false);
-	Hworld.updateEvalPt();
+	//Hworld.updateEvalPt();
 	EFDeltaValid=false;
 	EFAdjointsValid=false;
 	ef->setAdjointsF();
 	setPrecalcValues();
 
-	std::cout << "Hworld:" << Hworld;
-	std::cout << " HBias:" << Hbias;
+	std::cout << "optimize() POST\n    Hworld:" << Hworld << "    HBias:" << Hbias;
+
+	for(FrameHessian* fh : frameHessians) {
+		std::cout << "    Frame" << fh->frameID << ":" << *fh;
+	}
 
 	lastEnergy = linearizeAll(true);
 
@@ -601,18 +609,17 @@ float FullSystem::optimize(int mnumOptIts)
 	{
 		(*calibLog) << Hcalib.value_scaled.transpose() <<
 				" " << frameHessians.back()->get_state_scaled().transpose() <<
-				" " << sqrtf((float)(lastEnergy[0] / (patternNum*ef->resInA))) <<
+				" " << statistics_lastFineTrackRMSE <<
 				" " << ef->resInM << "\n";
 		calibLog->flush();
 	}
 
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
-		for(FrameHessian* fh : frameHessians)
-		{
+		for(FrameHessian* fh : frameHessians) {
 			fh->shell->TWorldCam = fh->PRE_TWorldCam;
 			fh->shell->aff_g2l = fh->aff_g2l();
-			fh->shell->velocity = fh->getVelocityScaled();
+			fh->shell->velocity = fh->PRE_velocity;
 		}
 	}
 
@@ -621,8 +628,15 @@ float FullSystem::optimize(int mnumOptIts)
 
 	debugPlotTracking();
 
-	return sqrtf((float)(lastEnergy[0] / (patternNum*ef->resInA)));
+	int nAllRes = 0;
+	for (EFFrame *f : ef->frames) {
+		for (EFPoint *p : f->points) {
+			nAllRes += p->residualsAll.size();
+		}
+	}
 
+	std::cout << "optimize() PtEnergy=" << lastEnergy[0] << " IMU=" << ef->lastImuEnergy << " resInA=" << ef->resInA << " rmse=" << statistics_lastFineTrackRMSE << " allPointSize=" << ef->allPoints.size() << " nResiduals=" << ef->nResiduals << " nResidualsInserts/Drops=" << ef->nResidualsInserts << "/" << ef->nResidualsDrops << " activeResiduals=" << activeResiduals.size() << "\n";
+	return statistics_lastFineTrackRMSE;
 }
 
 

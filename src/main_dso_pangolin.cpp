@@ -58,7 +58,7 @@ std::string source = "";
 std::string calib = "";
 std::string imuCalib = "";
 std::string imuData = "";
-double imuWeight = 6; // Set to 3 or 6 in VI-Stereo-DSO
+double efImuWeight = 0.01f; // Set to 3 or 6 in VI-Stereo-DSO
 double rescale = 1;
 bool reverse = false;
 bool disableROS = false;
@@ -152,7 +152,7 @@ void settingsDefault(int preset)
 
 
 
-
+[[clang::optnone]]
 void parseArgument(char* arg)
 {
 	int option;
@@ -216,6 +216,16 @@ void parseArgument(char* arg)
 		{
 			setting_logStuff = false;
 			printf("DISABLE LOGGING!\n");
+		} else {
+			setting_logStuff = true;
+			printf("ENABLE LOGGING!\n");
+		}
+		return;
+	}
+	if(1==sscanf(arg, "waitkey=%d",&option)) {
+		if (option==1) {
+			setting_wait_key_each_frame = 1;
+			printf("Wait for key each frame\n");
 		}
 		return;
 	}
@@ -310,8 +320,8 @@ void parseArgument(char* arg)
 
 	if(1==sscanf(arg,"imuWeight=%f",&foption))
 	{
-		imuWeight = foption;
-		printf("IMU Weight %f!\n", imuWeight);
+		efImuWeight = foption;
+		printf("EF IMU Weight %f!\n", efImuWeight);
 		return;
 	}
 
@@ -371,13 +381,17 @@ void parseArgument(char* arg)
 	printf("could not parse argument \"%s\"!!!!\n", arg);
 }
 
-
+[[clang::optnone]]
 int main( int argc, char** argv )
 {
 	//setlocale(LC_ALL, "");
 	for(int i=1; i<argc;i++)
 		parseArgument(argv[i]);
 
+	if (!multiThreading) {
+		std::srand(3141592); // Try and be deterministic in single threaded mode.
+		Eigen::setNbThreads(1);
+	}
 	// hook crtl+C.
 	boost::thread exThread = boost::thread(exitThread);
 
@@ -415,7 +429,7 @@ int main( int argc, char** argv )
 		linc = -1;
 	}
 
-	FullSystem* fullSystem = new FullSystem(reader->TBaseCam, imuWeight);
+	FullSystem* fullSystem = new FullSystem(reader->TBaseCam, efImuWeight);
 	fullSystem->setGammaFunction(reader->getPhotometricGamma());
 	fullSystem->linearizeOperation = (playbackSpeed==0);
 
@@ -541,7 +555,7 @@ int main( int argc, char** argv )
 
                     for(IOWrap::Output3DWrapper* ow : wraps) ow->reset();
 
-                    fullSystem = new FullSystem(reader->TBaseCam, imuWeight);
+                    fullSystem = new FullSystem(reader->TBaseCam, efImuWeight);
                     fullSystem->setGammaFunction(reader->getPhotometricGamma());
                     fullSystem->linearizeOperation = (playbackSpeed==0);
 
@@ -559,7 +573,7 @@ int main( int argc, char** argv )
             }
 
 			if (fullSystem->initialized) {
-				//lastKey.wait(-1);
+				if (setting_wait_key_each_frame) lastKey.wait(-1);
 				lastKey = -1;
 			}
 

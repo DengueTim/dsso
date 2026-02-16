@@ -142,10 +142,10 @@ public:
 
 
 	void addPointsInternal(
-			std::vector<EFPoint*>* points, bool shiftPriorToZero,
+			std::vector<EFPoint*>* points,
 			int min=0, int max=1, Vec10* stats=0, int tid=0)
 	{
-		for(int i=min;i<max;i++) addPoint((*points)[i],shiftPriorToZero,tid);
+		for(int i=min;i<max;i++) addPoint((*points)[i],true,tid);
 	}
 
 private:

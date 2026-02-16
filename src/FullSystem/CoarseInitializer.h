@@ -96,6 +96,7 @@ public:
 	AffLight thisToNext_aff;
 	SE3 thisToNext;
 
+	Vec3 firstVelocity,newVelocity;
 
 	FrameHessian* firstFrame;
 	FrameHessian* newFrame;
@@ -116,6 +117,7 @@ private:
 
 	bool snapped;
 	int snappedAt;
+	double lastTimestamp;
 
 	// pyramid images & levels on all levels
 	Eigen::Vector3f* dINew[PYR_LEVELS];

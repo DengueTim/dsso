@@ -64,7 +64,7 @@ int CalibHessian::instanceCounter=0;
 
 
 
-FullSystem::FullSystem(const SE3 &TBaseCam, const double imuWeight) : TBaseCam(TBaseCam), imuWeight(imuWeight) {
+FullSystem::FullSystem(const SE3 &TBaseCam, const double efImuWeight) : TBaseCam(TBaseCam) {
 	int retstat =0;
 	if(setting_logStuff)
 	{
@@ -151,7 +151,7 @@ FullSystem::FullSystem(const SE3 &TBaseCam, const double imuWeight) : TBaseCam(T
 	initialized=false;
 
 
-	ef = new EnergyFunctional(imuWeight, Hcalib, Hworld, Hbias);
+	ef = new EnergyFunctional(efImuWeight, Hcalib, Hworld, Hbias, TBaseCam);
 	ef->red = &this->treadReduce;
 
 	isLost=false;
@@ -163,9 +163,6 @@ FullSystem::FullSystem(const SE3 &TBaseCam, const double imuWeight) : TBaseCam(T
 	linearizeOperation=true;
 	runMapping=true;
 	mappingThread = boost::thread(&FullSystem::mappingLoop, this);
-	lastRefStopID=0;
-
-
 
 	minIdJetVisDebug = -1;
 	maxIdJetVisDebug = -1;
@@ -478,9 +475,9 @@ void FullSystem::traceNewCoarse(FrameHessian* fh)
 	for(FrameHessian* host : frameHessians)		// go through all active frames
 	{
 
-		SE3 hostToNew = fh->PRE_worldToCam * host->PRE_TWorldCam;
-		Mat33f KRKi = K * hostToNew.rotationMatrix().cast<float>() * K.inverse();
-		Vec3f Kt = K * hostToNew.translation().cast<float>();
+		SE3 TNewHost = fh->PRE_TCamWorld * host->PRE_TWorldCam;
+		Mat33f KRKi = K * TNewHost.rotationMatrix().cast<float>() * K.inverse();
+		Vec3f Kt = K * TNewHost.translation().cast<float>();
 
 		Vec2f aff = AffLight::fromToVecExposure(host->ab_exposure, fh->ab_exposure, host->aff_g2l(), fh->aff_g2l()).cast<float>();
 
@@ -571,9 +568,9 @@ void FullSystem::activatePointsMT()
 	{
 		if(host == newestHs) continue;
 
-		SE3 fhToNew = newestHs->PRE_worldToCam * host->PRE_TWorldCam;
-		Mat33f KRKi = (coarseDistanceMap->K[1] * fhToNew.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
-		Vec3f Kt = (coarseDistanceMap->K[1] * fhToNew.translation().cast<float>());
+		SE3 TNewFh = newestHs->PRE_TCamWorld * host->PRE_TWorldCam;
+		Mat33f KRKi = (coarseDistanceMap->K[1] * TNewFh.rotationMatrix().cast<float>() * coarseDistanceMap->Ki[0]);
+		Vec3f Kt = (coarseDistanceMap->K[1] * TNewFh.translation().cast<float>());
 
 
 		for(unsigned int i=0;i<host->immaturePoints.size();i+=1)
@@ -718,8 +715,6 @@ void FullSystem::flagPointsForRemoval()
 			if(frameHessians[i]->flaggedForMarginalization) fhsToMargPoints.push_back(frameHessians[i]);
 	}
 
-
-
 	//ef->setAdjointsF();
 	//ef->setDeltaF(&Hcalib);
 	int flag_oob=0, flag_in=0, flag_inin=0, flag_nores=0;
@@ -750,8 +745,8 @@ void FullSystem::flagPointsForRemoval()
 						r->resetOOB();
 						r->linearize(&Hcalib);
 						r->efResidual->isLinearized = false;
-						r->applyRes(true);
-						if(r->efResidual->isActive())
+						r->applyRes();
+						if(r->efResidual->isGood)
 						{
 							r->efResidual->fixLinearizationF(ef);
 							ngoodRes++;
@@ -803,7 +798,7 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const std::shar
     if(isLost) return;
 	boost::unique_lock<boost::mutex> lock(trackMutex);
 
-	if (Hworld.TMetricDso.scale() < 0.1 || Hworld.TMetricDso.scale() > 10){
+	if (Hworld.TMetricDso.scale() < MIN_WORLD_SCALE || Hworld.TMetricDso.scale() > 100){
 		initFailed = true;
 	}
 
@@ -816,10 +811,6 @@ void FullSystem::addActiveFrame(ImageAndExposure *image, int id, const std::shar
     shell->timestamp = image->timestamp;
     shell->incoming_id = id;
 	fh->shell = shell;
-	if (!allKeyFramesHistory.empty()) {
-		std::cerr << "addactive\n";
-		fh->setVelocityScaled(allKeyFramesHistory.back()->velocity);
-	}
 	allFrameHistory.push_back(shell);
 
 
@@ -908,24 +899,15 @@ void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF) {
 
 	if(linearizeOperation)
 	{
-		if(goStepByStep && lastRefStopID != coarseTracker->refFrameID)
-		{
-			MinimalImageF3 img(wG[0], hG[0], fh->dI);
-			IOWrap::displayImage("frameToTrack", &img);
-			while(true)
-			{
-				char k=IOWrap::waitKey(0);
-				if(k==' ') break;
-				handleKey( k );
-			}
-			lastRefStopID = coarseTracker->refFrameID;
-		}
-		else handleKey( IOWrap::waitKey(1) );
-
-
+		handleKey(IOWrap::waitKey(1));
 
 		if(needKF) {
 			imuIntegrator->getCurrentIntegration(fh->imuIntegration);
+			//std::cout << "KF IMU:\n" << fh->imuIntegration;
+			ImuIntegration imuIntegration;
+
+			// TODO, Does this remove the effect of bias from the measurements?
+			imuIntegrator->reset(Vec6::Zero());//Hbias.value);
 			makeKeyFrame(fh);
 		} else {
 			makeNonKeyFrame(fh);
@@ -937,6 +919,9 @@ void FullSystem::deliverTrackedFrame(FrameHessian* fh, bool needKF) {
 		unmappedTrackedFrames.push_back(fh);
 		if(needKF) {
 			imuIntegrator->getCurrentIntegration(fh->imuIntegration);
+
+			// TODO, Does this remove the effect of bias from the measurements?
+			imuIntegrator->reset(Vec6::Zero());//Hbias.value);
 			needNewKFAfter = fh->shell->trackingRef->id;
 		}
 		trackedFrameSignal.notify_all();
@@ -994,8 +979,7 @@ void FullSystem::mappingLoop()
 					boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 					assert(fh->shell->trackingRef != 0);
 					fh->shell->TWorldCam = fh->shell->trackingRef->TWorldCam * fh->shell->camToTrackingRef;
-					fh->shell->velocity = fh->getVelocityScaled();
-					// pointless because of delete... fh->setEvalPTAndStateZero(fh->shell->TWorldCam.inverse(), fh->shell->aff_g2l);
+					fh->shell->velocity = fh->PRE_velocity;
 				}
 				delete fh;
 			}
@@ -1040,8 +1024,7 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		assert(fh->shell->trackingRef != 0);
 		fh->shell->TWorldCam = fh->shell->trackingRef->TWorldCam * fh->shell->camToTrackingRef;
-		fh->shell->velocity = fh->getVelocityScaled();
-		// fh->setEvalPTAndStateZero(fh->shell->TWorldCam.inverse(), fh->shell->aff_g2l);
+		fh->shell->velocity = fh->PRE_velocity;
 		fh->setEvalPTAndStateZero(true);
 	}
 
@@ -1052,17 +1035,17 @@ void FullSystem::makeNonKeyFrame( FrameHessian* fh)
 [[clang::optnone]]
 void FullSystem::makeKeyFrame( FrameHessian* fh)
 {
-	//std::cout << "Keyframe time delta:" << (fh->shell->timestamp - allKeyFramesHistory.back()->timestamp) / 1000000000 << "\n";
-	ImuIntegration imuIntegration;
-	imuIntegrator->getCurrentIntegration(imuIntegration);
-	//std::cout << "II:\n" << imuIntegration << "\n";
+	//std::cout << "Keyframe time delta:" << (fh->shell->timestamp - allKeyFramesHistory.back()->timestamp) / 1e9 << "\n";
+
+	if (allKeyFramesHistory.size() > 1) {
+		fh->shell->velocity = allKeyFramesHistory.back()->velocity;
+	}
 
 	// needs to be set by mapping thread
 	{
 		boost::unique_lock<boost::mutex> crlock(shellPoseMutex);
 		assert(fh->shell->trackingRef != 0);
 		fh->shell->TWorldCam = fh->shell->trackingRef->TWorldCam * fh->shell->camToTrackingRef;
-		//fh->setEvalPTAndStateZero(fh->shell->TWorldCam.inverse(), fh->shell->aff_g2l);
 		fh->setEvalPTAndStateZero(true);
 	}
 
@@ -1117,24 +1100,22 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 
 
 
-
-
 	// =========================== Figure Out if INITIALIZATION FAILED =========================
 	if(allKeyFramesHistory.size() <= 4)
 	{
 		if(allKeyFramesHistory.size()==2 && rmse > 20*benchmark_initializerSlackFactor)
 		{
-			printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
+			printf("I THINK INITIALIZATION FAILED! Resetting. 2 frames, rmse %f > %f\n", rmse, 20*benchmark_initializerSlackFactor);
 			initFailed=true;
 		}
 		if(allKeyFramesHistory.size()==3 && rmse > 13*benchmark_initializerSlackFactor)
 		{
-			printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
+			printf("I THINK INITIALIZATION FAILED! Resetting. 3 frames, rmse=%f > %f\n", rmse, 13*benchmark_initializerSlackFactor);
 			initFailed=true;
 		}
 		if(allKeyFramesHistory.size()==4 && rmse > 9*benchmark_initializerSlackFactor)
 		{
-			printf("I THINK INITIALIZATINO FAILED! Resetting.\n");
+			printf("I THINK INITIALIZATION FAILED! Resetting. 4 frames, rmse=%f > %f\n", rmse, 9*benchmark_initializerSlackFactor);
 			initFailed=true;
 		}
 	}
@@ -1193,7 +1174,8 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
     for(IOWrap::Output3DWrapper* ow : outputWrapper)
     {
         ow->publishGraph(ef->connectivityMap);
-		ow->publishKeyframes(frameHessians, false, &Hcalib, &Hworld);
+		ow->publishKeyframes(frameHessians, false, &Hcalib);
+		ow->publishMetricDso(&Hworld.TMetricDso);
 	}
 
 
@@ -1201,11 +1183,11 @@ void FullSystem::makeKeyFrame( FrameHessian* fh)
 	// =========================== Marginalize Frames =========================
 
 	for(unsigned int i=0;i<frameHessians.size();i++)
-		if(frameHessians[i]->flaggedForMarginalization)
-			{marginalizeFrame(frameHessians[i]); i=0;}
-
-	// TODO, Does this remove the effect of bias from the measurements?
-	imuIntegrator->reset(Vec6::Zero());//Hbias.value);
+		if(frameHessians[i]->flaggedForMarginalization) {
+			assert(i != (frameHessians.size() - 1)); // Newest frame should never be marginalized.
+			marginalizeFrame(frameHessians[i]);
+			i=0; // Would i-- be the same?
+		}
 
 	printLogLine();
     //printEigenValLine();
@@ -1274,7 +1256,15 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame, Mat33 rotFirs
 		ef->insertPoint(ph);
 	}
 
-
+//Hworld.setScaleAndRotation(rotFirstBase);
+	//Hworld.setScaleAndRotation(SO3(0,0,0));
+	// Set Metric world X up..
+	Hworld.setScaleAndRotation(SO3(rotFirstBase * TBaseCam.rotationMatrix()));
+	Hworld.updateEvalPt();
+	std::cout << "Hworld:" << Hworld;
+//	// As the Metric frame has the same orientation as the IMU there is no rotation.
+//	Hworld.TMetricCamImu.setRotationMatrix(Mat33::Identity());
+//	Hworld.TMetricCamImu.translation() = -TBaseCam.translation();
 
 	SE3 firstToNew = coarseInitializer->thisToNext;
 	firstToNew.translation() /= rescaleFactor;
@@ -1296,29 +1286,21 @@ void FullSystem::initializeFromInitializer(FrameHessian* newFrame, Mat33 rotFirs
 
 		firstFrame->shell->TWorldCam = t;
 		firstFrame->shell->aff_g2l = AffLight(0,0);
-		//firstFrame->setEvalPTAndStateZero(firstFrame->shell->TWorldCam.inverse(), firstFrame->shell->aff_g2l);
+		firstFrame->shell->velocity = Hworld.TMetricDso.rotationMatrix() * coarseInitializer->firstVelocity / rescaleFactor;
 		firstFrame->setEvalPTAndStateZero(true);
 		firstFrame->shell->trackingRef=0;
 		firstFrame->shell->camToTrackingRef = SE3();
 
 		newFrame->shell->TWorldCam = t * firstToNew.inverse();
 		newFrame->shell->aff_g2l = AffLight(0,0);
-		//newFrame->setEvalPTAndStateZero(newFrame->shell->TWorldCam.inverse(), newFrame->shell->aff_g2l);
+		newFrame->shell->velocity = Hworld.TMetricDso.rotationMatrix() * coarseInitializer->newVelocity / rescaleFactor;
 		newFrame->setEvalPTAndStateZero(true);
 		newFrame->shell->trackingRef = firstFrame->shell;
 		newFrame->shell->camToTrackingRef = firstToNew.inverse();
 	}
 
-	//Hworld.setScaleAndRotation(rotFirstBase);
-	//Hworld.setScaleAndRotation(SO3(0,0,0));
-	// Set Metric world X up..
-	Hworld.setScaleAndRotation(SO3(rotFirstBase * TBaseCam.rotationMatrix()));
-	std::cout << "Hworld:" << Hworld;
-	Hworld.TMetricCamImu.setRotationMatrix(Mat33::Identity());
-	Hworld.TMetricCamImu.translation() = -TBaseCam.translation();
-
 	initialized=true;
-	printf("INITIALIZE FROM INITIALIZER (%d pts)!\n", (int)firstFrame->pointHessians.size());
+	printf("INITIALIZE FROM INITIALIZER (%d pts)! Translation %f\n", (int)firstFrame->pointHessians.size(), firstToNew.translation().norm());
 }
 
 void FullSystem::makeNewTraces(FrameHessian* newFrame, float* gtDepth)
@@ -1413,38 +1395,37 @@ void FullSystem::printLogLine()
 }
 
 
-
+[[clang::optnone]]
 void FullSystem::printEigenValLine()
 {
 	if(!setting_logStuff) return;
 	if(ef->lastHS.rows() < 12) return;
 
 
-	MatXX Hp = ef->lastHS.bottomRightCorner(ef->lastHS.cols()-CPARS,ef->lastHS.cols()-CPARS);
-	MatXX Ha = ef->lastHS.bottomRightCorner(ef->lastHS.cols()-CPARS,ef->lastHS.cols()-CPARS);
-	int n = Hp.cols()/8;
-	assert(Hp.cols()%8==0);
+	MatXX Hp = ef->lastHS.bottomRightCorner(ef->lastHS.cols()-ICPARS,ef->lastHS.cols()-ICPARS);
+	MatXX Ha = ef->lastHS.bottomRightCorner(ef->lastHS.cols()-ICPARS,ef->lastHS.cols()-ICPARS);
+	int n = Hp.cols()/IFPARS;
+	assert(Hp.cols()%IFPARS==0);
 
 	// sub-select
-	for(int i=0;i<n;i++)
-	{
-		MatXX tmp6 = Hp.block(i*8,0,6,n*8);
-		Hp.block(i*6,0,6,n*8) = tmp6;
+	for(int i=0;i<n;i++) {
+		MatXX tmp9 = Hp.block(i*IFPARS,0,TRVPARS,n*IFPARS);
+		Hp.block(i*TRVPARS,0,TRVPARS,n*IFPARS) = tmp9;
 
-		MatXX tmp2 = Ha.block(i*8+6,0,2,n*8);
-		Ha.block(i*2,0,2,n*8) = tmp2;
+		MatXX tmp2 = Ha.block(i*IFPARS+TRVPARS,0,2,n*IFPARS);
+		Ha.block(i*2,0,2,n*IFPARS) = tmp2;
 	}
 	for(int i=0;i<n;i++)
 	{
-		MatXX tmp6 = Hp.block(0,i*8,n*8,6);
-		Hp.block(0,i*6,n*8,6) = tmp6;
+		MatXX tmp9 = Hp.block(0,i*IFPARS,n*IFPARS,TRVPARS);
+		Hp.block(0,i*TRVPARS,n*IFPARS,TRVPARS) = tmp9;
 
-		MatXX tmp2 = Ha.block(0,i*8+6,n*8,2);
-		Ha.block(0,i*2,n*8,2) = tmp2;
+		MatXX tmp2 = Ha.block(0,i*IFPARS+TRVPARS,n*IFPARS,2);
+		Ha.block(0,i*2,n*IFPARS,2) = tmp2;
 	}
 
 	VecX eigenvaluesAll = ef->lastHS.eigenvalues().real();
-	VecX eigenP = Hp.topLeftCorner(n*6,n*6).eigenvalues().real();
+	VecX eigenP = Hp.topLeftCorner(n*TRVPARS,n*TRVPARS).eigenvalues().real();
 	VecX eigenA = Ha.topLeftCorner(n*2,n*2).eigenvalues().real();
 	VecX diagonal = ef->lastHS.diagonal();
 
@@ -1452,43 +1433,44 @@ void FullSystem::printEigenValLine()
 	std::sort(eigenP.data(), eigenP.data()+eigenP.size());
 	std::sort(eigenA.data(), eigenA.data()+eigenA.size());
 
-	int nz = std::max(100,setting_maxFrames*10);
+	int nz = ICPARS + (setting_maxFrames+1)*IFPARS;
+	int frameId = allKeyFramesHistory.back()->id;; //frameHessians.back()->frameID;
 
 	if(eigenAllLog != 0)
 	{
 		VecX ea = VecX::Zero(nz); ea.head(eigenvaluesAll.size()) = eigenvaluesAll;
-		(*eigenAllLog) << allKeyFramesHistory.back()->id << " " <<  ea.transpose() << "\n";
+		(*eigenAllLog) << frameId << " " << ea.transpose() << "\n";
 		eigenAllLog->flush();
 	}
 	if(eigenALog != 0)
 	{
 		VecX ea = VecX::Zero(nz); ea.head(eigenA.size()) = eigenA;
-		(*eigenALog) << allKeyFramesHistory.back()->id << " " <<  ea.transpose() << "\n";
+		(*eigenALog) << frameId << " " << ea.transpose() << "\n";
 		eigenALog->flush();
 	}
 	if(eigenPLog != 0)
 	{
 		VecX ea = VecX::Zero(nz); ea.head(eigenP.size()) = eigenP;
-		(*eigenPLog) << allKeyFramesHistory.back()->id << " " <<  ea.transpose() << "\n";
+		(*eigenPLog) << frameId << " " << ea.transpose() << "\n";
 		eigenPLog->flush();
 	}
 
 	if(DiagonalLog != 0)
 	{
 		VecX ea = VecX::Zero(nz); ea.head(diagonal.size()) = diagonal;
-		(*DiagonalLog) << allKeyFramesHistory.back()->id << " " <<  ea.transpose() << "\n";
+		(*DiagonalLog) << frameId << " " << ea.transpose() << "\n";
 		DiagonalLog->flush();
 	}
 
 	if(variancesLog != 0)
 	{
 		VecX ea = VecX::Zero(nz); ea.head(diagonal.size()) = ef->lastHS.inverse().diagonal();
-		(*variancesLog) << allKeyFramesHistory.back()->id << " " <<  ea.transpose() << "\n";
+		(*variancesLog) << frameId << " " << ea.transpose() << "\n";
 		variancesLog->flush();
 	}
 
 	std::vector<VecX> &nsp = ef->lastNullspaces_forLogging;
-	(*nullspacesLog) << allKeyFramesHistory.back()->id << " ";
+	(*nullspacesLog) << frameId << " ";
 	for(unsigned int i=0;i<nsp.size();i++)
 		(*nullspacesLog) << nsp[i].dot(ef->lastHS * nsp[i]) << " " << nsp[i].dot(ef->lastbS) << " " ;
 	(*nullspacesLog) << "\n";

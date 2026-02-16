@@ -24,7 +24,7 @@ namespace dso {
 			linAcc(ax, ay, az), rotRate(wx, wy, wz), timestamp(timestamp), interval(interval) {}
 
 		const double intervalAsSeconds() const {
-			return interval / 1000000000.0; // from nano-seconds.
+			return interval / 1e9; // from nano-seconds.
 		}
     };
 

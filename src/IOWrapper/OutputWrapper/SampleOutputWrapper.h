@@ -74,7 +74,7 @@ public:
 
 
 
-        virtual void publishKeyframes( std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib, MetricWorldHessian* HWorld) override
+        virtual void publishKeyframes( std::vector<FrameHessian*> &frames, bool final, CalibHessian* HCalib) override
         {
             for(FrameHessian* f : frames)
             {
@@ -97,6 +97,10 @@ public:
                 }
             }
         }
+
+		virtual void publishMetricDso(Sim3* metricDso) override {
+			std::cout << "MetricDso:\n" << metricDso->matrix3x4() << "\n";
+		}
 
         virtual void publishCamPose(FrameShell* frame, CalibHessian* HCalib) override
         {

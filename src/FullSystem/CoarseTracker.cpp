@@ -130,7 +130,7 @@ void CoarseTracker::makeK(CalibHessian* HCalib, MetricWorldHessian* Hworld, ImuB
 		cyi[level] = Ki[level](1,2);
 	}
 
-	Hworld->get_value_minus_valueZero();
+	//Hworld->get_value_minus_valueZero();
 
 	TMetricDso = Hworld->TMetricDso;
 
@@ -154,7 +154,7 @@ void CoarseTracker::makeCoarseDepthL0(std::vector<FrameHessian*> frameHessians)
 			if(ph->lastResiduals[0].first != 0 && ph->lastResiduals[0].second == ResState::IN)
 			{
 				PointFrameResidual* r = ph->lastResiduals[0].first;
-				assert(r->efResidual->isActive() && r->target == lastRef);
+				assert(r->efResidual->isGood && r->target == lastRef);
 				int u = r->centerProjectedTo[0] + 0.5f;
 				int v = r->centerProjectedTo[1] + 0.5f;
 				float new_idepth = r->centerProjectedTo[2];
@@ -547,13 +547,13 @@ double CoarseTracker::calcImuResAndGs(Mat66 &Himu, Vec6 &bimu, const SE3 &TNewRe
 
 	Vec3 res_phi = SO3(res_R).log();
 
-	const Vec3 velocity = R_WB*(R_WB.transpose()*(lastRef->getVelocityScaled()+negativeG*dt)+
+	const Vec3 velocity = R_WB*(R_WB.transpose()*(lastRef->PRE_velocity+negativeG*dt)+
 		(imuIntegration.deltaVel+imuIntegration.jVelBa*imuBiasAccDelta+imuIntegration.jVelBg*imuBiasGyroDelta));
 	//std::cerr << "CoarseTracker velocity:" << velocity.transpose().format(StdOutFmt) << "\n";
 //	newFrame->setVelocityScaled(velocity);
 //	newFrame->shell->velocity = velocity;
 
-	Vec3 res_p = R_WB.transpose()*(t_WBj-t_WB-lastRef->getVelocityScaled()*dt-0.5*negativeG*dt*dt)-
+	Vec3 res_p = R_WB.transpose()*(t_WBj-t_WB-lastRef->PRE_velocity*dt-0.5*negativeG*dt*dt)-
 		(imuIntegration.deltaTrn+imuIntegration.jTrnBa*imuBiasAccDelta+imuIntegration.jTrnBg*imuBiasGyroDelta);
 
 	Vec6 res_PVPhi;
@@ -979,9 +979,9 @@ void CoarseDistanceMap::makeDistanceMap(
 	{
 		if(frame == fh) continue;
 
-		SE3 fhToNew = frame->PRE_worldToCam * fh->PRE_TWorldCam;
-		Mat33f KRKi = (K[1] * fhToNew.rotationMatrix().cast<float>() * Ki[0]);
-		Vec3f Kt = (K[1] * fhToNew.translation().cast<float>());
+		SE3 TNewFh = frame->PRE_TCamWorld * fh->PRE_TWorldCam;
+		Mat33f KRKi = (K[1] * TNewFh.rotationMatrix().cast<float>() * Ki[0]);
+		Vec3f Kt = (K[1] * TNewFh.translation().cast<float>());
 
 		for(PointHessian* ph : fh->pointHessians)
 		{

@@ -749,7 +749,7 @@ inline void finish()
 
 
 /*
- * same as other method, just that x/y are composed of two parts, the first 4 elements are in x4/y4, the last 6 in x6/y6.
+ * same as other method, just that x/y are composed of two parts. image x & y derivatives WRT C(4) & XI(6).
  */
   inline void update(
 		  const float* const x4,
