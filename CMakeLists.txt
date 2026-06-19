@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.10)
 SET(PROJECT_NAME DSSO)
 
 # On Mac, use gnu gcc over clang. Compiles slower and has missing LD simbols!?
@@ -10,7 +10,7 @@ PROJECT(${PROJECT_NAME})
 CMAKE_MINIMUM_REQUIRED(VERSION 3.14)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_BUILD_TYPE Debug)
 #set(CMAKE_BUILD_TYPE Release)
@@ -22,8 +22,9 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 # required libraries
 find_package(SuiteParse REQUIRED)
-find_package(Eigen3 REQUIRED)
-find_package(Boost COMPONENTS system thread)
+find_package(Eigen3 3.4...5 REQUIRED)
+#find_package(Boost COMPONENTS system thread)
+find_package(Boost REQUIRED NO_MODULE)
 find_package(GTSAM REQUIRED)
 
 # Google Test
@@ -48,7 +49,8 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin" AND CMAKE_CXX_COMPILER_ID MATCHES "Cla
 	set(CPU_CXX_FLAG -mcpu=apple-m1)
     else()
     	set(CPU_CXX_FLAG -mcpu=x86_64)
-    endif()
+	endif()
+	add_compile_definitions(_OSX_=1)
 else()
     if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "armv7l") # OSX
 	set(CPU_CXX_FLAG "-march=native -mfpu=neon")
@@ -93,14 +95,21 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/src
   ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
   ${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
+  ${Boost_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${GTSAM_INCLUDE_DIR}
   ${PROJECT_SOURCE_DIR}/tests
 ) 
 
+if (Eigen3_FOUND)
+	get_target_property(Eigen3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+	message("--- found Eigen3 (${Eigen3_VERSION}) in ${Eigen3_INCLUDE_DIR}")
+	include_directories( ${Eigen3_INCLUDE_DIR} )
+endif()
+
 # decide if we have pangolin
 if (Pangolin_FOUND)
-	message("--- found PANGOLIN, compiling dsso_pangolin library.")
+	message("--- found PANGOLIN (${Pangolin_VERSION}), compiling dsso_pangolin library.")
 	include_directories( ${Pangolin_INCLUDE_DIRS} ) 
 	set(dsso_pangolin_SOURCE_FILES
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/Pangolin/KeyFrameDisplay.cpp
@@ -158,7 +167,7 @@ add_library(dsso ${dsso_SOURCE_FILES} ${dsso_opencv_SOURCE_FILES} ${dsso_pangoli
 if (OpenCV_FOUND AND Pangolin_FOUND)
 	message("--- compiling dsso_dataset.")
 	add_executable(dsso_dataset ${PROJECT_SOURCE_DIR}/src/main_dso_pangolin.cpp )
-    target_link_libraries(dsso_dataset dsso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS} gtsam)
+    target_link_libraries(dsso_dataset dsso cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS} gtsam)
 else()
 	message("--- not building dsso_dataset, since either don't have openCV or Pangolin.")
 endif()
@@ -174,7 +183,7 @@ add_executable(
 
 target_link_libraries(
   all_tests
-  dsso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS} gtsam
+  dsso cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS} gtsam
   gtest_main gtest gmock
 )
 
