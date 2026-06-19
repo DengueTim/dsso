@@ -148,8 +148,8 @@ namespace dso {
 	class GtsamImuIntegrator : public ImuIntegrator {
 		EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
-		boost::shared_ptr<gtsam::PreintegrationParams> params;
-		boost::shared_ptr<gtsam::PreintegratedImuMeasurements> preintegratedMeasurements;
+		std::shared_ptr<gtsam::PreintegrationParams> params;
+		std::shared_ptr<gtsam::PreintegratedImuMeasurements> preintegratedMeasurements;
 
 		void printDebug();
 

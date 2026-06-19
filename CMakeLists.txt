@@ -1,13 +1,12 @@
+cmake_minimum_required(VERSION 3.16)
 SET(PROJECT_NAME DSO)
 
 # If ld can't find boost_system do: export LIBRARY_PATH=/opt/homebrew/lib
 
-CMAKE_MINIMUM_REQUIRED(VERSION 3.8)
 PROJECT(${PROJECT_NAME})
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
-SET(CMAKE_CXX_STANDARD 17)
-
+set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_BUILD_TYPE Debug)
 #set(CMAKE_BUILD_TYPE Release)
@@ -19,8 +18,9 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 # required libraries
 find_package(SuiteParse REQUIRED)
-find_package(Eigen3 REQUIRED)
-find_package(Boost COMPONENTS system thread)
+find_package(Eigen3 3.4...5 REQUIRED)
+#find_package(Boost COMPONENTS system thread)
+find_package(Boost REQUIRED NO_MODULE)
 find_package(GTSAM REQUIRED)
 
 # Google Test
@@ -45,16 +45,17 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin" AND CMAKE_CXX_COMPILER_ID MATCHES "Cla
     	set(CPU_CXX_FLAG -mcpu=apple-m1)
     else()
     	set(CPU_CXX_FLAG -mcpu=x86_64)
-    endif()
+	endif()
+	add_compile_definitions(_OSX_=1)
 else()
     set(CPU_CXX_FLAG -march=native)
 endif()
 
 add_definitions("-DENABLE_SSE")
 set(CMAKE_CXX_FLAGS
-#   "${SSE_FLAGS} -O -Wall -g ${CPU_CXX_FLAG}"
-	"${SSE_FLAGS} -O1 -g ${CPU_CXX_FLAG}"
-#   "${SSE_FLAGS} -O3 -g -fno-omit-frame-pointer"
+#   "${SSE_FLAGS} -O -Wall -g -std=c++0x ${CPU_CXX_FLAG}"
+	"${SSE_FLAGS} -O1 -g -std=c++0x ${CPU_CXX_FLAG}"
+#   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
 )
 
 if (MSVC)
@@ -72,6 +73,7 @@ set(dso_SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/FullSystem/CoarseTracker.cpp
   ${PROJECT_SOURCE_DIR}/src/FullSystem/CoarseInitializer.cpp
   ${PROJECT_SOURCE_DIR}/src/FullSystem/ImmaturePoint.cpp
+		${PROJECT_SOURCE_DIR}/src/FullSystem/IMU.cpp
   ${PROJECT_SOURCE_DIR}/src/FullSystem/HessianBlocks.cpp
   ${PROJECT_SOURCE_DIR}/src/FullSystem/PixelSelector2.cpp
   ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/EnergyFunctional.cpp
@@ -81,22 +83,28 @@ set(dso_SOURCE_FILES
   ${PROJECT_SOURCE_DIR}/src/util/settings.cpp
   ${PROJECT_SOURCE_DIR}/src/util/Undistort.cpp
   ${PROJECT_SOURCE_DIR}/src/util/globalCalib.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/IMU.cpp
 )
 
 include_directories(
   ${PROJECT_SOURCE_DIR}/src
   ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
   ${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
+  ${Boost_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${GTSAM_INCLUDE_DIR}
   ${PROJECT_SOURCE_DIR}/tests
 )
 
+if (Eigen3_FOUND)
+	get_target_property(Eigen3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+	message("--- found Eigen3 (${Eigen3_VERSION}) in ${Eigen3_INCLUDE_DIR}")
+	include_directories( ${Eigen3_INCLUDE_DIR} )
+endif()
+
 # decide if we have pangolin
 if (Pangolin_FOUND)
-	message("--- found PANGOLIN, compiling dso_pangolin library.")
-	include_directories( ${Pangolin_INCLUDE_DIRS} ) 
+	message("--- found PANGOLIN (${Pangolin_VERSION}), compiling dso_pangolin library.")
+	include_directories( ${Pangolin_INCLUDE_DIRS} )
 	set(dso_pangolin_SOURCE_FILES 
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/Pangolin/KeyFrameDisplay.cpp
 	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/Pangolin/PangolinDSOViewer.cpp)
@@ -152,8 +160,7 @@ add_library(dso ${dso_SOURCE_FILES} ${dso_opencv_SOURCE_FILES} ${dso_pangolin_SO
 if (OpenCV_FOUND AND Pangolin_FOUND)
 	message("--- compiling dso_dataset.")
 	add_executable(dso_dataset ${PROJECT_SOURCE_DIR}/src/main_dso_pangolin.cpp )
-    target_link_libraries(dso_dataset dso boost_system cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS} gtsam)
+    target_link_libraries(dso_dataset dso cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS} gtsam)
 else()
 	message("--- not building dso_dataset, since either don't have openCV or Pangolin.")
 endif()
-

@@ -34,6 +34,8 @@
 #include "IOWrapper/Output3DWrapper.h"
 #include "IOWrapper/ImageDisplay.h"
 
+#include "IOWrapper/Pangolin/PangolinDSOViewer.h"
+#include "IOWrapper/OutputWrapper/SampleOutputWrapper.h"
 
 #include <boost/thread.hpp>
 #include "util/settings.h"
@@ -45,12 +47,6 @@
 #include "FullSystem/FullSystem.h"
 #include "OptimizationBackend/MatrixAccumulators.h"
 #include "FullSystem/PixelSelector2.h"
-
-
-
-#include "IOWrapper/Pangolin/PangolinDSOViewer.h"
-#include "IOWrapper/OutputWrapper/SampleOutputWrapper.h"
-
 
 std::string vignette = "";
 std::string gammaCalib = "";
