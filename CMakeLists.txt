@@ -26,9 +26,9 @@ find_package(GTSAM REQUIRED)
 # Google Test
 include(FetchContent)
 FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/refs/tags/release-1.11.0.zip
-  DOWNLOAD_NO_EXTRACT TRUE
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/release-1.11.0.zip
+        DOWNLOAD_NO_EXTRACT TRUE
 )
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -42,109 +42,109 @@ find_package(OpenCV QUIET)
 # flags
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin" AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64") # OSX
-    	set(CPU_CXX_FLAG -mcpu=apple-m1)
-    else()
-    	set(CPU_CXX_FLAG -mcpu=x86_64)
-	endif()
-	add_compile_definitions(_OSX_=1)
-else()
+        set(CPU_CXX_FLAG -mcpu=apple-m1)
+    else ()
+        set(CPU_CXX_FLAG -mcpu=x86_64)
+    endif ()
+    add_compile_definitions(_OSX_=1)
+else ()
     set(CPU_CXX_FLAG -march=native)
-endif()
+endif ()
 
 add_definitions("-DENABLE_SSE")
 set(CMAKE_CXX_FLAGS
-#   "${SSE_FLAGS} -O -Wall -g -std=c++0x ${CPU_CXX_FLAG}"
-	"${SSE_FLAGS} -O1 -g -std=c++0x ${CPU_CXX_FLAG}"
-#   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
+        #   "${SSE_FLAGS} -O -Wall -g -std=c++0x ${CPU_CXX_FLAG}"
+        "${SSE_FLAGS} -O1 -g -std=c++0x ${CPU_CXX_FLAG}"
+        #   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
 )
 
 if (MSVC)
-     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 endif (MSVC)
 
 # Sources files
 set(dso_SOURCE_FILES
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystem.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystemOptimize.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystemOptPoint.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystemDebugStuff.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystemMarginalize.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/Residuals.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/CoarseTracker.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/CoarseInitializer.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/ImmaturePoint.cpp
-		${PROJECT_SOURCE_DIR}/src/FullSystem/IMU.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/HessianBlocks.cpp
-  ${PROJECT_SOURCE_DIR}/src/FullSystem/PixelSelector2.cpp
-  ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/EnergyFunctional.cpp
-  ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/AccumulatedTopHessian.cpp
-  ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/AccumulatedSCHessian.cpp
-  ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/EnergyFunctionalStructs.cpp
-  ${PROJECT_SOURCE_DIR}/src/util/settings.cpp
-  ${PROJECT_SOURCE_DIR}/src/util/Undistort.cpp
-  ${PROJECT_SOURCE_DIR}/src/util/globalCalib.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystem.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystemOptimize.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystemOptPoint.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystemDebugStuff.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/FullSystemMarginalize.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/Residuals.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/CoarseTracker.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/CoarseInitializer.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/ImmaturePoint.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/IMU.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/HessianBlocks.cpp
+        ${PROJECT_SOURCE_DIR}/src/FullSystem/PixelSelector2.cpp
+        ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/EnergyFunctional.cpp
+        ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/AccumulatedTopHessian.cpp
+        ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/AccumulatedSCHessian.cpp
+        ${PROJECT_SOURCE_DIR}/src/OptimizationBackend/EnergyFunctionalStructs.cpp
+        ${PROJECT_SOURCE_DIR}/src/util/settings.cpp
+        ${PROJECT_SOURCE_DIR}/src/util/Undistort.cpp
+        ${PROJECT_SOURCE_DIR}/src/util/globalCalib.cpp
 )
 
 include_directories(
-  ${PROJECT_SOURCE_DIR}/src
-  ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
-  ${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
-  ${Boost_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIR}
-  ${GTSAM_INCLUDE_DIR}
-  ${PROJECT_SOURCE_DIR}/tests
+        ${PROJECT_SOURCE_DIR}/src
+        ${PROJECT_SOURCE_DIR}/thirdparty/Sophus
+        ${PROJECT_SOURCE_DIR}/thirdparty/sse2neon
+        ${Boost_INCLUDE_DIRS}
+        ${EIGEN3_INCLUDE_DIR}
+        ${GTSAM_INCLUDE_DIR}
+        ${PROJECT_SOURCE_DIR}/tests
 )
 
 if (Eigen3_FOUND)
-	get_target_property(Eigen3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
-	message("--- found Eigen3 (${Eigen3_VERSION}) in ${Eigen3_INCLUDE_DIR}")
-	include_directories( ${Eigen3_INCLUDE_DIR} )
-endif()
+    get_target_property(Eigen3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+    message("--- found Eigen3 (${Eigen3_VERSION}) in ${Eigen3_INCLUDE_DIR}")
+    include_directories(${Eigen3_INCLUDE_DIR})
+endif ()
 
 # decide if we have pangolin
 if (Pangolin_FOUND)
-	message("--- found PANGOLIN (${Pangolin_VERSION}), compiling dso_pangolin library.")
-	include_directories( ${Pangolin_INCLUDE_DIRS} )
-	set(dso_pangolin_SOURCE_FILES 
-	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/Pangolin/KeyFrameDisplay.cpp
-	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/Pangolin/PangolinDSOViewer.cpp)
-	set(HAS_PANGOLIN 1)
+    message("--- found PANGOLIN (${Pangolin_VERSION}), compiling dso_pangolin library.")
+    include_directories(${Pangolin_INCLUDE_DIRS})
+    set(dso_pangolin_SOURCE_FILES
+            ${PROJECT_SOURCE_DIR}/src/IOWrapper/Pangolin/KeyFrameDisplay.cpp
+            ${PROJECT_SOURCE_DIR}/src/IOWrapper/Pangolin/PangolinDSOViewer.cpp)
+    set(HAS_PANGOLIN 1)
 else ()
-	message("--- could not find PANGOLIN, not compiling dso_pangolin library.")
-	message("    this means there will be no 3D display / GUI available for dso_dataset.")
-	set(dso_pangolin_SOURCE_FILES )
-	set(HAS_PANGOLIN 0)
+    message("--- could not find PANGOLIN, not compiling dso_pangolin library.")
+    message("    this means there will be no 3D display / GUI available for dso_dataset.")
+    set(dso_pangolin_SOURCE_FILES)
+    set(HAS_PANGOLIN 0)
 endif ()
 
 # decide if we have openCV
 if (OpenCV_FOUND)
-	message("--- found OpenCV, compiling dso_opencv library.")
-	include_directories( ${OpenCV_INCLUDE_DIRS} )
-	set(dso_opencv_SOURCE_FILES 
-	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/OpenCV/ImageDisplay_OpenCV.cpp
-	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/OpenCV/ImageRW_OpenCV.cpp)
-	set(HAS_OPENCV 1)
+    message("--- found OpenCV, compiling dso_opencv library.")
+    include_directories(${OpenCV_INCLUDE_DIRS})
+    set(dso_opencv_SOURCE_FILES
+            ${PROJECT_SOURCE_DIR}/src/IOWrapper/OpenCV/ImageDisplay_OpenCV.cpp
+            ${PROJECT_SOURCE_DIR}/src/IOWrapper/OpenCV/ImageRW_OpenCV.cpp)
+    set(HAS_OPENCV 1)
 else ()
-	message("--- could not find OpenCV, not compiling dso_opencv library.")
-	message("    this means there will be no image display, and image read / load functionality.")
-	set(dso_opencv_SOURCE_FILES 
-	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageDisplay_dummy.cpp
-	  ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageRW_dummy.cpp src/util/OptimisationUtils.h)
-	set(HAS_OPENCV 0)
+    message("--- could not find OpenCV, not compiling dso_opencv library.")
+    message("    this means there will be no image display, and image read / load functionality.")
+    set(dso_opencv_SOURCE_FILES
+            ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageDisplay_dummy.cpp
+            ${PROJECT_SOURCE_DIR}/src/IOWrapper/ImageRW_dummy.cpp src/util/OptimisationUtils.h)
+    set(HAS_OPENCV 0)
 endif ()
 
 # decide if we have ziplib.
 if (LIBZIP_LIBRARY)
-	message("--- found ziplib (${LIBZIP_VERSION}), compiling with zip capability.")
-	add_definitions(-DHAS_ZIPLIB=1)
-	include_directories( ${LIBZIP_INCLUDE_DIR_ZIP} ${LIBZIP_INCLUDE_DIR_ZIPCONF} ) 
-else()
-	message("--- not found ziplib (${LIBZIP_LIBRARY}), compiling without zip capability.")
-	set(LIBZIP_LIBRARY "")
-endif()
+    message("--- found ziplib (${LIBZIP_VERSION}), compiling with zip capability.")
+    add_definitions(-DHAS_ZIPLIB=1)
+    include_directories(${LIBZIP_INCLUDE_DIR_ZIP} ${LIBZIP_INCLUDE_DIR_ZIPCONF})
+else ()
+    message("--- not found ziplib (${LIBZIP_LIBRARY}), compiling without zip capability.")
+    set(LIBZIP_LIBRARY "")
+endif ()
 
 # compile main library.
-include_directories( ${CSPARSE_INCLUDE_DIR} ${CHOLMOD_INCLUDE_DIR}) 
+include_directories(${CSPARSE_INCLUDE_DIR} ${CHOLMOD_INCLUDE_DIR})
 add_library(dso ${dso_SOURCE_FILES} ${dso_opencv_SOURCE_FILES} ${dso_pangolin_SOURCE_FILES})
 
 #set_property( TARGET dso APPEND_STRING PROPERTY COMPILE_FLAGS -Wall )
@@ -153,14 +153,14 @@ add_library(dso ${dso_SOURCE_FILES} ${dso_opencv_SOURCE_FILES} ${dso_pangolin_SO
 #if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin") # OSX
 #    set(BOOST_THREAD_LIBRARY boost_thread-mt)
 #else()
-    set(BOOST_THREAD_LIBRARY boost_thread)
+set(BOOST_THREAD_LIBRARY boost_thread)
 #endif()
 
 # build main executable (only if we have both OpenCV and Pangolin)
 if (OpenCV_FOUND AND Pangolin_FOUND)
-	message("--- compiling dso_dataset.")
-	add_executable(dso_dataset ${PROJECT_SOURCE_DIR}/src/main_dso_pangolin.cpp )
+    message("--- compiling dso_dataset.")
+    add_executable(dso_dataset ${PROJECT_SOURCE_DIR}/src/main_dso_pangolin.cpp)
     target_link_libraries(dso_dataset dso cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS} gtsam)
-else()
-	message("--- not building dso_dataset, since either don't have openCV or Pangolin.")
-endif()
+else ()
+    message("--- not building dso_dataset, since either don't have openCV or Pangolin.")
+endif ()
