@@ -6,7 +6,7 @@ SET(PROJECT_NAME DSO)
 PROJECT(${PROJECT_NAME})
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_BUILD_TYPE Debug)
 #set(CMAKE_BUILD_TYPE Release)
@@ -18,7 +18,7 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 # required libraries
 find_package(SuiteParse REQUIRED)
-find_package(Eigen3 3.4...5 REQUIRED)
+find_package(Eigen3 3.4...3.5 REQUIRED)
 #find_package(Boost COMPONENTS system thread)
 find_package(Boost REQUIRED NO_MODULE)
 find_package(GTSAM REQUIRED)
@@ -36,7 +36,7 @@ FetchContent_MakeAvailable(googletest)
 
 # optional libraries
 find_package(LibZip QUIET)
-find_package(Pangolin 0.6 QUIET)
+find_package(Pangolin 0.9 QUIET)
 find_package(OpenCV QUIET)
 
 # flags
@@ -49,6 +49,7 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin" AND CMAKE_CXX_COMPILER_ID MATCHES "Cla
     add_compile_definitions(_OSX_=1)
 else ()
     set(CPU_CXX_FLAG -march=native)
+    add_compile_options(-Wno-attributes)
 endif ()
 
 add_definitions("-DENABLE_SSE")
@@ -94,6 +95,10 @@ include_directories(
         ${GTSAM_INCLUDE_DIR}
         ${PROJECT_SOURCE_DIR}/tests
 )
+
+if (Boost_FOUND)
+    message("--- found Boost (${Boost_VERSION}) in ${Boost_INCLUDE_DIR}")
+endif ()
 
 if (Eigen3_FOUND)
     get_target_property(Eigen3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)

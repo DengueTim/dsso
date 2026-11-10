@@ -241,7 +241,7 @@ namespace dso {
 	// GTSAM...
 [[clang::optnone]]
 	GtsamImuIntegrator::GtsamImuIntegrator(const dso::ImuCalib& imuCalib) : ImuIntegrator(imuCalib){
-		params = std::make_shared<gtsam::PreintegrationParams>(Gravity);
+		params = boost::make_shared<gtsam::PreintegrationParams>(Gravity);
         params->setIntegrationCovariance(imuCalib.integration_covariance * Eigen::Matrix3d::Identity());
 		// GTSAM takes the continuous-time noise covariance.
         params->setAccelerometerCovariance(imuCalib.accel_noise_density * imuCalib.accel_noise_density * Eigen::Matrix3d::Identity());

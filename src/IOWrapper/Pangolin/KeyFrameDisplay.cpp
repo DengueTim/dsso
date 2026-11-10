@@ -26,11 +26,7 @@
 #include <stdio.h>
 #include "util/settings.h"
 
-//#include <GL/glx.h>
-//#include <GL/gl.h>
-//#include <GL/glu.h>
-
-#include <GL/glew.h>
+#include <epoxy/gl.h>
 
 #include <pangolin/pangolin.h>
 #include "KeyFrameDisplay.h"

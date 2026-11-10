@@ -23,7 +23,7 @@
 
 
 #pragma once
-#include <GL/glew.h>
+#include <epoxy/gl.h>
 #include <pangolin/pangolin.h>
 #include "boost/thread.hpp"
 #include "util/MinimalImage.h"
