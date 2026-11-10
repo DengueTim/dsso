@@ -1,5 +1,5 @@
-cmake_minimum_required(VERSION 3.10)
-SET(PROJECT_NAME DSSO)
+cmake_minimum_required(VERSION 3.16)
+SET(PROJECT_NAME DSO)
 
 # On Mac, use gnu gcc over clang. Compiles slower and has missing LD simbols!?
 #set(CMAKE_C_COMPILER "gcc-12")
@@ -7,10 +7,9 @@ SET(PROJECT_NAME DSSO)
 # If ld can't find boost_system do: export LIBRARY_PATH=/opt/homebrew/lib
 
 PROJECT(${PROJECT_NAME})
-CMAKE_MINIMUM_REQUIRED(VERSION 3.14)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 set(CMAKE_BUILD_TYPE Debug)
 #set(CMAKE_BUILD_TYPE Release)
@@ -22,7 +21,7 @@ set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
 # required libraries
 find_package(SuiteParse REQUIRED)
-find_package(Eigen3 3.4...5 REQUIRED)
+find_package(Eigen3 3.4...3.5 REQUIRED)
 #find_package(Boost COMPONENTS system thread)
 find_package(Boost REQUIRED NO_MODULE)
 find_package(GTSAM REQUIRED)
@@ -30,9 +29,9 @@ find_package(GTSAM REQUIRED)
 # Google Test
 include(FetchContent)
 FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/refs/tags/release-1.11.0.zip
-  DOWNLOAD_NO_EXTRACT TRUE
+        googletest
+        URL https://github.com/google/googletest/archive/refs/tags/release-1.11.0.zip
+        DOWNLOAD_NO_EXTRACT TRUE
 )
 # For Windows: Prevent overriding the parent project's compiler/linker settings
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -40,33 +39,31 @@ FetchContent_MakeAvailable(googletest)
 
 # optional libraries
 find_package(LibZip QUIET)
-find_package(Pangolin 0.6 QUIET)
+find_package(Pangolin 0.9 QUIET)
 find_package(OpenCV QUIET)
 
 # flags
 if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin" AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm64") # OSX
-	set(CPU_CXX_FLAG -mcpu=apple-m1)
-    else()
-    	set(CPU_CXX_FLAG -mcpu=x86_64)
-	endif()
-	add_compile_definitions(_OSX_=1)
-else()
-    if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "armv7l") # OSX
-	set(CPU_CXX_FLAG "-march=native -mfpu=neon")
-    else()
-	set(CPU_CXX_FLAG -march=native)
-    endif()
-endif()
+        set(CPU_CXX_FLAG -mcpu=apple-m1)
+    else ()
+        set(CPU_CXX_FLAG -mcpu=x86_64)
+    endif ()
+    add_compile_definitions(_OSX_=1)
+else ()
+    set(CPU_CXX_FLAG -march=native)
+    add_compile_options(-Wno-attributes)
+endif ()
 
 add_definitions("-DENABLE_SSE")
 set(CMAKE_CXX_FLAGS
-   "${SSE_FLAGS} -O1 -g -std=c++0x ${CPU_CXX_FLAG}"
-#   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
+        #   "${SSE_FLAGS} -O -Wall -g -std=c++0x ${CPU_CXX_FLAG}"
+        "${SSE_FLAGS} -O1 -g -std=c++0x ${CPU_CXX_FLAG}"
+        #   "${SSE_FLAGS} -O3 -g -std=c++0x -fno-omit-frame-pointer"
 )
 
 if (MSVC)
-     set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
 endif (MSVC)
 
 # Sources files
@@ -101,11 +98,15 @@ include_directories(
   ${PROJECT_SOURCE_DIR}/tests
 ) 
 
+if (Boost_FOUND)
+    message("--- found Boost (${Boost_VERSION}) in ${Boost_INCLUDE_DIR}")
+endif ()
+
 if (Eigen3_FOUND)
-	get_target_property(Eigen3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
-	message("--- found Eigen3 (${Eigen3_VERSION}) in ${Eigen3_INCLUDE_DIR}")
-	include_directories( ${Eigen3_INCLUDE_DIR} )
-endif()
+    get_target_property(Eigen3_INCLUDE_DIR Eigen3::Eigen INTERFACE_INCLUDE_DIRECTORIES)
+    message("--- found Eigen3 (${Eigen3_VERSION}) in ${Eigen3_INCLUDE_DIR}")
+    include_directories(${Eigen3_INCLUDE_DIR})
+endif ()
 
 # decide if we have pangolin
 if (Pangolin_FOUND)
