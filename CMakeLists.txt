@@ -30,11 +30,9 @@ find_package(GTSAM REQUIRED)
 include(FetchContent)
 FetchContent_Declare(
         googletest
-        URL https://github.com/google/googletest/archive/refs/tags/release-1.11.0.zip
-        DOWNLOAD_NO_EXTRACT TRUE
+        URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
+		DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
-# For Windows: Prevent overriding the parent project's compiler/linker settings
-set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 FetchContent_MakeAvailable(googletest)
 
 # optional libraries
@@ -185,7 +183,7 @@ add_executable(
 target_link_libraries(
   all_tests
   dsso cxsparse ${BOOST_THREAD_LIBRARY} ${LIBZIP_LIBRARY} ${Pangolin_LIBRARIES} ${OpenCV_LIBS} gtsam
-  gtest_main gtest gmock
+  GTest::gtest_main GTest::gtest GTest::gmock
 )
 
 include(GoogleTest)
